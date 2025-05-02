@@ -288,6 +288,9 @@ async def check_reaction(reaction):
         files_list = "\n".join(f"[{a.filename}]({a.url})" for a in non_image_attachments)
         embed.add_field(name="🗂️ Archivos adjuntos", value=files_list, inline=False)
 
+    # Añadir información del mensaje
+    emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
+
     # Añadir salto al mensaje original
     jump_link = f"[Saltar al mensaje]({message.jump_url})"
     embed.add_field(name="🔗 Enlace", value=jump_link, inline=False)
@@ -295,7 +298,6 @@ async def check_reaction(reaction):
 
     # Publicar o actualizar el mensaje en el SkullBoard
     # Crear mensaje de texto fuera del embed
-    emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
     skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
 
 
