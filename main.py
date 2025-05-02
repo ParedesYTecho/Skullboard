@@ -291,19 +291,25 @@ async def check_reaction(reaction):
     # Añadir salto al mensaje original
     jump_link = f"[Saltar al mensaje]({message.jump_url})"
     embed.add_field(name="🔗 Enlace", value=jump_link, inline=False)
-    embed.set_footer(text=f"{reaction.count} 💀")
+    embed.set_footer(text=f"{reaction.count} {emoji}")
 
     # Publicar o actualizar el mensaje en el SkullBoard
+    # Crear mensaje de texto fuera del embed
+    emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
+    skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
+
+
     if message.id not in tracked_messages:
-        sent_msg = await skullboard_channel.send(embed=embed)
+        sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
         tracked_messages[message.id] = sent_msg.id
     else:
         try:
             existing_msg = await skullboard_channel.fetch_message(tracked_messages[message.id])
-            await existing_msg.edit(embed=embed)
+            await existing_msg.edit(content=skullboard_text, embed=embed)
         except discord.NotFound:
-            sent_msg = await skullboard_channel.send(embed=embed)
+            sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
             tracked_messages[message.id] = sent_msg.id
+
 
 ### ========== GESTIÓN DE ERRORES ==========
 @bot.event
