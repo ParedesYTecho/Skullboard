@@ -286,3 +286,4 @@ webserver.keep_alive()
 bot.run(DISCORD_TOKEN)
 # El token y el ID del bot se encuentran en el archivo secrets_1.py
 # Asegúrate de que el archivo config.json esté en la misma carpeta que este script y tenga el siguiente formato:
+#PRUEBA
