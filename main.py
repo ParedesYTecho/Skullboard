@@ -45,6 +45,7 @@ bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 tree = bot.tree
 skull_emoji = '💀'
 tracked_messages = {}
+processing_messages = set()
 
 # Evento de inicio
 @bot.event
@@ -250,83 +251,92 @@ async def on_reaction_remove(reaction, user):
     await check_reaction(reaction)
 
 async def check_reaction(reaction):
-    if reaction.emoji != skull_emoji:
-        return
-
     message = reaction.message
     guild_config = get_guild_config(message.guild.id)
 
-    if reaction.count < guild_config["min_skulls"]:
+    # 🚫 Evitar procesar varias veces el mismo mensaje simultáneamente
+    if message.id in processing_messages:
         return
+    processing_messages.add(message.id)
 
-    skullboard_channel = bot.get_channel(guild_config["skullboard_channel_id"])
-    if not skullboard_channel or not message.guild:
-        return
-
-    # 🚫 Evitar publicar mensajes que ya están en el canal skullboard
-    if message.channel.id == skullboard_channel.id:
-        return
-
-    has_text = bool(message.content.strip())
-    attachments = message.attachments
-
-    # 🖼️ Detectar imagen
-    image_attachment = next(
-        (a for a in attachments if a.content_type and a.content_type.startswith("image/")),
-        None
-    )
-
-    # 🧼 Ignorar mensajes sin texto ni adjuntos
-    if not has_text and not attachments:
-        return
-
-    # 🔧 Crear embed
-    embed = discord.Embed(
-        description=message.content if has_text else None,
-        color=discord.Color.dark_gray()
-    )
-
-    embed.set_author(
-        name=message.author.display_name,
-        icon_url=message.author.avatar.url if message.author.avatar else None
-    )
-
-    if image_attachment:
-        embed.set_image(url=image_attachment.url)
-
-    non_image_attachments = [
-        a for a in attachments
-        if not (a.content_type and a.content_type.startswith("image/"))
-    ]
-
-    if non_image_attachments:
-        files_list = "\n".join(f"[{a.filename}]({a.url})" for a in non_image_attachments)
-        embed.add_field(name="🗂️ Archivos adjuntos", value=files_list, inline=False)
-
-    jump_link = f"[Saltar al mensaje]({message.jump_url})"
-    embed.add_field(name="🔗 Enlace", value=jump_link, inline=False)
-
-    # 🧠 Elegir emoji según cantidad de reacciones
-    emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
-    fecha_formateada = formatear_fecha(message.created_at)
-    embed.set_footer(text=f"{reaction.count} {emoji} • {fecha_formateada}")
-
-
-    # 📝 Mensaje fuera del embed
-    skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
-
-    # 🔄 Si ya existe, edítalo
-    if message.id in tracked_messages:
-        try:
-            existing_msg = await skullboard_channel.fetch_message(tracked_messages[message.id])
-            await existing_msg.edit(content=skullboard_text, embed=embed)
+    try:
+        # 🚫 Ignorar reacciones que no sean 💀
+        if reaction.emoji != skull_emoji:
             return
-        except discord.NotFound:
-            pass  # Si fue borrado, continuamos para volver a enviarlo
 
-    # 🚀 Si no existe, publícalo por primera vez
-    sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
-    tracked_messages[message.id] = sent_msg.id
+        if reaction.count < guild_config["min_skulls"]:
+            return
+
+        skullboard_channel = bot.get_channel(guild_config["skullboard_channel_id"])
+        if not skullboard_channel or not message.guild:
+            return
+
+        # 🚫 Evitar republicar desde el propio canal skullboard
+        if message.channel.id == skullboard_channel.id:
+            return
+
+        has_text = bool(message.content.strip())
+        attachments = message.attachments
+
+        # 🖼️ Detectar imagen
+        image_attachment = next(
+            (a for a in attachments if a.content_type and a.content_type.startswith("image/")),
+            None
+        )
+
+        # 🧼 Ignorar mensajes vacíos
+        if not has_text and not attachments:
+            return
+
+        # 🔧 Crear embed
+        embed = discord.Embed(
+            description=message.content if has_text else None,
+            color=discord.Color.dark_gray()
+        )
+
+        embed.set_author(
+            name=message.author.display_name,
+            icon_url=message.author.avatar.url if message.author.avatar else None
+        )
+
+        if image_attachment:
+            embed.set_image(url=image_attachment.url)
+
+        non_image_attachments = [
+            a for a in attachments
+            if not (a.content_type and a.content_type.startswith("image/"))
+        ]
+
+        if non_image_attachments:
+            files_list = "\n".join(f"[{a.filename}]({a.url})" for a in non_image_attachments)
+            embed.add_field(name="🗂️ Archivos adjuntos", value=files_list, inline=False)
+
+        jump_link = f"[Saltar al mensaje]({message.jump_url})"
+        embed.add_field(name="🔗 Enlace", value=jump_link, inline=False)
+
+        # 🧠 Emoji y fecha
+        emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
+        fecha_formateada = formatear_fecha(message.created_at)
+        embed.set_footer(text=f"{reaction.count} {emoji} • {fecha_formateada}")
+
+        # 📝 Texto fuera del embed
+        skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
+
+        # 🔄 Si ya existe, edítalo
+        if message.id in tracked_messages:
+            try:
+                existing_msg = await skullboard_channel.fetch_message(tracked_messages[message.id])
+                await existing_msg.edit(content=skullboard_text, embed=embed)
+                return
+            except discord.NotFound:
+                pass
+
+        # 🚀 Publicar por primera vez
+        sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
+        tracked_messages[message.id] = sent_msg.id
+
+    finally:
+        processing_messages.discard(message.id)
 
 ### ========== GESTIÓN DE ERRORES ==========
 @bot.event
