@@ -240,31 +240,71 @@ async def on_reaction_remove(reaction, user):
 async def check_reaction(reaction):
     if reaction.emoji != skull_emoji:
         return
-    message = reaction.message 
-    guild_config = get_guild_config(reaction.message.guild.id)
 
-    if reaction.count >= guild_config['min_skulls']:
-        skullboard_channel = bot.get_channel(guild_config["skullboard_channel_id"])
+    message = reaction.message
+    guild_config = get_guild_config(message.guild.id)
 
-        if not skullboard_channel or not message.guild:
-            return
+    if reaction.count < guild_config["min_skulls"]:
+        return
 
-        jump_link = f"[Click para ver mensaje]({message.jump_url})"
-        embed = discord.Embed(description=message.content or "*Mensaje vacío*", color=discord.Color.dark_gray())
-        embed.set_author(name=message.author.display_name, icon_url=message.author.avatar.url if message.author.avatar else None)
-        embed.add_field(name="Saltar al mensaje", value=jump_link, inline=False)
-        embed.set_footer(text=f"{reaction.count} 💀")
+    skullboard_channel = bot.get_channel(guild_config["skullboard_channel_id"])
+    if not skullboard_channel or not message.guild:
+        return
 
-        if message.id not in tracked_messages:
+    has_text = bool(message.content.strip())
+    attachments = message.attachments
+
+    # Detectar si hay alguna imagen
+    image_attachment = next(
+        (a for a in attachments if a.content_type and a.content_type.startswith("image/")),
+        None
+    )
+
+    # Si no hay texto ni archivos, no publicamos
+    if not has_text and not attachments:
+        return
+
+    embed = discord.Embed(
+        description=message.content if has_text else None,
+        color=discord.Color.dark_gray()
+    )
+
+    embed.set_author(
+        name=message.author.display_name,
+        icon_url=message.author.avatar.url if message.author.avatar else None
+    )
+
+    # Añadir imagen si la hay
+    if image_attachment:
+        embed.set_image(url=image_attachment.url)
+
+    # Añadir enlaces a archivos no visuales
+    non_image_attachments = [
+        a for a in attachments
+        if not (a.content_type and a.content_type.startswith("image/"))
+    ]
+
+    if non_image_attachments:
+        files_list = "\n".join(f"[{a.filename}]({a.url})" for a in non_image_attachments)
+        embed.add_field(name="🗂️ Archivos adjuntos", value=files_list, inline=False)
+
+    # Añadir salto al mensaje original
+    jump_link = f"[Saltar al mensaje]({message.jump_url})"
+    embed.add_field(name="🔗 Enlace", value=jump_link, inline=False)
+    embed.set_footer(text=f"{reaction.count} 💀")
+
+    # Publicar o actualizar el mensaje en el SkullBoard
+    if message.id not in tracked_messages:
+        sent_msg = await skullboard_channel.send(embed=embed)
+        tracked_messages[message.id] = sent_msg.id
+    else:
+        try:
+            existing_msg = await skullboard_channel.fetch_message(tracked_messages[message.id])
+            await existing_msg.edit(embed=embed)
+        except discord.NotFound:
             sent_msg = await skullboard_channel.send(embed=embed)
             tracked_messages[message.id] = sent_msg.id
-        else:
-            try:
-                existing_msg = await skullboard_channel.fetch_message(tracked_messages[message.id])
-                await existing_msg.edit(embed=embed)
-            except discord.NotFound:
-                sent_msg = await skullboard_channel.send(embed=embed)
-                tracked_messages[message.id] = sent_msg.id
+
 ### ========== GESTIÓN DE ERRORES ==========
 @bot.event
 async def on_command_error(ctx, error):
@@ -286,4 +326,3 @@ webserver.keep_alive()
 bot.run(DISCORD_TOKEN)
 # El token y el ID del bot se encuentran en el archivo secrets_1.py
 # Asegúrate de que el archivo config.json esté en la misma carpeta que este script y tenga el siguiente formato:
-#PRUEBA
