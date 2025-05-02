@@ -266,12 +266,13 @@ async def on_reaction_remove(reaction, user):
 
 async def check_reaction(reaction):
     message = reaction.message
+    message_id = str(message.id)  # 🔑 Convertimos a string
     guild_config = get_guild_config(message.guild.id)
 
     # 🚫 Evitar procesar varias veces el mismo mensaje simultáneamente
-    if message.id in processing_messages:
+    if message_id in processing_messages:
         return
-    processing_messages.add(message.id)
+    processing_messages.add(message_id)
 
     try:
         # 🚫 Ignorar reacciones que no sean 💀
@@ -337,21 +338,21 @@ async def check_reaction(reaction):
         skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
 
         # 🔄 Si ya existe, edítalo
-        if message.id in tracked_messages:
+        if message_id in tracked_messages:
             try:
-                existing_msg = await skullboard_channel.fetch_message(tracked_messages[message.id])
+                existing_msg = await skullboard_channel.fetch_message(tracked_messages[message_id])
                 await existing_msg.edit(content=skullboard_text, embed=embed)
                 return
             except discord.NotFound:
-                pass
+                pass  # Si fue borrado, continuamos para volver a enviarlo
 
         # 🚀 Publicar por primera vez
         sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
-        tracked_messages[message.id] = sent_msg.id
+        tracked_messages[message_id] = sent_msg.id
         save_tracked_messages()
 
     finally:
-        processing_messages.discard(message.id)
+        processing_messages.discard(message_id)
 
 ### ========== GESTIÓN DE ERRORES ==========
 @bot.event
