@@ -276,7 +276,7 @@ async def check_reaction(reaction):
 
     try:
         # 🚫 Ignorar reacciones que no sean 💀
-        if reaction.emoji != skull_emoji:
+        if str(reaction.emoji) != skull_emoji:
             return
 
         if reaction.count < guild_config["min_skulls"]:
