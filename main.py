@@ -21,6 +21,19 @@ def save_config(data):
     with open('config.json', 'w') as f:
         json.dump(data, f, indent=4)
 
+# Cargar mensajes rastreados del JSON
+def load_tracked_messages():
+    try:
+        with open("tracked_messages.json", "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+# Guardar mensajes rastreados al JSON
+def save_tracked_messages():
+    with open("tracked_messages.json", "w") as f:
+        json.dump(tracked_messages, f, indent=4)
+
 # Obtener o crear config para un servidor específico
 def get_guild_config(guild_id):
     guild_id = str(guild_id)
@@ -44,7 +57,7 @@ intents.messages = True
 bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
 tree = bot.tree
 skull_emoji = '💀'
-tracked_messages = {}
+tracked_messages = load_tracked_messages()
 processing_messages = set()
 
 # Evento de inicio
@@ -53,7 +66,8 @@ async def on_ready():
     await tree.sync()
     print("✅ Comandos de barra sincronizados")
     print(f'🔧 Bot conectado como {bot.user.name} - {bot.user.id}')
-
+    print(f'📌 Mensajes rastreados cargados: {len(tracked_messages)}')
+    print(f'🗂️ Configuración cargada: {len(config)} servidores')
 
 ### ========== COMANDOS CON PREFIJO ==========
 @bot.command()
@@ -334,6 +348,7 @@ async def check_reaction(reaction):
         # 🚀 Publicar por primera vez
         sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
         tracked_messages[message.id] = sent_msg.id
+        save_tracked_messages()
 
     finally:
         processing_messages.discard(message.id)
