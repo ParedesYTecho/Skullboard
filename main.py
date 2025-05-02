@@ -332,7 +332,7 @@ async def check_reaction(reaction):
         # 🧠 Emoji y fecha
         emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
         fecha_formateada = formatear_fecha(message.created_at)
-        embed.set_footer(text=f"{reaction.count} {emoji} • {fecha_formateada}")
+        embed.set_footer(text=f"{reaction.count} {emoji}  •  {fecha_formateada}")
 
         # 📝 Texto fuera del embed
         skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
