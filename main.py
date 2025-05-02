@@ -4,6 +4,7 @@ from discord import app_commands
 import json
 import os
 import webserver
+from datetime import datetime, timezone, timedelta
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
@@ -121,6 +122,17 @@ async def invite(ctx):
     )
     await ctx.send(embed=embed)
 
+def formatear_fecha(fecha: datetime) -> str:
+    ahora = datetime.now(timezone.utc)
+    diferencia = ahora.date() - fecha.date()
+    hora_min = fecha.strftime("%H:%M")
+
+    if diferencia.days == 0:
+        return f"Hoy a las {hora_min}"
+    elif diferencia.days == 1:
+        return f"Ayer a las {hora_min}"
+    else:
+        return fecha.strftime("%d/%m/%Y %H:%M")
 
 ### ========== COMANDOS DE BARRA ==========
 @tree.command(name="ajustes", description="Muestra los ajustes actuales del bot")
@@ -251,19 +263,24 @@ async def check_reaction(reaction):
     if not skullboard_channel or not message.guild:
         return
 
+    # 🚫 Evitar publicar mensajes que ya están en el canal skullboard
+    if message.channel.id == skullboard_channel.id:
+        return
+
     has_text = bool(message.content.strip())
     attachments = message.attachments
 
-    # Detectar si hay alguna imagen
+    # 🖼️ Detectar imagen
     image_attachment = next(
         (a for a in attachments if a.content_type and a.content_type.startswith("image/")),
         None
     )
 
-    # Si no hay texto ni archivos, no publicamos
+    # 🧼 Ignorar mensajes sin texto ni adjuntos
     if not has_text and not attachments:
         return
 
+    # 🔧 Crear embed
     embed = discord.Embed(
         description=message.content if has_text else None,
         color=discord.Color.dark_gray()
@@ -274,11 +291,9 @@ async def check_reaction(reaction):
         icon_url=message.author.avatar.url if message.author.avatar else None
     )
 
-    # Añadir imagen si la hay
     if image_attachment:
         embed.set_image(url=image_attachment.url)
 
-    # Añadir enlaces a archivos no visuales
     non_image_attachments = [
         a for a in attachments
         if not (a.content_type and a.content_type.startswith("image/"))
@@ -288,30 +303,30 @@ async def check_reaction(reaction):
         files_list = "\n".join(f"[{a.filename}]({a.url})" for a in non_image_attachments)
         embed.add_field(name="🗂️ Archivos adjuntos", value=files_list, inline=False)
 
-    # Añadir información del mensaje
-    emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
-
-    # Añadir salto al mensaje original
     jump_link = f"[Saltar al mensaje]({message.jump_url})"
     embed.add_field(name="🔗 Enlace", value=jump_link, inline=False)
-    embed.set_footer(text=f"{reaction.count} {emoji}")
 
-    # Publicar o actualizar el mensaje en el SkullBoard
-    # Crear mensaje de texto fuera del embed
+    # 🧠 Elegir emoji según cantidad de reacciones
+    emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
+    fecha_formateada = formatear_fecha(message.created_at)
+    embed.set_footer(text=f"{reaction.count} {emoji} • {fecha_formateada}")
+
+
+    # 📝 Mensaje fuera del embed
     skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
 
-
-    if message.id not in tracked_messages:
-        sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
-        tracked_messages[message.id] = sent_msg.id
-    else:
+    # 🔄 Si ya existe, edítalo
+    if message.id in tracked_messages:
         try:
             existing_msg = await skullboard_channel.fetch_message(tracked_messages[message.id])
             await existing_msg.edit(content=skullboard_text, embed=embed)
+            return
         except discord.NotFound:
-            sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
-            tracked_messages[message.id] = sent_msg.id
+            pass  # Si fue borrado, continuamos para volver a enviarlo
 
+    # 🚀 Si no existe, publícalo por primera vez
+    sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
+    tracked_messages[message.id] = sent_msg.id
 
 ### ========== GESTIÓN DE ERRORES ==========
 @bot.event
