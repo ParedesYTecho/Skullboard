@@ -40,10 +40,15 @@ def get_guild_config(guild_id):
     if guild_id not in config:
         config[guild_id] = {
             "skullboard_channel_id": 0,
-            "min_skulls": 1
+            "min_skulls": 1,
+            "prefix": "sk!"
         }
         save_config(config)
+    if "prefix" not in config[guild_id]:
+        config[guild_id]["prefix"] = "sk!"
+        save_config(config)
     return config[guild_id]
+
 
 config = load_config()
 
@@ -54,11 +59,26 @@ intents.guilds = True
 intents.members = True
 intents.messages = True
 
-bot = commands.Bot(command_prefix='!', intents=intents, help_command=None)
+async def get_prefix(bot, message):
+    if not message.guild:
+        return "sk!"  # predeterminado para DMs
+    guild_config = get_guild_config(message.guild.id)
+    return guild_config.get("prefix", "sk!")
+
+
+bot = commands.Bot(command_prefix=get_prefix, intents=intents, help_command=None)
+
 tree = bot.tree
 skull_emoji = '💀'
 tracked_messages = load_tracked_messages()
 processing_messages = set()
+
+def get_formatted_prefix(ctx_or_interaction) -> str:
+    if isinstance(ctx_or_interaction, discord.Interaction):
+        guild_id = ctx_or_interaction.guild.id
+    else:
+        guild_id = ctx_or_interaction.guild.id
+    return get_guild_config(guild_id).get("prefix", "sk!")
 
 # Evento de inicio
 @bot.event
@@ -71,6 +91,18 @@ async def on_ready():
 
 ### ========== COMANDOS CON PREFIJO ==========
 @bot.command()
+@commands.has_permissions(administrator=True)
+async def set_prefix(ctx, nuevo_prefijo: str = None):
+    if not nuevo_prefijo:
+        await ctx.send("❌ Debes proporcionar un nuevo prefijo. Ejemplo: `sk!set_prefix ?`")
+        return
+
+    guild_config = get_guild_config(ctx.guild.id)
+    guild_config["prefix"] = nuevo_prefijo
+    save_config(config)
+    await ctx.send(f"✅ Prefijo actualizado a `{nuevo_prefijo}`")
+
+@bot.command()
 async def ajustes(ctx):
     await send_ajustes_embed(ctx)
 
@@ -78,7 +110,7 @@ async def ajustes(ctx):
 @commands.has_permissions(administrator=True)
 async def set_channel(ctx, channel: discord.TextChannel = None):
     if channel is None:
-        await ctx.send("❌ Debes mencionar un canal válido. Ejemplo: `!set_channel #nombre-del-canal`")
+        await ctx.send("❌ Debes mencionar un canal válido. Ejemplo: `sk!set_channel #nombre-del-canal`")
         return
 
     guild_config = get_guild_config(ctx.guild.id)
@@ -90,7 +122,7 @@ async def set_channel(ctx, channel: discord.TextChannel = None):
 @commands.has_permissions(administrator=True)
 async def set_min(ctx, cantidad: int = None):
     if cantidad is None or cantidad <= 0:
-        await ctx.send("❌ Debes proporcionar una cantidad válida mayor que 0. Ejemplo: `!set_min 3`")
+        await ctx.send("❌ Debes proporcionar una cantidad válida mayor que 0. Ejemplo: `sk!set_min 3`")
         return
 
     guild_config = get_guild_config(ctx.guild.id)
@@ -99,23 +131,29 @@ async def set_min(ctx, cantidad: int = None):
     await ctx.send(f"✅ Reacciones mínimas actualizadas a {cantidad}")
 
 
+
 @bot.command()
 async def help(ctx):
+    prefix = get_formatted_prefix(ctx)
+
     embed = discord.Embed(
         title="📖 Lista de comandos - SkullBoard",
         description="Aquí tienes los comandos disponibles del bot.",
         color=discord.Color.teal()
     )
-    embed.add_field(name="!ajustes", value="📋 Ver configuración del bot.", inline=False)
-    embed.add_field(name="!set_channel", value="📌 Establece el canal de SkullBoard.", inline=False)
-    embed.add_field(name="!set_min", value="💀 Cambia el mínimo de reacciones.", inline=False)
-    embed.add_field(name="!ping", value="🏓 Ver latencia del bot.", inline=False)
-    embed.add_field(name="!invite", value="🔗 Invita al bot a tu servidor.", inline=False)
-    embed.add_field(name="!help", value="❓ Muestra esta ayuda.", inline=False)
+    embed.add_field(name=f"{prefix}ajustes", value="📋 Ver configuración del bot.", inline=False)
+    embed.add_field(name=f"{prefix}set_channel 🔒", value="📌 Establece el canal de SkullBoard.", inline=False)
+    embed.add_field(name=f"{prefix}set_min 🔒", value="💀 Cambia el mínimo de reacciones.", inline=False)
+    embed.add_field(name=f"{prefix}set_prefix 🔒", value="✏️ Cambia el prefijo del bot.", inline=False)
+    embed.add_field(name=f"{prefix}ping", value="🏓 Ver latencia del bot.", inline=False)
+    embed.add_field(name=f"{prefix}invite", value="🔗 Invita al bot a tu servidor.", inline=False)
+    embed.add_field(name=f"{prefix}help", value="❓ Muestra esta ayuda.", inline=False)
 
-    embed.set_footer(text="Todos los comandos son accesibles con barra (/).")
+    embed.set_footer(text="🔒 Requiere permisos de administrador • También puedes usar los comandos con barra (/).")
     embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else None)
     await ctx.send(embed=embed)
+
+
 
 @bot.command()
 async def ping(ctx):
@@ -150,6 +188,21 @@ def formatear_fecha(fecha: datetime) -> str:
         return fecha.strftime("%d/%m/%Y %H:%M")
 
 ### ========== COMANDOS DE BARRA ==========
+@tree.command(name="set_prefix", description="Cambia el prefijo de comandos del bot (admin)")
+@app_commands.describe(nuevo_prefijo="El nuevo prefijo que quieres usar")
+async def set_prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message(
+            "❌ Necesitas permisos de **Administrador** para usar este comando.",
+            ephemeral=True
+        )
+        return
+
+    guild_config = get_guild_config(interaction.guild.id)
+    guild_config["prefix"] = nuevo_prefijo
+    save_config(config)
+    await interaction.response.send_message(f"✅ Prefijo actualizado a `{nuevo_prefijo}`")
+
 @tree.command(name="ajustes", description="Muestra los ajustes actuales del bot")
 async def ajustes_slash(interaction: discord.Interaction):
     await send_ajustes_embed(interaction)
@@ -206,22 +259,24 @@ async def invite_slash(interaction: discord.Interaction):
 
 @tree.command(name="help", description="Muestra los comandos disponibles del bot")
 async def help_slash(interaction: discord.Interaction):
+    prefix = get_formatted_prefix(interaction)
+
     embed = discord.Embed(
         title="📖 Lista de comandos - SkullBoard",
         description="Aquí tienes los comandos disponibles del bot.",
         color=discord.Color.teal()
     )
     embed.add_field(name="/ajustes", value="📋 Ver configuración del bot.", inline=False)
-    embed.add_field(name="/set_channel", value="📌 Establece el canal de SkullBoard.", inline=False)
-    embed.add_field(name="/set_min", value="💀 Cambia el mínimo de reacciones.", inline=False)
+    embed.add_field(name="/set_channel 🔒", value="📌 Establece el canal de SkullBoard.", inline=False)
+    embed.add_field(name="/set_min 🔒", value="💀 Cambia el mínimo de reacciones.", inline=False)
+    embed.add_field(name="/set_prefix 🔒", value="✏️ Cambia el prefijo del bot.", inline=False)
     embed.add_field(name="/ping", value="🏓 Ver latencia del bot.", inline=False)
     embed.add_field(name="/invite", value="🔗 Invita al bot a tu servidor.", inline=False)
 
-    embed.set_footer(text="También puedes usar los comandos con `!` si lo prefieres.")
+    embed.set_footer(text=f"🔒 Requiere permisos de administrador • También puedes usar los comandos con `{prefix}` si lo prefieres.")
     embed.set_thumbnail(url=bot.user.avatar.url if bot.user.avatar else None)
 
     await interaction.response.send_message(embed=embed)
-
 
 ### ========== FUNCIONES COMUNES ==========
 
@@ -238,6 +293,7 @@ async def send_ajustes_embed(dest):
 
     guild_config = get_guild_config(guild_id)
     skull_channel = bot.get_channel(guild_config["skullboard_channel_id"])
+    prefix = guild_config.get("prefix", "sk!")
 
     embed = discord.Embed(
         title="⚙️ Ajustes del SkullBoard",
@@ -246,6 +302,7 @@ async def send_ajustes_embed(dest):
     )
     embed.add_field(name="📌 Canal configurado", value=skull_channel.mention if skull_channel else "❌ No configurado", inline=False)
     embed.add_field(name="🔧 Reacciones mínimas", value=f"{guild_config['min_skulls']} 💀", inline=False)
+    embed.add_field(name="✏️ Prefijo actual", value=f"`{prefix}`", inline=False)
     embed.add_field(name="🏓 Latencia", value=f"{round(bot.latency * 1000)}ms", inline=False)
     embed.add_field(name="🔗 Invitación", value=f"[Invitar SkullBoard]({get_invite_url()})", inline=False)
 
@@ -253,6 +310,7 @@ async def send_ajustes_embed(dest):
         await dest.response.send_message(embed=embed)
     else:
         await dest.send(embed=embed)
+
 
 
 ### ========== EVENTOS DE REACCIÓN ==========
@@ -362,9 +420,11 @@ async def on_command_error(ctx, error):
     elif isinstance(error, commands.BadArgument):
         await ctx.send("❌ Argumento inválido. Verifica el tipo de dato o el formato.")
     elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("❌ Faltan argumentos. Usa `!help` para ver cómo se usa el comando.")
+        prefix = get_formatted_prefix(ctx)
+        await ctx.send(f"❌ Faltan argumentos. Usa `{prefix}help` para ver cómo se usa el comando.")
     elif isinstance(error, commands.CommandNotFound):
-        await ctx.send("❌ Ese comando no existe. Usa `!help` para ver los comandos disponibles.")
+        prefix = get_formatted_prefix(ctx)
+        await ctx.send(f"❌ Ese comando no existe. Usa `{prefix}help` para ver los comandos disponibles.")
     else:
         raise error  # Útil para depurar errores inesperados
 
