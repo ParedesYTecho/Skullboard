@@ -83,13 +83,19 @@ def get_formatted_prefix(ctx_or_interaction) -> str:
 # Evento de inicio
 @bot.event
 async def on_ready():
-    await tree.sync()
-    print("✅ Comandos de barra sincronizados")
     print(f'🔧 Bot conectado como {bot.user.name} - {bot.user.id}')
     print(f'📌 Mensajes rastreados cargados: {len(tracked_messages)}')
     print(f'🗂️ Configuración cargada: {len(config)} servidores')
 
+    for guild in bot.guilds:
+        try:
+            synced = await tree.sync(guild=guild)
+            print(f"✅ Slash commands sincronizados en: {guild.name} ({guild.id}) → {len(synced)} comandos")
+        except Exception as e:
+            print(f"❌ Error al sincronizar en {guild.name} ({guild.id}): {e}")
+
 ### ========== COMANDOS CON PREFIJO ==========
+
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def set_prefix(ctx, nuevo_prefijo: str = None):
@@ -188,6 +194,7 @@ def formatear_fecha(fecha: datetime) -> str:
         return fecha.strftime("%d/%m/%Y %H:%M")
 
 ### ========== COMANDOS DE BARRA ==========
+
 @tree.command(name="set_prefix", description="Cambia el prefijo de comandos del bot (admin)")
 @app_commands.describe(nuevo_prefijo="El nuevo prefijo que quieres usar")
 async def set_prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
