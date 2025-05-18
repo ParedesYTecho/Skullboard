@@ -84,6 +84,9 @@ def get_formatted_prefix(ctx_or_interaction) -> str:
 @bot.event
 async def on_ready():
     print(f'🔧 Bot conectado como {bot.user.name} - {bot.user.id}')
+    print(f'🟢 Está presente en {len(bot.guilds)} servidores:')
+    for guild in bot.guilds:
+        print(f" - {guild.name} ({guild.id})")
     print(f'📌 Mensajes rastreados cargados: {len(tracked_messages)}')
     print(f'🗂️ Configuración cargada: {len(config)} servidores')
 
