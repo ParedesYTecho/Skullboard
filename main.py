@@ -331,16 +331,14 @@ async def on_reaction_remove(reaction, user):
 
 async def check_reaction(reaction):
     message = reaction.message
-    message_id = str(message.id)  # 🔑 Convertimos a string
+    message_id = str(message.id)
     guild_config = get_guild_config(message.guild.id)
 
-    # 🚫 Evitar procesar varias veces el mismo mensaje simultáneamente
     if message_id in processing_messages:
         return
     processing_messages.add(message_id)
 
     try:
-        # 🚫 Ignorar reacciones que no sean 💀
         if str(reaction.emoji) != skull_emoji:
             return
 
@@ -351,29 +349,39 @@ async def check_reaction(reaction):
         if not skullboard_channel or not message.guild:
             return
 
-        # 🚫 Evitar republicar desde el propio canal skullboard
         if message.channel.id == skullboard_channel.id:
             return
 
         has_text = bool(message.content.strip())
         attachments = message.attachments
 
-        # 🖼️ Detectar imagen
+        # Detectar imagen
         image_attachment = next(
             (a for a in attachments if a.content_type and a.content_type.startswith("image/")),
             None
         )
 
-        # 🧼 Ignorar mensajes vacíos
-        if not has_text and not attachments:
+        # Ignorar mensajes vacíos
+        if not has_text and not attachments and not message.embeds:
             return
 
-        # 🔧 Crear embed
-        embed = discord.Embed(
-            description=message.content if has_text else None,
-            color=discord.Color.dark_gray()
+        # Detectar si es solo un enlace que debería estar fuera del embed
+        contenido = message.content.strip()
+        solo_un_link = (
+            has_text and
+            len(contenido.split()) == 1 and
+            contenido.startswith("http")
         )
 
+        # Emoji y fecha
+        emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
+        fecha_formateada = formatear_fecha(message.created_at)
+
+        # Construir embed
+        embed = discord.Embed(
+            description=message.content if has_text and not solo_un_link else None,
+            color=discord.Color.dark_gray()
+        )
         embed.set_author(
             name=message.author.display_name,
             icon_url=message.author.avatar.url if message.author.avatar else None
@@ -386,39 +394,35 @@ async def check_reaction(reaction):
             a for a in attachments
             if not (a.content_type and a.content_type.startswith("image/"))
         ]
-
         if non_image_attachments:
             files_list = "\n".join(f"[{a.filename}]({a.url})" for a in non_image_attachments)
             embed.add_field(name="🗂️ Archivos adjuntos", value=files_list, inline=False)
 
         jump_link = f"[Saltar al mensaje]({message.jump_url})"
         embed.add_field(name="🔗 Enlace", value=jump_link, inline=False)
-
-        # 🧠 Emoji y fecha
-        emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
-        fecha_formateada = formatear_fecha(message.created_at)
         embed.set_footer(text=f"{reaction.count} {emoji}  •  {fecha_formateada}")
 
-        # 📝 Texto fuera del embed
+        # Texto del mensaje fuera del embed
         skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
+        if solo_un_link:
+            skullboard_text += f"\n{contenido}"
 
-        # 🔄 Si ya existe, edítalo
+        # Publicar o editar el mensaje
         if message_id in tracked_messages:
             try:
                 existing_msg = await skullboard_channel.fetch_message(tracked_messages[message_id])
                 await existing_msg.edit(content=skullboard_text, embed=embed)
                 return
             except discord.NotFound:
-                pass  # Si fue borrado, continuamos para volver a enviarlo
+                pass
 
-        # 🚀 Publicar por primera vez
         sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
         tracked_messages[message_id] = sent_msg.id
         save_tracked_messages()
 
     finally:
         processing_messages.discard(message_id)
-
+    
 ### ========== GESTIÓN DE ERRORES ==========
 @bot.event
 async def on_command_error(ctx, error):
