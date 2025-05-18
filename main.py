@@ -87,9 +87,7 @@ async def on_ready():
     logging.info(f'🔧 Bot conectado como {bot.user.name} - {bot.user.id}')
     logging.info(f'📌 Mensajes rastreados cargados: {len(tracked_messages)}')
     logging.info(f'🗂️ Configuración cargada: {len(config)} servidores')
-    logging.info(f'🤖 Estoy en {len(bot.guilds)} servidores:')
-    for guild in bot.guilds:
-        logging.info(f" - {guild.name} (ID: {guild.id})")
+    logging.info(f'🤖 Estoy en {len(bot.guilds)} servidores.')
 
     for guild in bot.guilds:
         try:
