@@ -1,12 +1,13 @@
 import discord
-from discord.ext import commands
-from discord import app_commands
+import logging
 import json
 import os
 import webserver
 from datetime import datetime, timezone, timedelta
-
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+from discord.ext import commands
+from discord import app_commands
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN") # Token del bot adquirido en Render
+logging.basicConfig(level=logging.INFO) # Configurar el nivel de logging
 
 # Cargar toda la config
 def load_config():
@@ -83,26 +84,21 @@ def get_formatted_prefix(ctx_or_interaction) -> str:
 # Evento de inicio
 @bot.event
 async def on_ready():
-    import time
-    print("⏳ Esperando a que el bot esté completamente listo...")
-    await bot.wait_until_ready()
-    time.sleep(1)  # Forzar espera mínima por si Render lo trunca
-
-    print(f'🔧 Bot conectado como {bot.user.name} - {bot.user.id}')
-    print(f'📌 Mensajes rastreados cargados: {len(tracked_messages)}')
-    print(f'🗂️ Configuración cargada: {len(config)} servidores')
-    print(f'🤖 Estoy en {len(bot.guilds)} servidores:')
+    logging.info(f'🔧 Bot conectado como {bot.user.name} - {bot.user.id}')
+    logging.info(f'📌 Mensajes rastreados cargados: {len(tracked_messages)}')
+    logging.info(f'🗂️ Configuración cargada: {len(config)} servidores')
+    logging.info(f'🤖 Estoy en {len(bot.guilds)} servidores:')
     for guild in bot.guilds:
-        print(f" - {guild.name} (ID: {guild.id})")
+        logging.info(f" - {guild.name} (ID: {guild.id})")
 
     for guild in bot.guilds:
         try:
             synced = await tree.sync(guild=guild)
-            print(f"✅ Slash commands sincronizados en: {guild.name} ({guild.id}) → {len(synced)} comandos")
+            logging.info(f"✅ Slash commands sincronizados en: {guild.name} ({guild.id}) → {len(synced)} comandos")
         except Exception as e:
-            print(f"❌ Error al sincronizar en {guild.name} ({guild.id}): {e}")
-
-    print("🔗 Bot en línea y listo para recibir comandos.")
+            logging.error(f"❌ Error al sincronizar en {guild.name} ({guild.id}): {e}")
+    
+    logging.info("🔗 Bot en línea y listo para recibir comandos.")
 
 ### ========== COMANDOS CON PREFIJO ==========
 
