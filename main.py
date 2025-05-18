@@ -84,11 +84,11 @@ def get_formatted_prefix(ctx_or_interaction) -> str:
 @bot.event
 async def on_ready():
     print(f'🔧 Bot conectado como {bot.user.name} - {bot.user.id}')
-    print(f'🟢 Está presente en {len(bot.guilds)} servidores:')
-    for guild in bot.guilds:
-        print(f" - {guild.name} ({guild.id})")
     print(f'📌 Mensajes rastreados cargados: {len(tracked_messages)}')
     print(f'🗂️ Configuración cargada: {len(config)} servidores')
+    print(f'🤖 Estoy en {len(bot.guilds)} servidores:')
+    for guild in bot.guilds:
+        print(f" - {guild.name} (ID: {guild.id})")
 
     for guild in bot.guilds:
         try:
@@ -96,7 +96,7 @@ async def on_ready():
             print(f"✅ Slash commands sincronizados en: {guild.name} ({guild.id}) → {len(synced)} comandos")
         except Exception as e:
             print(f"❌ Error al sincronizar en {guild.name} ({guild.id}): {e}")
-
+    print("🔗 Bot en línea y listo para recibir comandos.")
 ### ========== COMANDOS CON PREFIJO ==========
 
 @bot.command()
@@ -334,55 +334,53 @@ async def on_reaction_remove(reaction, user):
 
 async def check_reaction(reaction):
     message = reaction.message
-    message_id = str(message.id)
+    message_id = str(message.id)  # Usamos el ID como string para el diccionario
     guild_config = get_guild_config(message.guild.id)
 
+    # 🚫 Evitar procesar varias veces el mismo mensaje al mismo tiempo
     if message_id in processing_messages:
         return
     processing_messages.add(message_id)
 
     try:
+        # 💀 Solo procesar reacciones con el emoji correspondiente
         if str(reaction.emoji) != skull_emoji:
             return
 
+        # 📉 Verificar si se alcanzó el umbral mínimo de reacciones
         if reaction.count < guild_config["min_skulls"]:
             return
 
+        # 📍 Obtener el canal destino del SkullBoard
         skullboard_channel = bot.get_channel(guild_config["skullboard_channel_id"])
         if not skullboard_channel or not message.guild:
             return
 
+        # 🚫 Evitar republicar mensajes que ya están en el canal SkullBoard
         if message.channel.id == skullboard_channel.id:
             return
 
+        # ✅ Verificar si el mensaje tiene texto o adjuntos
         has_text = bool(message.content.strip())
         attachments = message.attachments
 
-        # Detectar imagen
+        # 🖼️ Buscar la primera imagen adjunta (si existe)
         image_attachment = next(
             (a for a in attachments if a.content_type and a.content_type.startswith("image/")),
             None
         )
 
-        # Ignorar mensajes vacíos
-        if not has_text and not attachments and not message.embeds:
+        # 🧼 Ignorar mensajes completamente vacíos
+        if not has_text and not attachments:
             return
 
-        # Detectar si es solo un enlace que debería estar fuera del embed
-        contenido = message.content.strip()
-        solo_un_link = (
-            has_text and
-            len(contenido.split()) == 1 and
-            contenido.startswith("http")
-        )
-
-        # Emoji y fecha
+        # 🧠 Elegir emoji según la cantidad de reacciones
         emoji = "☠️" if reaction.count >= guild_config["min_skulls"] * 2 else "💀"
         fecha_formateada = formatear_fecha(message.created_at)
 
-        # Construir embed
+        # 📦 Crear el embed para mostrar el contenido
         embed = discord.Embed(
-            description=message.content if has_text and not solo_un_link else None,
+            description=message.content if has_text else None,
             color=discord.Color.dark_gray()
         )
         embed.set_author(
@@ -393,6 +391,7 @@ async def check_reaction(reaction):
         if image_attachment:
             embed.set_image(url=image_attachment.url)
 
+        # 📎 Adjuntar archivos no-imagen como enlaces
         non_image_attachments = [
             a for a in attachments
             if not (a.content_type and a.content_type.startswith("image/"))
@@ -401,31 +400,33 @@ async def check_reaction(reaction):
             files_list = "\n".join(f"[{a.filename}]({a.url})" for a in non_image_attachments)
             embed.add_field(name="🗂️ Archivos adjuntos", value=files_list, inline=False)
 
+        # 🔗 Agregar enlace al mensaje original
         jump_link = f"[Saltar al mensaje]({message.jump_url})"
         embed.add_field(name="🔗 Enlace", value=jump_link, inline=False)
+
+        # 🦶 Pie de embed con info de reacciones y fecha
         embed.set_footer(text=f"{reaction.count} {emoji}  •  {fecha_formateada}")
 
-        # Texto del mensaje fuera del embed
+        # ✏️ Texto visible fuera del embed
         skullboard_text = f"{emoji} {reaction.count} | {message.channel.mention}"
-        if solo_un_link:
-            skullboard_text += f"\n{contenido}"
 
-        # Publicar o editar el mensaje
+        # 🔄 Si ya existe en el SkullBoard, editar
         if message_id in tracked_messages:
             try:
                 existing_msg = await skullboard_channel.fetch_message(tracked_messages[message_id])
                 await existing_msg.edit(content=skullboard_text, embed=embed)
                 return
             except discord.NotFound:
-                pass
+                pass  # Si fue borrado, continuar para reenviarlo
 
+        # 🆕 Publicar por primera vez
         sent_msg = await skullboard_channel.send(content=skullboard_text, embed=embed)
         tracked_messages[message_id] = sent_msg.id
         save_tracked_messages()
 
     finally:
-        processing_messages.discard(message_id)
-    
+        processing_messages.discard(message_id)  # 🔓 Liberar bloqueo para este mensaje
+
 ### ========== GESTIÓN DE ERRORES ==========
 @bot.event
 async def on_command_error(ctx, error):
