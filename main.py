@@ -83,6 +83,11 @@ def get_formatted_prefix(ctx_or_interaction) -> str:
 # Evento de inicio
 @bot.event
 async def on_ready():
+    import time
+    print("⏳ Esperando a que el bot esté completamente listo...")
+    await bot.wait_until_ready()
+    time.sleep(1)  # Forzar espera mínima por si Render lo trunca
+
     print(f'🔧 Bot conectado como {bot.user.name} - {bot.user.id}')
     print(f'📌 Mensajes rastreados cargados: {len(tracked_messages)}')
     print(f'🗂️ Configuración cargada: {len(config)} servidores')
@@ -96,7 +101,9 @@ async def on_ready():
             print(f"✅ Slash commands sincronizados en: {guild.name} ({guild.id}) → {len(synced)} comandos")
         except Exception as e:
             print(f"❌ Error al sincronizar en {guild.name} ({guild.id}): {e}")
+
     print("🔗 Bot en línea y listo para recibir comandos.")
+
 ### ========== COMANDOS CON PREFIJO ==========
 
 @bot.command()
@@ -195,6 +202,23 @@ def formatear_fecha(fecha: datetime) -> str:
         return f"Ayer a las {hora_min}"
     else:
         return fecha.strftime("%d/%m/%Y %H:%M")
+
+@bot.command(name="servers", hidden=True)
+@commands.has_permissions(administrator=True)
+async def servers(ctx):
+    servidores = bot.guilds
+    total = len(servidores)
+    
+    texto = "\n".join(f"• {g.name} (`{g.id}`)" for g in servidores)
+    if len(texto) > 1900:
+        texto = texto[:1900] + "\n... (truncado)"
+    
+    embed = discord.Embed(
+        title=f"🌍 El bot está en {total} servidor{'es' if total != 1 else ''}:",
+        description=texto,
+        color=discord.Color.gold()
+    )
+    await ctx.send(embed=embed)
 
 ### ========== COMANDOS DE BARRA ==========
 
