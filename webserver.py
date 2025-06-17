@@ -47,16 +47,17 @@ def callback():
     }
 
     payload = {
-        "platform_name": "Skullboard",
-        "platform_username": "Owner",
-        "metadata": {
-            "is_owner": True
-        }
+    "platform_name": "Skullboard",
+    "platform_username": "Owner",
+    "metadata": {
+        "is_owner": True
     }
+}
+
 
     assign_res = requests.put(connection_url, headers=headers, json=payload)
 
-    if assign_res.status_code == 204:
+    if assign_res.status_code in [200, 204]:
         return "✅ Rol vinculado correctamente. Ya puedes cerrar esta ventana."
     else:
         return f"❌ Error al vincular el rol: {assign_res.status_code} {assign_res.text}"
