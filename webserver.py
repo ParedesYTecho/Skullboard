@@ -7,6 +7,10 @@ app = Flask(__name__)
 def index():
     return "Hello, I am alive!"
 
+@app.route('/callback')
+def callback():
+    return "Redirección OAuth completada correctamente."
+
 def run():
     try:
         app.run(host='0.0.0.0', port=8080)
