@@ -53,8 +53,7 @@ def callback():
         "is_owner": True
     }
 }
-
-
+    # Enviar la solicitud para vincular el rol
     assign_res = requests.put(connection_url, headers=headers, json=payload)
 
     if assign_res.status_code in [200, 204]:
