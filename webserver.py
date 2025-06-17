@@ -5,11 +5,10 @@ import os
 
 app = Flask(__name__)
 
-# Cargar credenciales desde variables de entorno (Render)
 APPLICATION_ID = "1367463352774955059"
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_TOKEN")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
-REDIRECT_URI = "https://skullboard-fqf1.onrender.com/callback"  # tu URL de Render
+REDIRECT_URI = "https://skullboard-fqf1.onrender.com/callback"
 
 @app.route('/')
 def index():
@@ -21,7 +20,7 @@ def callback():
     if not code:
         return "❌ No se proporcionó el código de autorización.", 400
 
-    # Intercambiar el código por un token de acceso
+    # Intercambiar código por access_token
     data = {
         "client_id": APPLICATION_ID,
         "client_secret": DISCORD_CLIENT_SECRET,
@@ -30,7 +29,6 @@ def callback():
         "redirect_uri": REDIRECT_URI,
         "scope": "identify role_connections.write"
     }
-
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
     token_res = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
 
@@ -39,21 +37,30 @@ def callback():
 
     access_token = token_res.json()["access_token"]
 
-    # Enviar datos de conexión de rol
+    # Obtener datos del usuario
+    user_info = requests.get(
+        "https://discord.com/api/users/@me",
+        headers={"Authorization": f"Bearer {access_token}"}
+    ).json()
+
+    if user_info.get("id") != "561225979389804544": # ID del propietario del bot
+        return "❌ No estás autorizado para vincular este rol.", 403
+
+    # Asignar datos de rol
     connection_url = f"https://discord.com/api/v10/users/@me/applications/{APPLICATION_ID}/role-connection"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
-    # Preparar el payload para vincular el rol
+
     payload = {
-    "platform_name": "Skullboard",
-    "platform_username": "Owner",
-    "metadata": {
-        "is_owner": True
+        "platform_name": "Skullboard",
+        "platform_username": "Owner",
+        "metadata": {
+            "is_owner": True
+        }
     }
-}
-    # Enviar la solicitud para vincular el rol
+
     assign_res = requests.put(connection_url, headers=headers, json=payload)
 
     if assign_res.status_code in [200, 204]:
@@ -90,4 +97,3 @@ def run():
 def keep_alive():
     server = Thread(target=run)
     server.start()
-# Mantener el servidor activo
