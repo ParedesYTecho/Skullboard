@@ -45,7 +45,7 @@ def callback():
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
-
+    # Preparar el payload para vincular el rol
     payload = {
     "platform_name": "Skullboard",
     "platform_username": "Owner",
