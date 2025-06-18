@@ -6,6 +6,8 @@ import webserver
 from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 from discord import app_commands
+
+# Configuración del bot
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN") # Token del bot adquirido en Render
 logging.basicConfig(level=logging.INFO) # Configurar el nivel de logging
 
