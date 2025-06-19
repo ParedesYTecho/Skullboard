@@ -241,33 +241,39 @@ async def ajustes_slash(interaction: discord.Interaction):
 @app_commands.describe(nuevo_prefijo="Prefijo nuevo")
 async def set_prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
     if not interaction.user.guild_permissions.administrator:
-        return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
+        await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
+        return
     update_guild_config(interaction.guild.id, {"prefix": nuevo_prefijo})
-    await interaction.response.send_message(f"✅ Prefijo `{nuevo_prefijo}`")
+    await interaction.response.send_message(f"✅ Prefijo cambiado a `{nuevo_prefijo}`")
 
 @tree.command(name="set_channel", description="Configurar canal SkullBoard")
 @app_commands.describe(canal="Canal destino")
 async def set_channel_slash(interaction: discord.Interaction, canal: discord.TextChannel):
     if not interaction.user.guild_permissions.administrator:
-        return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
+        await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
+        return
     update_guild_config(interaction.guild.id, {"skullboard_channel_id": canal.id})
-    await interaction.response.send_message(f"✅ Canal set a {canal.mention}")
+    await interaction.response.send_message(f"✅ SkullBoard apuntando a {canal.mention}")
 
 @tree.command(name="set_min", description="Fijar mínimo de reacciones")
 @app_commands.describe(n="Número mínimo")
 async def set_min_slash(interaction: discord.Interaction, n: int):
     if not interaction.user.guild_permissions.administrator:
-        return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
+        await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
+        return
+    if n < 1:
+        await interaction.response.send_message("❌ ¡Número inválido!", ephemeral=True)
+        return
     update_guild_config(interaction.guild.id, {"min_skulls": n})
-    await interaction.response.send_message(f"✅ Mínimo {n}")
+    await interaction.response.send_message(f"✅ Mínimo de reacciones ajustado a {n}")
 
 @tree.command(name="ping", description="Ver latencia")
 async def ping_slash(interaction: discord.Interaction):
-    await interaction.response.send_message(f"🏓 Pong `{round(bot.latency*1000)}ms`")
+    await interaction.response.send_message(f"🏓 Pong! `{round(bot.latency*1000)}ms`")
 
 @tree.command(name="invite", description="Invita al bot")
 async def invite_slash(interaction: discord.Interaction):
-    await interaction.response.send_message(get_invite_url())
+    await interaction.response.send_message(f"🔗 Invita al bot: {get_invite_url()}")
 
 @tree.command(name="help", description="Muestra los comandos disponibles del bot")
 async def help_slash(interaction: discord.Interaction):
@@ -277,7 +283,7 @@ async def help_slash(interaction: discord.Interaction):
         description="Estos son los comandos disponibles:",
         color=discord.Color.teal()
     )
-    embed.add_field(name=f"{prefix}ajustes",       value="📋 Ver configuración del bot.", inline=False)
+    embed.add_field(name=f"{prefix}ajustes",        value="📋 Ver configuración del bot.", inline=False)
     embed.add_field(name=f"{prefix}set_channel 🔒", value="📌 Establece el canal de SkullBoard.", inline=False)
     embed.add_field(name=f"{prefix}set_min 🔒",     value="💀 Cambia el mínimo de reacciones.", inline=False)
     embed.add_field(name=f"{prefix}set_prefix 🔒",  value="✏️ Cambia el prefijo del bot.", inline=False)
