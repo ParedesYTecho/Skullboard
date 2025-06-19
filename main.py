@@ -2,7 +2,7 @@ import discord
 import logging
 import os
 import webserver
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from discord.ext import commands
 from discord import app_commands
 from supabase import create_client
@@ -15,12 +15,12 @@ supabase       = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── Funciones de configuración ────────────────────────────────────────────────
 def get_guild_config(guild_id):
-    guild_id = str(guild_id)
-    resp = supabase.table("settings").select("*").eq("guild_id", guild_id).execute()
-    if resp.data:
+    gid = str(guild_id)
+    resp = supabase.table("settings").select("*").eq("guild_id", gid).execute()
+    if resp.data and len(resp.data) > 0:
         return resp.data[0]
     default = {
-        "guild_id": guild_id,
+        "guild_id": gid,
         "skullboard_channel_id": 0,
         "min_skulls": 1,
         "prefix": "sk!"
@@ -30,6 +30,19 @@ def get_guild_config(guild_id):
 
 def update_guild_config(guild_id, updates: dict):
     supabase.table("settings").update(updates).eq("guild_id", str(guild_id)).execute()
+
+# ─── Persistencia de mensajes rastreados ──────────────────────────────────────
+def get_tracked_message(message_id: str):
+    resp = supabase.table("tracked_messages").select("skullboard_message_id").eq("message_id", str(message_id)).execute()
+    if resp.data and len(resp.data) > 0:
+        return resp.data[0]["skullboard_message_id"]
+    return None
+
+def set_tracked_message(message_id: str, skullboard_id: int):
+    supabase.table("tracked_messages").upsert({
+        "message_id": str(message_id),
+        "skullboard_message_id": skullboard_id
+    }).execute()
 
 # ─── Prefijo dinámico ────────────────────────────────────────────────────────
 async def get_prefix(bot, message):
@@ -52,6 +65,10 @@ tree   = bot.tree
 skull_emoji        = '💀'
 processing_messages = set()
 
+def get_formatted_prefix(ctx_or_interaction) -> str:
+    gid = ctx_or_interaction.guild.id
+    return get_guild_config(gid).get("prefix", "sk!")
+
 # ─── Utilidades ─────────────────────────────────────────────────────────────
 def formatear_fecha(fecha: datetime) -> str:
     ahora = datetime.now(timezone.utc)
@@ -64,49 +81,38 @@ def formatear_fecha(fecha: datetime) -> str:
     return fecha.strftime("%d/%m/%Y %H:%M")
 
 def get_invite_url():
-    client_id  = 1367463352774955059
-    permissions= 277025508352
+    client_id   = 1367463352774955059
+    permissions = 277025508352
     return f"https://discord.com/oauth2/authorize?client_id={client_id}&permissions={permissions}&scope=bot+applications.commands"
 
 async def send_ajustes_embed(dest):
-    guild_cfg     = get_guild_config(dest.guild.id)
-    skull_channel = bot.get_channel(guild_cfg["skullboard_channel_id"])
-    prefix        = guild_cfg.get("prefix", "sk!")
+    cfg           = get_guild_config(dest.guild.id)
+    skull_channel = bot.get_channel(cfg["skullboard_channel_id"])
+    prefix        = cfg.get("prefix", "sk!")
     embed = discord.Embed(
         title="⚙️ Ajustes del SkullBoard",
         description="Configuración actual del bot:",
         color=discord.Color.purple()
     )
     embed.add_field(name="📌 Canal",    value=skull_channel.mention if skull_channel else "❌ No configurado", inline=False)
-    embed.add_field(name="🔧 Mínimos",  value=f"{guild_cfg['min_skulls']} 💀",                 inline=False)
-    embed.add_field(name="✏️ Prefijo",  value=f"`{prefix}`",                               inline=False)
-    embed.add_field(name="🏓 Latencia", value=f"{round(bot.latency*1000)}ms",              inline=False)
-    embed.add_field(name="🔗 Invita",   value=f"[Invitar]({get_invite_url()})",            inline=False)
+    embed.add_field(name="🔧 Mínimos",  value=f"{cfg['min_skulls']} 💀",                            inline=False)
+    embed.add_field(name="✏️ Prefijo",  value=f"`{prefix}`",                                       inline=False)
+    embed.add_field(name="🏓 Latencia", value=f"{round(bot.latency*1000)}ms",                     inline=False)
+    embed.add_field(name="🔗 Invita",   value=f"[Invitar SkullBoard]({get_invite_url()})",        inline=False)
 
     if isinstance(dest, discord.Interaction):
         await dest.response.send_message(embed=embed)
     else:
         await dest.send(embed=embed)
 
-# ─── Persistencia de mensajes ────────────────────────────────────────────────
-def get_tracked_message(msg_id: str):
-    resp = supabase.table("tracked_messages").select("skullboard_message_id").eq("message_id", msg_id).execute()
-    return resp.data[0]["skullboard_message_id"] if resp.data else None
-
-def set_tracked_message(msg_id: str, skull_id: int):
-    supabase.table("tracked_messages").upsert({
-        "message_id": msg_id,
-        "skullboard_message_id": skull_id
-    }).execute()
-
-# ─── Eventos básicos ─────────────────────────────────────────────────────────
+# ─── Arranque y sincronización ────────────────────────────────────────────────
 @bot.event
 async def on_ready():
-    logging.info(f"🔧 Conectado como {bot.user} ({bot.user.id})")
+    logging.info(f"🔧 Bot conectado como {bot.user} ({bot.user.id})")
     for guild in bot.guilds:
         try:
             cmds = await tree.sync(guild=guild)
-            logging.info(f"✅ Slash sync en {guild.name} → {len(cmds)} cmd(s)")
+            logging.info(f"✅ Slash sync en {guild.name} → {len(cmds)} cmds")
         except Exception as e:
             logging.error(f"❌ Sync failed en {guild.name}: {e}")
     logging.info("🔗 Bot listo.")
@@ -121,19 +127,19 @@ async def on_reaction_remove(reaction, user):
     await _check(reaction)
 
 async def _check(reaction):
-    msg      = reaction.message
-    msg_id   = str(msg.id)
-    cfg      = get_guild_config(msg.guild.id)
-    if str(reaction.emoji)!=skull_emoji or msg_id in processing_messages:
+    msg    = reaction.message
+    mid    = str(msg.id)
+    cfg    = get_guild_config(msg.guild.id)
+    if str(reaction.emoji) != skull_emoji or mid in processing_messages:
         return
-    processing_messages.add(msg_id)
+    processing_messages.add(mid)
     try:
         if reaction.count < cfg["min_skulls"]:
             return
         dest = bot.get_channel(cfg["skullboard_channel_id"])
-        if not dest or msg.channel.id==dest.id:
+        if not dest or msg.channel.id == dest.id:
             return
-        emoji = "☠️" if reaction.count>=cfg["min_skulls"]*2 else "💀"
+        emoji = "☠️" if reaction.count >= cfg["min_skulls"]*2 else "💀"
         embed = discord.Embed(description=msg.content or None, color=discord.Color.dark_gray())
         embed.set_author(name=msg.author.display_name, icon_url=msg.author.avatar.url if msg.author.avatar else None)
         img = next((a for a in msg.attachments if a.content_type and a.content_type.startswith("image/")), None)
@@ -143,20 +149,21 @@ async def _check(reaction):
         embed.set_footer(text=f"{reaction.count} {emoji}  •  {formatear_fecha(msg.created_at)}")
         texto = f"{emoji} {reaction.count} | {msg.channel.mention}"
 
-        exist_id = get_tracked_message(msg_id)
-        if exist_id:
+        existing = get_tracked_message(mid)
+        if existing:
             try:
-                sent = await dest.fetch_message(exist_id)
-                await sent.edit(content=texto, embed=embed)
+                old = await dest.fetch_message(existing)
+                await old.edit(content=texto, embed=embed)
                 return
             except discord.NotFound:
                 pass
-        sent = await dest.send(content=texto, embed=embed)
-        set_tracked_message(msg_id, sent.id)
-    finally:
-        processing_messages.discard(msg_id)
 
-# ─── Comandos de texto ────────────────────────────────────────────────────────
+        sent = await dest.send(content=texto, embed=embed)
+        set_tracked_message(mid, sent.id)
+    finally:
+        processing_messages.discard(mid)
+
+# ─── COMANDOS CON PREFIJO ─────────────────────────────────────────────────────
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def set_prefix(ctx, nuevo_prefijo: str=None):
@@ -176,7 +183,7 @@ async def set_channel(ctx, canal: discord.TextChannel=None):
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def set_min(ctx, n: int=None):
-    if not n or n<1:
+    if not n or n < 1:
         return await ctx.send("❌ ¡Número inválido!")
     update_guild_config(ctx.guild.id, {"min_skulls": n})
     await ctx.send(f"✅ Mínimo de reacciones ajustado a {n}")
@@ -191,11 +198,25 @@ async def ping(ctx):
 
 @bot.command()
 async def invite(ctx):
-    await ctx.send(get_invite_url())
+    await ctx.send(f"🔗 Invita al bot: {get_invite_url()}")
 
-# ─── Slash commands ──────────────────────────────────────────────────────────
-@tree.command(name="ajustes", description="Ver ajustes actuales")
-async def ajustes_slash(interaction: discord.Interaction):
+@bot.command(name="servers", hidden=True)
+@commands.has_permissions(administrator=True)
+async def servers(ctx):
+    total = len(bot.guilds)
+    texto = "\n".join(f"• {g.name} (`{g.id}`)" for g in bot.guilds)
+    if len(texto) > 1900:
+        texto = texto[:1900] + "\n... (truncado)"
+    embed = discord.Embed(
+        title=f"🌍 El bot está en {total} servidores:",
+        description=texto,
+        color=discord.Color.gold()
+    )
+    await ctx.send(embed=embed)
+
+# ─── SLASH COMMANDS ──────────────────────────────────────────────────────────
+@tree.command(name="help", description="Muestra la ayuda completa")
+async def help_slash(interaction: discord.Interaction):
     await send_ajustes_embed(interaction)
 
 @tree.command(name="set_prefix", description="Cambiar prefijo (admin)")
@@ -230,6 +251,21 @@ async def ping_slash(interaction: discord.Interaction):
 async def invite_slash(interaction: discord.Interaction):
     await interaction.response.send_message(get_invite_url())
 
-# ─── Arranque ────────────────────────────────────────────────────────────────
+# ─── GESTIÓN DE ERRORES ───────────────────────────────────────────────────────
+@bot.event
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.MissingPermissions):
+        return await ctx.send("❌ No tienes permiso de **Administrador**.")
+    if isinstance(error, commands.BadArgument):
+        return await ctx.send("❌ Argumento inválido.")
+    if isinstance(error, commands.MissingRequiredArgument):
+        p = get_formatted_prefix(ctx)
+        return await ctx.send(f"❌ Faltan argumentos. Usa `{p}help`.")
+    if isinstance(error, commands.CommandNotFound):
+        p = get_formatted_prefix(ctx)
+        return await ctx.send(f"❌ Comando no existe. Usa `{p}help`.")
+    raise error
+
+# ─── EJECUCIÓN ───────────────────────────────────────────────────────────────
 webserver.keep_alive()
 bot.run(DISCORD_TOKEN)
