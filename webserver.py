@@ -14,6 +14,7 @@ REDIRECT_URI = "https://skullboard-fqf1.onrender.com/callback"
 def index():
     return "Hello, I am alive!"
 
+# Linked Role Connection
 @app.route('/callback')
 def callback():
     code = request.args.get("code")

@@ -109,13 +109,11 @@ async def send_ajustes_embed(dest):
 @bot.event
 async def on_ready():
     logging.info(f"🔧 Bot conectado como {bot.user} ({bot.user.id})")
-    for guild in bot.guilds:
-        try:
-            cmds = await tree.sync(guild=guild)
-            logging.info(f"✅ Slash sync en {guild.name} → {len(cmds)} cmds")
-        except Exception as e:
-            logging.error(f"❌ Sync failed en {guild.name}: {e}")
-    logging.info("🔗 Bot listo.")
+    # Esto reemplaza tu bucle por guilds:
+    synced = await bot.tree.sync()
+    logging.info(f"✅ Comandos sincronizados globalmente: {len(synced)} comandos registrados")
+    # Sincronizar comandos de aplicación (slash commands)
+    await bot.change_presence(activity=discord.Game(name="💀 SkullBoard"))
 
 # ─── Reacciones ───────────────────────────────────────────────────────────────
 @bot.event
@@ -245,23 +243,50 @@ async def set_prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str)
     update_guild_config(interaction.guild.id, {"prefix": nuevo_prefijo})
     await interaction.response.send_message(f"✅ Prefijo cambiado a `{nuevo_prefijo}`")
 
-@tree.command(name="set_channel", description="Configurar canal SkullBoard")
-@app_commands.describe(canal="Canal destino")
-async def set_channel_slash(interaction: discord.Interaction, canal: discord.TextChannel):
+# ─── Slash: configurar canal SkullBoard ────────────────────────────────────────
+@tree.command(
+    name="set_channel",
+    description="Configura el canal del SkullBoard"
+)
+@app_commands.describe(
+    channel="Canal donde se enviarán los mensajes del SkullBoard"
+)
+async def set_channel_slash(interaction: discord.Interaction, channel: discord.TextChannel):
     if not interaction.user.guild_permissions.administrator:
-        return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
-    update_guild_config(interaction.guild.id, {"skullboard_channel_id": canal.id})
-    await interaction.response.send_message(f"✅ SkullBoard apuntando a {canal.mention}")
+        return await interaction.response.send_message(
+            "❌ No tienes permiso de **Administrador**.",
+            ephemeral=True
+        )
+    # Actualiza en Supabase
+    update_guild_config(interaction.guild.id, {"skullboard_channel_id": channel.id})
+    await interaction.response.send_message(
+        f"✅ Los mensajes destacados se enviarán a {channel.mention}",
+    )
 
-@tree.command(name="set_min", description="Fijar mínimo de reacciones")
-@app_commands.describe(n="Número mínimo")
-async def set_min_slash(interaction: discord.Interaction, n: int):
+# ─── Slash: fijar mínimo de reacciones ────────────────────────────────────────
+@tree.command(
+    name="set_min",
+    description="Fija el mínimo de reacciones 💀"
+)
+@app_commands.describe(
+    cantidad="Número mínimo de reacciones para destacar un mensaje (≥ 1)"
+)
+async def set_min_slash(interaction: discord.Interaction, cantidad: int):
     if not interaction.user.guild_permissions.administrator:
-        return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
-    if n < 1:
-        return await interaction.response.send_message("❌ ¡Número inválido!", ephemeral=True)
-    update_guild_config(interaction.guild.id, {"min_skulls": n})
-    await interaction.response.send_message(f"✅ Mínimo de reacciones ajustado a {n}")
+        return await interaction.response.send_message(
+            "❌ No tienes permiso de **Administrador**.",
+            ephemeral=True
+        )
+    if cantidad < 1:
+        return await interaction.response.send_message(
+            "❌ ¡Número inválido! Debe ser ≥ 1.",
+            ephemeral=True
+        )
+    # Actualiza en Supabase
+    update_guild_config(interaction.guild.id, {"min_skulls": cantidad})
+    await interaction.response.send_message(
+        f"✅ Mínimo de reacciones ajustado a {cantidad} 💀",
+    )
 
 @tree.command(name="ping", description="Ver latencia")
 async def ping_slash(interaction: discord.Interaction):
@@ -287,7 +312,7 @@ async def help_slash(interaction: discord.Interaction):
     embed.add_field(name=f"{prefix}invite",          value="🔗 Obtén el enlace de invitación.", inline=False)
     embed.add_field(name=f"{prefix}help",            value="❓ Muestra esta ayuda.", inline=False)
     embed.set_footer(text="🔒 Requiere permisos de Administrador donde aparezca el candado")
-    await interaction.response.send_message(embed=embed, ephemeral=True)
+    await interaction.response.send_message(embed=embed)
 
 # ─── GESTIÓN DE ERRORES ───────────────────────────────────────────────────────
 @bot.event
