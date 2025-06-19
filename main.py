@@ -2,7 +2,7 @@ import discord
 import logging
 import os
 import webserver
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from discord.ext import commands
 from discord import app_commands
 from supabase import create_client
@@ -208,13 +208,13 @@ async def help_cmd(ctx):
         description="Estos son los comandos disponibles:",
         color=discord.Color.teal()
     )
-    embed.add_field(name=f"{prefix}ajustes",       value="📋 Ver configuración del bot.", inline=False)
-    embed.add_field(name=f"{prefix}set_channel 🔒", value="📌 Establece el canal de SkullBoard.", inline=False)
-    embed.add_field(name=f"{prefix}set_min 🔒",     value="💀 Cambia el mínimo de reacciones.", inline=False)
-    embed.add_field(name=f"{prefix}set_prefix 🔒",  value="✏️ Cambia el prefijo del bot.", inline=False)
-    embed.add_field(name=f"{prefix}ping",           value="🏓 Ver latencia del bot.", inline=False)
-    embed.add_field(name=f"{prefix}invite",         value="🔗 Obtén el enlace de invitación.", inline=False)
-    embed.add_field(name=f"{prefix}help",           value="❓ Muestra esta ayuda.", inline=False)
+    embed.add_field(name=f"{prefix}ajustes",        value="📋 Ver configuración del bot.", inline=False)
+    embed.add_field(name=f"{prefix}set_channel 🔒",  value="📌 Establece el canal de SkullBoard.", inline=False)
+    embed.add_field(name=f"{prefix}set_min 🔒",      value="💀 Cambia el mínimo de reacciones.", inline=False)
+    embed.add_field(name=f"{prefix}set_prefix 🔒",   value="✏️ Cambia el prefijo del bot.", inline=False)
+    embed.add_field(name=f"{prefix}ping",            value="🏓 Ver latencia del bot.", inline=False)
+    embed.add_field(name=f"{prefix}invite",          value="🔗 Obtén el enlace de invitación.", inline=False)
+    embed.add_field(name=f"{prefix}help",            value="❓ Muestra esta ayuda.", inline=False)
     embed.set_footer(text="🔒 Requiere permisos de Administrador donde aparezca el candado")
     await ctx.send(embed=embed)
 
@@ -241,8 +241,7 @@ async def ajustes_slash(interaction: discord.Interaction):
 @app_commands.describe(nuevo_prefijo="Prefijo nuevo")
 async def set_prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
     if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
-        return
+        return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
     update_guild_config(interaction.guild.id, {"prefix": nuevo_prefijo})
     await interaction.response.send_message(f"✅ Prefijo cambiado a `{nuevo_prefijo}`")
 
@@ -250,8 +249,7 @@ async def set_prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str)
 @app_commands.describe(canal="Canal destino")
 async def set_channel_slash(interaction: discord.Interaction, canal: discord.TextChannel):
     if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
-        return
+        return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
     update_guild_config(interaction.guild.id, {"skullboard_channel_id": canal.id})
     await interaction.response.send_message(f"✅ SkullBoard apuntando a {canal.mention}")
 
@@ -259,11 +257,9 @@ async def set_channel_slash(interaction: discord.Interaction, canal: discord.Tex
 @app_commands.describe(n="Número mínimo")
 async def set_min_slash(interaction: discord.Interaction, n: int):
     if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
-        return
+        return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
     if n < 1:
-        await interaction.response.send_message("❌ ¡Número inválido!", ephemeral=True)
-        return
+        return await interaction.response.send_message("❌ ¡Número inválido!", ephemeral=True)
     update_guild_config(interaction.guild.id, {"min_skulls": n})
     await interaction.response.send_message(f"✅ Mínimo de reacciones ajustado a {n}")
 
@@ -284,12 +280,12 @@ async def help_slash(interaction: discord.Interaction):
         color=discord.Color.teal()
     )
     embed.add_field(name=f"{prefix}ajustes",        value="📋 Ver configuración del bot.", inline=False)
-    embed.add_field(name=f"{prefix}set_channel 🔒", value="📌 Establece el canal de SkullBoard.", inline=False)
-    embed.add_field(name=f"{prefix}set_min 🔒",     value="💀 Cambia el mínimo de reacciones.", inline=False)
-    embed.add_field(name=f"{prefix}set_prefix 🔒",  value="✏️ Cambia el prefijo del bot.", inline=False)
-    embed.add_field(name=f"{prefix}ping",           value="🏓 Ver latencia del bot.", inline=False)
-    embed.add_field(name=f"{prefix}invite",         value="🔗 Obtén el enlace de invitación.", inline=False)
-    embed.add_field(name=f"{prefix}help",           value="❓ Muestra esta ayuda.", inline=False)
+    embed.add_field(name=f"{prefix}set_channel 🔒",  value="📌 Establece el canal de SkullBoard.", inline=False)
+    embed.add_field(name=f"{prefix}set_min 🔒",      value="💀 Cambia el mínimo de reacciones.", inline=False)
+    embed.add_field(name=f"{prefix}set_prefix 🔒",   value="✏️ Cambia el prefijo del bot.", inline=False)
+    embed.add_field(name=f"{prefix}ping",            value="🏓 Ver latencia del bot.", inline=False)
+    embed.add_field(name=f"{prefix}invite",          value="🔗 Obtén el enlace de invitación.", inline=False)
+    embed.add_field(name=f"{prefix}help",            value="❓ Muestra esta ayuda.", inline=False)
     embed.set_footer(text="🔒 Requiere permisos de Administrador donde aparezca el candado")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
