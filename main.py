@@ -162,31 +162,31 @@ async def _check(reaction):
         processing_messages.discard(mid)
 
 # ─── COMANDOS CON PREFIJO ─────────────────────────────────────────────────────
-@bot.command()
+@bot.command(name="prefix", aliases=["set_prefix"])
 @commands.has_permissions(administrator=True)
-async def set_prefix(ctx, nuevo_prefijo: str=None):
+async def prefix(ctx, nuevo_prefijo: str=None):
     if not nuevo_prefijo:
         return await ctx.send("❌ ¡Falta el nuevo prefijo!")
     update_guild_config(ctx.guild.id, {"prefix": nuevo_prefijo})
     await ctx.send(f"✅ Prefijo cambiado a `{nuevo_prefijo}`")
 
-@bot.command()
+@bot.command(name="set_channel", aliases=["channel"])
 @commands.has_permissions(administrator=True)
-async def set_channel(ctx, canal: discord.TextChannel=None):
+async def set_channel(ctx, canal: discord.TextChannel = None):
     if not canal:
         return await ctx.send("❌ ¡Menciona un canal!")
     update_guild_config(ctx.guild.id, {"skullboard_channel_id": canal.id})
     await ctx.send(f"✅ SkullBoard apuntando a {canal.mention}")
 
-@bot.command()
+@bot.command(name="set_min", aliases=["min"])
 @commands.has_permissions(administrator=True)
-async def set_min(ctx, n: int=None):
+async def set_min(ctx, n: int = None):
     if not n or n < 1:
         return await ctx.send("❌ ¡Número inválido!")
     update_guild_config(ctx.guild.id, {"min_skulls": n})
     await ctx.send(f"✅ Mínimo de reacciones ajustado a {n}")
 
-@bot.command()
+@bot.command(name="ajustes", aliases=["settings"])
 async def ajustes(ctx):
     await send_ajustes_embed(ctx)
 
@@ -198,7 +198,7 @@ async def ping(ctx):
 async def invite(ctx):
     await ctx.send(f"🔗 Invita al bot: {get_invite_url()}")
 
-@bot.command(name="help")
+@bot.command(name="help", aliases=["ayuda", "comandos"])
 async def help_cmd(ctx):
     prefix = get_formatted_prefix(ctx)
     embed = discord.Embed(
@@ -209,7 +209,7 @@ async def help_cmd(ctx):
     embed.add_field(name=f"{prefix}ajustes",        value="📋 Ver configuración del bot.", inline=False)
     embed.add_field(name=f"{prefix}set_channel 🔒",  value="📌 Establece el canal de SkullBoard.", inline=False)
     embed.add_field(name=f"{prefix}set_min 🔒",      value="💀 Cambia el mínimo de reacciones.", inline=False)
-    embed.add_field(name=f"{prefix}set_prefix 🔒",   value="✏️ Cambia el prefijo del bot.", inline=False)
+    embed.add_field(name=f"{prefix}prefix 🔒",   value="✏️ Cambia el prefijo del bot.", inline=False)
     embed.add_field(name=f"{prefix}ping",            value="🏓 Ver latencia del bot.", inline=False)
     embed.add_field(name=f"{prefix}invite",          value="🔗 Obtén el enlace de invitación.", inline=False)
     embed.add_field(name=f"{prefix}help",            value="❓ Muestra esta ayuda.", inline=False)
@@ -235,9 +235,9 @@ async def servers(ctx):
 async def ajustes_slash(interaction: discord.Interaction):
     await send_ajustes_embed(interaction)
 
-@tree.command(name="set_prefix", description="Cambiar prefijo (admin)")
+@tree.command(name="prefix", description="Cambiar prefijo (admin)")
 @app_commands.describe(nuevo_prefijo="Prefijo nuevo")
-async def set_prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
+async def prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
     if not interaction.user.guild_permissions.administrator:
         return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
     update_guild_config(interaction.guild.id, {"prefix": nuevo_prefijo})
@@ -307,7 +307,7 @@ async def help_slash(interaction: discord.Interaction):
     embed.add_field(name=f"{prefix}ajustes",        value="📋 Ver configuración del bot.", inline=False)
     embed.add_field(name=f"{prefix}set_channel 🔒",  value="📌 Establece el canal de SkullBoard.", inline=False)
     embed.add_field(name=f"{prefix}set_min 🔒",      value="💀 Cambia el mínimo de reacciones.", inline=False)
-    embed.add_field(name=f"{prefix}set_prefix 🔒",   value="✏️ Cambia el prefijo del bot.", inline=False)
+    embed.add_field(name=f"{prefix}prefix 🔒",   value="✏️ Cambia el prefijo del bot.", inline=False)
     embed.add_field(name=f"{prefix}ping",            value="🏓 Ver latencia del bot.", inline=False)
     embed.add_field(name=f"{prefix}invite",          value="🔗 Obtén el enlace de invitación.", inline=False)
     embed.add_field(name=f"{prefix}help",            value="❓ Muestra esta ayuda.", inline=False)
