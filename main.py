@@ -233,6 +233,10 @@ async def servers(ctx):
     await ctx.send(embed=embed)
 
 # ─── SLASH COMMANDS ──────────────────────────────────────────────────────────
+@tree.command(name="ajustes", description="Ver configuración del bot")
+async def ajustes_slash(interaction: discord.Interaction):
+    await send_ajustes_embed(interaction)
+
 @tree.command(name="set_prefix", description="Cambiar prefijo (admin)")
 @app_commands.describe(nuevo_prefijo="Prefijo nuevo")
 async def set_prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
