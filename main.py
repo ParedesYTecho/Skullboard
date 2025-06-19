@@ -200,6 +200,24 @@ async def ping(ctx):
 async def invite(ctx):
     await ctx.send(f"🔗 Invita al bot: {get_invite_url()}")
 
+@bot.command(name="help")
+async def help_cmd(ctx):
+    prefix = get_formatted_prefix(ctx)
+    embed = discord.Embed(
+        title="📖 Lista de comandos - SkullBoard",
+        description="Estos son los comandos disponibles:",
+        color=discord.Color.teal()
+    )
+    embed.add_field(name=f"{prefix}ajustes",       value="📋 Ver configuración del bot.", inline=False)
+    embed.add_field(name=f"{prefix}set_channel 🔒", value="📌 Establece el canal de SkullBoard.", inline=False)
+    embed.add_field(name=f"{prefix}set_min 🔒",     value="💀 Cambia el mínimo de reacciones.", inline=False)
+    embed.add_field(name=f"{prefix}set_prefix 🔒",  value="✏️ Cambia el prefijo del bot.", inline=False)
+    embed.add_field(name=f"{prefix}ping",           value="🏓 Ver latencia del bot.", inline=False)
+    embed.add_field(name=f"{prefix}invite",         value="🔗 Obtén el enlace de invitación.", inline=False)
+    embed.add_field(name=f"{prefix}help",           value="❓ Muestra esta ayuda.", inline=False)
+    embed.set_footer(text="🔒 Requiere permisos de Administrador donde aparezca el candado")
+    await ctx.send(embed=embed)
+
 @bot.command(name="servers", hidden=True)
 @commands.has_permissions(administrator=True)
 async def servers(ctx):
@@ -250,6 +268,24 @@ async def ping_slash(interaction: discord.Interaction):
 @tree.command(name="invite", description="Invita al bot")
 async def invite_slash(interaction: discord.Interaction):
     await interaction.response.send_message(get_invite_url())
+
+@tree.command(name="help", description="Muestra los comandos disponibles del bot")
+async def help_slash(interaction: discord.Interaction):
+    prefix = get_formatted_prefix(interaction)
+    embed = discord.Embed(
+        title="📖 Lista de comandos - SkullBoard",
+        description="Estos son los comandos disponibles:",
+        color=discord.Color.teal()
+    )
+    embed.add_field(name=f"{prefix}ajustes",       value="📋 Ver configuración del bot.", inline=False)
+    embed.add_field(name=f"{prefix}set_channel 🔒", value="📌 Establece el canal de SkullBoard.", inline=False)
+    embed.add_field(name=f"{prefix}set_min 🔒",     value="💀 Cambia el mínimo de reacciones.", inline=False)
+    embed.add_field(name=f"{prefix}set_prefix 🔒",  value="✏️ Cambia el prefijo del bot.", inline=False)
+    embed.add_field(name=f"{prefix}ping",           value="🏓 Ver latencia del bot.", inline=False)
+    embed.add_field(name=f"{prefix}invite",         value="🔗 Obtén el enlace de invitación.", inline=False)
+    embed.add_field(name=f"{prefix}help",           value="❓ Muestra esta ayuda.", inline=False)
+    embed.set_footer(text="🔒 Requiere permisos de Administrador donde aparezca el candado")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # ─── GESTIÓN DE ERRORES ───────────────────────────────────────────────────────
 @bot.event
