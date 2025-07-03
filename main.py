@@ -6,6 +6,9 @@ from datetime import datetime, timezone
 from discord.ext import commands
 from discord import app_commands
 from supabase import create_client
+from types import SimpleNamespace
+import discord.abc
+from typing import cast
 
 # ─── Configuración de Supabase ───────────────────────────────────────────────
 DISCORD_TOKEN  = os.getenv("DISCORD_TOKEN")
@@ -115,51 +118,102 @@ async def on_ready():
     # Sincronizar comandos de aplicación (slash commands)
     await bot.change_presence(activity=discord.Game(name="💀 SkullBoard"))
 
-# ─── Reacciones ───────────────────────────────────────────────────────────────
-@bot.event
-async def on_reaction_add(reaction, user):
-    await _check(reaction)
+from types import SimpleNamespace
+import discord.abc
+from typing import cast
+
+# ── React hooks ──────────────────────────────────────────────────────────────
 
 @bot.event
-async def on_reaction_remove(reaction, user):
-    await _check(reaction)
+async def on_raw_reaction_add(payload):
+    if payload.user_id == bot.user.id:
+        return
+
+    # Obtenemos el canal y comprobamos que es Messageable
+    chan = bot.get_channel(payload.thread_id or payload.channel_id)
+    if not isinstance(chan, discord.abc.Messageable):
+        return
+    channel = cast(discord.abc.Messageable, chan)
+
+    try:
+        msg = await channel.fetch_message(payload.message_id)  # type: ignore[attr-defined]
+    except Exception:
+        return
+
+    r = SimpleNamespace(emoji=str(payload.emoji), message=msg)
+    await _check(r)
+
+@bot.event
+async def on_raw_reaction_remove(payload):
+    if payload.user_id == bot.user.id:
+        return
+
+    chan = bot.get_channel(payload.thread_id or payload.channel_id)
+    if not isinstance(chan, discord.abc.Messageable):
+        return
+    channel = cast(discord.abc.Messageable, chan)
+
+    try:
+        msg = await channel.fetch_message(payload.message_id)  # type: ignore[attr-defined]
+    except Exception:
+        return
+
+    r = SimpleNamespace(emoji=str(payload.emoji), message=msg)
+    await _check(r)
+
+
+# ── Core logic ────────────────────────────────────────────────────────────────
 
 async def _check(reaction):
-    msg    = reaction.message
-    mid    = str(msg.id)
-    cfg    = get_guild_config(msg.guild.id)
-    if str(reaction.emoji) != skull_emoji or mid in processing_messages:
+    msg = reaction.message
+    mid = str(msg.id)
+    cfg = get_guild_config(msg.guild.id)
+
+    if reaction.emoji != skull_emoji or mid in processing_messages:
         return
     processing_messages.add(mid)
     try:
-        if reaction.count < cfg["min_skulls"]:
+        skull_reac = next((r for r in msg.reactions if str(r.emoji) == skull_emoji), None)
+        count = skull_reac.count if skull_reac else 0
+        if count < cfg["min_skulls"]:
             return
-        dest = bot.get_channel(cfg["skullboard_channel_id"])
-        if not dest or msg.channel.id == dest.id:
+
+        dest_chan = bot.get_channel(cfg["skullboard_channel_id"])
+        if not isinstance(dest_chan, discord.abc.Messageable):
             return
-        emoji = "☠️" if reaction.count >= cfg["min_skulls"]*2 else "💀"
+        dest = cast(discord.abc.Messageable, dest_chan)
+
+        emoji = "☠️" if count >= cfg["min_skulls"] * 2 else "💀"
         embed = discord.Embed(description=msg.content or None, color=discord.Color.dark_gray())
-        embed.set_author(name=msg.author.display_name, icon_url=msg.author.avatar.url if msg.author.avatar else None)
+        embed.set_author(
+            name=msg.author.display_name,
+            icon_url=(msg.author.avatar.url if msg.author.avatar else None)
+        )
+
         img = next((a for a in msg.attachments if a.content_type and a.content_type.startswith("image/")), None)
         if img:
             embed.set_image(url=img.url)
+
         embed.add_field(name="🔗 Enlace", value=f"[Saltar al mensaje]({msg.jump_url})", inline=False)
-        embed.set_footer(text=f"{reaction.count} {emoji}  •  {formatear_fecha(msg.created_at)}")
-        texto = f"{emoji} {reaction.count} | {msg.channel.mention}"
+        embed.set_footer(text=f"{count} {emoji}  •  {formatear_fecha(msg.created_at)}")
+
+        texto = f"{emoji} {count} | {msg.channel.mention}"
 
         existing = get_tracked_message(mid)
         if existing:
             try:
-                old = await dest.fetch_message(existing)
+                old = await dest.fetch_message(existing)  # type: ignore[attr-defined]
                 await old.edit(content=texto, embed=embed)
                 return
             except discord.NotFound:
                 pass
 
-        sent = await dest.send(content=texto, embed=embed)
+        sent = await dest.send(content=texto, embed=embed)  # type: ignore[attr-defined]
         set_tracked_message(mid, sent.id)
+
     finally:
         processing_messages.discard(mid)
+
 
 # ─── COMANDOS CON PREFIJO ─────────────────────────────────────────────────────
 @bot.command(name="prefix", aliases=["set_prefix"])
