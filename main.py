@@ -9,6 +9,7 @@ from supabase import create_client
 from types import SimpleNamespace
 import discord.abc
 from typing import cast
+import asyncio
 
 # ─── Configuración de Supabase ───────────────────────────────────────────────
 DISCORD_TOKEN  = os.getenv("DISCORD_TOKEN")
@@ -164,40 +165,65 @@ async def on_raw_reaction_remove(payload):
 # ── Core logic ────────────────────────────────────────────────────────────────
 
 async def _check(reaction):
-    msg = reaction.message
+    # Obtenemos canal y refrescamos el mensaje para tener reacciones al día
+    chan = reaction.message.channel
+    try:
+        msg = await chan.fetch_message(reaction.message.id)  # actualiza objeto msg
+    except Exception:
+        return
+
     mid = str(msg.id)
     cfg = get_guild_config(msg.guild.id)
 
-    if reaction.emoji != skull_emoji or mid in processing_messages:
+    # Filtrar emoji y bloqueo simultáneo
+    if str(reaction.emoji) != skull_emoji or mid in processing_messages:
         return
     processing_messages.add(mid)
+
     try:
-        skull_reac = next((r for r in msg.reactions if str(r.emoji) == skull_emoji), None)
+        # Intentamos hasta 3 veces obtener reacciones actualizadas
+        skull_reac = None
+        for attempt in range(3):
+            skull_reac = next((r for r in msg.reactions if str(r.emoji) == skull_emoji), None)
+            count = skull_reac.count if skull_reac else 0
+            if count >= cfg["min_skulls"]:
+                break
+            # espera medio segundo y vuelve a refrescar
+            await asyncio.sleep(0.5)
+            try:
+                msg = await chan.fetch_message(mid)
+            except Exception:
+                break
+
+        # Si no alcanzó mínimo, abortamos
         count = skull_reac.count if skull_reac else 0
         if count < cfg["min_skulls"]:
             return
 
+        # Obtenemos canal SkullBoard
         dest_chan = bot.get_channel(cfg["skullboard_channel_id"])
         if not isinstance(dest_chan, discord.abc.Messageable):
             return
-        dest = cast(discord.abc.Messageable, dest_chan)
+        dest = dest_chan  # ya es Messageable
 
+        # Elegimos el emoji según doble umbral
         emoji = "☠️" if count >= cfg["min_skulls"] * 2 else "💀"
+
+        # Construimos embed
         embed = discord.Embed(description=msg.content or None, color=discord.Color.dark_gray())
         embed.set_author(
             name=msg.author.display_name,
             icon_url=(msg.author.avatar.url if msg.author.avatar else None)
         )
-
         img = next((a for a in msg.attachments if a.content_type and a.content_type.startswith("image/")), None)
         if img:
             embed.set_image(url=img.url)
-
         embed.add_field(name="🔗 Enlace", value=f"[Saltar al mensaje]({msg.jump_url})", inline=False)
         embed.set_footer(text=f"{count} {emoji}  •  {formatear_fecha(msg.created_at)}")
 
         texto = f"{emoji} {count} | {msg.channel.mention}"
 
+        # Si ya existía, lo editamos
         existing = get_tracked_message(mid)
         if existing:
             try:
@@ -205,8 +231,9 @@ async def _check(reaction):
                 await old.edit(content=texto, embed=embed)
                 return
             except discord.NotFound:
-                pass
+                pass  # si lo borraron, cae y vuelve a enviar
 
+        # Nuevo envío
         sent = await dest.send(content=texto, embed=embed)  # type: ignore[attr-defined]
         set_tracked_message(mid, sent.id)
 
