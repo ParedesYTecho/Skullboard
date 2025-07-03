@@ -129,17 +129,17 @@ async def on_raw_reaction_add(payload):
     if payload.user_id == bot.user.id:
         return
 
-    # Obtenemos el canal y comprobamos que es Messageable
-    chan = bot.get_channel(payload.thread_id or payload.channel_id)
-    if not isinstance(chan, discord.abc.Messageable):
+    # En lugar de payload.thread_id or payload.channel_id
+    chan = bot.get_channel(payload.channel_id)
+    if chan is None:
         return
-    channel = cast(discord.abc.Messageable, chan)
 
     try:
-        msg = await channel.fetch_message(payload.message_id)  # type: ignore[attr-defined]
-    except Exception:
+        msg = await chan.fetch_message(payload.message_id)
+    except:
         return
 
+    # SimpleNamespace o tu R = SimpleNamespace…
     r = SimpleNamespace(emoji=str(payload.emoji), message=msg)
     await _check(r)
 
@@ -148,14 +148,13 @@ async def on_raw_reaction_remove(payload):
     if payload.user_id == bot.user.id:
         return
 
-    chan = bot.get_channel(payload.thread_id or payload.channel_id)
-    if not isinstance(chan, discord.abc.Messageable):
+    chan = bot.get_channel(payload.channel_id)
+    if chan is None:
         return
-    channel = cast(discord.abc.Messageable, chan)
 
     try:
-        msg = await channel.fetch_message(payload.message_id)  # type: ignore[attr-defined]
-    except Exception:
+        msg = await chan.fetch_message(payload.message_id)
+    except:
         return
 
     r = SimpleNamespace(emoji=str(payload.emoji), message=msg)
