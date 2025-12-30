@@ -360,6 +360,16 @@ async def servers(ctx):
     )
     await ctx.send(embed=embed)
 
+@bot.command(name="stats")
+async def stats(ctx):
+    embed = discord.Embed(title="📊 Estadísticas de SkullBoard", color=discord.Color.blue())
+    embed.add_field(name="🏠 Servidores", value=str(len(bot.guilds)), inline=True)
+    embed.add_field(name="👥 Usuarios", value=str(len(bot.users)), inline=True) # Aproximado
+    embed.add_field(name="🏓 Ping", value=f"{round(bot.latency * 1000)}ms", inline=True)
+    embed.add_field(name="🐍 Python", value="3.10+", inline=True)
+    embed.add_field(name="📚 Lib", value=f"discord.py {discord.__version__}", inline=True)
+    await ctx.send(embed=embed)
+
 # ─── SLASH COMMANDS ──────────────────────────────────────────────────────────
 @tree.command(name="ajustes", description="Ver configuración del bot")
 async def ajustes_slash(interaction: discord.Interaction):
@@ -443,8 +453,12 @@ async def on_command_error(ctx, error):
         except:
              return await ctx.send("❌ Faltan argumentos.")
     if isinstance(error, commands.CommandNotFound):
-        # Ignorar comandos no encontrados para no spame logs
-        return
+        # Responder al usuario que el comando no existe
+        try:
+             # Usamos unicode emoji o simple texto
+             return await ctx.message.add_reaction("❓")
+        except:
+             return await ctx.send(f"❌ Comando desconocido. Usa /help para ver la lista.")
     logger.error(f"Error en comando de texto: {error}")
 
 @tree.error
