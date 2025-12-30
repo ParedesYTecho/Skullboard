@@ -122,7 +122,7 @@ async def status_loop():
     activities = [
         discord.Activity(type=discord.ActivityType.watching, name=f"{len(bot.guilds)} servidores"),
         discord.Game(name="💀 SkullBoard"),
-        discord.Activity(type=discord.ActivityType.listening, name="reacciones de calavera")
+        discord.Activity(type=discord.ActivityType.listening, name="Board Calaverosa")
     ]
     for activity in activities:
         await bot.change_presence(activity=activity)
@@ -247,13 +247,13 @@ async def _check(reaction):
         # Emoji especial para muchos likes
         emoji = "☠️" if count >= cfg["min_skulls"] * 2 else "💀"
 
-        # Crear Embed mejorado
+        # Crear Embed mejorado (pero volviendo al estilo visual anterior)
         # Truncar contenido para evitar errores (limite de discord 4096, usamos 1800 para seguridad + embeds)
         content = msg.content or ""
         if len(content) > 1800:
             content = content[:1800] + "...\n*(mensaje truncado)*"
             
-        embed = discord.Embed(description=content, color=discord.Color.from_rgb(47, 49, 54))
+        embed = discord.Embed(description=content, color=discord.Color.dark_gray())
         embed.set_author(
             name=msg.author.display_name,
             icon_url=(msg.author.avatar.url if msg.author.avatar else msg.author.default_avatar.url)
@@ -264,12 +264,12 @@ async def _check(reaction):
         if img:
             embed.set_image(url=img.url)
             
-        # Campos extra
-        embed.add_field(name="🔗 Original", value=f"[Ir al mensaje]({msg.jump_url})", inline=False)
+        # Campos extra (Estilo Anterior)
+        embed.add_field(name="🔗 Enlace", value=f"[Saltar al mensaje]({msg.jump_url})", inline=False)
         
-        # Footer con timestamp
-        embed.set_footer(text=f"ID: {mid}")
-        embed.timestamp = msg.created_at
+        # Footer con la fecha formateada (Estilo Anterior)
+        # Formato: "6 💀  •  18/12/2025 23:56" o "Ayer a las..."
+        embed.set_footer(text=f"{count} {emoji}  •  {formatear_fecha(msg.created_at)}")
 
         texto = f"{emoji} **{count}** | {msg.channel.mention}"
 
@@ -299,23 +299,26 @@ async def prefix(ctx, nuevo_prefijo: str=None):
     if not nuevo_prefijo:
         return await ctx.send("❌ ¡Falta el nuevo prefijo!")
     await update_guild_config(ctx.guild.id, {"prefix": nuevo_prefijo})
-    await ctx.send(f"✅ Prefijo cambiado a `{nuevo_prefijo}`")
+    # Mensaje mejorado
+    await ctx.send(f"✅ **Prefijo actualizado**\nAhora puedes usar comandos con `{nuevo_prefijo}`")
 
 @bot.command(name="set_channel", aliases=["channel"])
 @commands.has_permissions(administrator=True)
 async def set_channel(ctx, canal: discord.TextChannel = None):
     if not canal:
-        return await ctx.send("❌ ¡Menciona un canal!")
+        return await ctx.send("❌ ¡Debes mencionar el canal (ej: `#general`)!")
     await update_guild_config(ctx.guild.id, {"skullboard_channel_id": canal.id})
-    await ctx.send(f"✅ SkullBoard apuntando a {canal.mention}")
+    # Mensaje mejorado
+    await ctx.send(f"✅ **Canal configurado**\nLos mensajes se enviarán a {canal.mention}")
 
 @bot.command(name="set_min", aliases=["min"])
 @commands.has_permissions(administrator=True)
 async def set_min(ctx, n: int = None):
     if not n or n < 1:
-        return await ctx.send("❌ ¡Número inválido!")
+        return await ctx.send("❌ ¡Introduce un número válido mayor a 0!")
     await update_guild_config(ctx.guild.id, {"min_skulls": n})
-    await ctx.send(f"✅ Mínimo de reacciones ajustado a {n}")
+    # Mensaje mejorado
+    await ctx.send(f"✅ **Meta establecida**\nSe necesitan **{n}** reacciones 💀 para destacar un mensaje.")
 
 @bot.command(name="ajustes", aliases=["settings"])
 async def ajustes(ctx):
@@ -360,16 +363,6 @@ async def servers(ctx):
     )
     await ctx.send(embed=embed)
 
-@bot.command(name="stats")
-async def stats(ctx):
-    embed = discord.Embed(title="📊 Estadísticas de SkullBoard", color=discord.Color.blue())
-    embed.add_field(name="🏠 Servidores", value=str(len(bot.guilds)), inline=True)
-    embed.add_field(name="👥 Usuarios", value=str(len(bot.users)), inline=True) # Aproximado
-    embed.add_field(name="🏓 Ping", value=f"{round(bot.latency * 1000)}ms", inline=True)
-    embed.add_field(name="🐍 Python", value="3.10+", inline=True)
-    embed.add_field(name="📚 Lib", value=f"discord.py {discord.__version__}", inline=True)
-    await ctx.send(embed=embed)
-
 # ─── SLASH COMMANDS ──────────────────────────────────────────────────────────
 @tree.command(name="ajustes", description="Ver configuración del bot")
 async def ajustes_slash(interaction: discord.Interaction):
@@ -381,7 +374,8 @@ async def prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
     if not interaction.user.guild_permissions.administrator:
         return await interaction.response.send_message("❌ ¡No tienes permiso!", ephemeral=True)
     await update_guild_config(interaction.guild.id, {"prefix": nuevo_prefijo})
-    await interaction.response.send_message(f"✅ Prefijo cambiado a `{nuevo_prefijo}`")
+    # Mensaje mejorado
+    await interaction.response.send_message(f"✅ **Prefijo actualizado**\nAhora es: `{nuevo_prefijo}`")
 
 @tree.command(name="set_channel", description="Configura el canal del SkullBoard")
 @app_commands.describe(channel="Canal donde se enviarán los mensajes del SkullBoard")
@@ -389,7 +383,8 @@ async def set_channel_slash(interaction: discord.Interaction, channel: discord.T
     if not interaction.user.guild_permissions.administrator:
         return await interaction.response.send_message("❌ No tienes permiso de **Administrador**.", ephemeral=True)
     await update_guild_config(interaction.guild.id, {"skullboard_channel_id": channel.id})
-    await interaction.response.send_message(f"✅ Los mensajes destacados se enviarán a {channel.mention}")
+    # Mensaje mejorado
+    await interaction.response.send_message(f"✅ **Canal configurado**\nMensajes a {channel.mention}")
 
 @tree.command(name="set_min", description="Fija el mínimo de reacciones 💀")
 @app_commands.describe(cantidad="Número mínimo de reacciones para destacar un mensaje (≥ 1)")
@@ -399,7 +394,8 @@ async def set_min_slash(interaction: discord.Interaction, cantidad: int):
     if cantidad < 1:
         return await interaction.response.send_message("❌ ¡Número inválido! Debe ser ≥ 1.", ephemeral=True)
     await update_guild_config(interaction.guild.id, {"min_skulls": cantidad})
-    await interaction.response.send_message(f"✅ Mínimo de reacciones ajustado a {cantidad} 💀")
+    # Mensaje mejorado
+    await interaction.response.send_message(f"✅ **Meta establecida**\nMínimo: {cantidad} 💀")
 
 @tree.command(name="ping", description="Ver latencia")
 async def ping_slash(interaction: discord.Interaction):
@@ -423,20 +419,8 @@ async def help_slash(interaction: discord.Interaction):
     embed.add_field(name="/set_channel 🔒", value="📌 Configurar canal",   inline=True)
     embed.add_field(name="/set_min 🔒",     value="💀 Mínimo reacciones",  inline=True)
     embed.add_field(name="/prefix 🔒",      value="✏️ Cambiar prefijo",    inline=True)
-    embed.add_field(name="/stats",         value="📊 Estadísticas del bot", inline=True)
     
     embed.set_footer(text="🔒 = Requiere permisos de administrador")
-    await interaction.response.send_message(embed=embed)
-
-@tree.command(name="stats", description="Ver estadísticas del bot")
-async def stats_slash(interaction: discord.Interaction):
-    delta = datetime.now() - datetime.fromtimestamp(interaction.client.user.created_at.timestamp())
-    embed = discord.Embed(title="📊 Estadísticas de SkullBoard", color=discord.Color.blue())
-    embed.add_field(name="🏠 Servidores", value=str(len(bot.guilds)), inline=True)
-    embed.add_field(name="👥 Usuarios", value=str(len(bot.users)), inline=True) # Aproximado
-    embed.add_field(name="🏓 Ping", value=f"{round(bot.latency * 1000)}ms", inline=True)
-    embed.add_field(name="🐍 Python", value="3.10+", inline=True)
-    embed.add_field(name="📚 Lib", value=f"discord.py {discord.__version__}", inline=True)
     await interaction.response.send_message(embed=embed)
 
 # ─── MANEJO DE ERRORES GLOBAL ────────────────────────────────────────────────
