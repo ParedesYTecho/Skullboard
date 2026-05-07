@@ -676,7 +676,7 @@ async def ignored_cmd(ctx):
     embed.set_footer(text=f"{len(channels)} canal(es) ignorado(s) · Usa {p}unignore para desbloquear")
     await ctx.send(embed=embed)
 
-# ─── Comandos privados del owner (BACKFILL RESUCITADOR) ─────────────────────────
+# ─── Comandos privados del owner (BACKFILL IDs PURAS) ─────────────────────────
 @bot.command(name="backfill", hidden=True)
 async def backfill_cmd(ctx):
     if ctx.author.id != OWNER_ID:
@@ -700,77 +700,115 @@ async def backfill_cmd(ctx):
         ))
 
     msg_status = await ctx.send(embed=discord.Embed(
-        title="⏳ Paso 1/2 — Leyendo canal y Resucitando...",
-        description="Leyendo TODO el historial del canal para recuperar registros perdidos...",
+        title="⏳ Paso 1/3 — Recopilando enlaces...",
+        description="Buscando los enlaces de todos los mensajes en el canal...",
         color=0x8b5cf6
     ))
 
-    registros_a_subir = []
+    enlaces = {}
     leidos = 0
-    errores_parseo = 0
 
-    # PASO 1: Leer TODO el canal (sin importar si lo envió este bot u otro antiguo)
+    # PASO 1: Extraer solo los enlaces de los mensajes del board
     async for sb_msg in channel.history(limit=None, oldest_first=False):
         if not sb_msg.author.bot: continue 
         if not sb_msg.embeds: continue
 
-        try:
-            # 1. Extraer Count (buscamos el primer número en el mensaje, ej: 8)
+        emb = sb_msg.embeds[0]
+        embed_str = str(emb.to_dict())
+        
+        # Extraer el enlace original a través del texto del embed
+        match_msg = re.search(r'discord\.com/channels/\d+/(\d+)/(\d+)', embed_str)
+        if match_msg:
+            orig_chan_id = int(match_msg.group(1))
+            orig_msg_id = match_msg.group(2)
+            
+            # Raspamos calaveras por si acaso el mensaje original fue borrado
             count = 0
             nums = re.findall(r'\d+', sb_msg.content)
-            if nums:
-                count = int(nums[0])
+            if nums: count = int(nums[0])
             
-            # 2. Extraer Author ID de la URL de la imagen del avatar
-            author_id = None
-            emb = sb_msg.embeds[0]
+            # Raspamos ID del avatar como ÚLTIMO recurso (por si borraron el original)
+            fallback_author = None
             if emb.author and emb.author.icon_url:
-                icon_url = str(emb.author.icon_url)
-                if "/avatars/" in icon_url:
-                    candidate = icon_url.split("/avatars/")[1].split("/")[0]
-                    if candidate.isdigit():
-                        author_id = candidate
+                match_auth = re.search(r'(?:avatars|users)/(\d+)/', str(emb.author.icon_url))
+                if match_auth: fallback_author = match_auth.group(1)
 
-            # 3. Extraer Message ID original del enlace oculto en el embed
-            orig_message_id = None
-            for field in emb.fields:
-                if field.value and "discord.com/channels/" in field.value:
-                    match = re.search(r'discord\.com/channels/\d+/\d+/(\d+)', field.value)
-                    if match:
-                        orig_message_id = match.group(1)
-                        break
-            
-            # Si logramos raspar los datos vitales, lo preparamos para resucitarlo
-            if orig_message_id and author_id:
-                registros_a_subir.append({
-                    "message_id": str(orig_message_id),
-                    "skullboard_message_id": str(sb_msg.id),
-                    "skull_count": count,
-                    "author_id": str(author_id),
-                    "guild_id": gid
-                })
-            else:
-                errores_parseo += 1
-
-        except Exception as e:
-            errores_parseo += 1
-            continue
-        
+            enlaces[orig_msg_id] = {
+                "sb_msg_id": str(sb_msg.id),
+                "orig_chan_id": orig_chan_id,
+                "count_fallback": count,
+                "author_fallback": fallback_author
+            }
         leidos += 1
-        if leidos % 100 == 0:
-            await msg_status.edit(embed=discord.Embed(
-                title="⏳ Paso 1/2 — Leyendo canal...",
-                description=f"Leídos **{leidos}** mensajes...",
-                color=0x8b5cf6
-            ))
 
     await msg_status.edit(embed=discord.Embed(
-        title="⏳ Paso 2/2 — Restaurando Base de Datos...",
-        description=f"Se encontraron **{len(registros_a_subir)}** mensajes válidos.\nSubiendo a Supabase en bloque... ¡Esto puede tardar unos segundos!",
+        title="⏳ Paso 2/3 — Obteniendo IDs Puras...",
+        description=f"Se extrajeron {len(enlaces)} enlaces.\nVisitando los mensajes originales para sacar la ID real... ☕ (Esto tomará unos minutos para que Discord no nos bloquee)",
         color=0x8b5cf6
     ))
 
-    # PASO 2: Subir (Upsert) a Supabase en bloques de 100 para no saturar la API
+    registros_dict = {}
+    procesados = 0
+    errores_borrados = 0
+
+    # PASO 2: Fetch seguro (LA VERDAD ABSOLUTA)
+    for orig_msg_id, data in enlaces.items():
+        author_id = data["author_fallback"]
+        count = data["count_fallback"]
+        
+        try:
+            orig_chan = bot.get_channel(data["orig_chan_id"])
+            if orig_chan:
+                # FETCH AL MENSAJE ORIGINAL -> Sacamos la ID Pura inmutable
+                orig_msg = await orig_chan.fetch_message(int(orig_msg_id))
+                author_id = str(orig_msg.author.id)
+                
+                # Aprovechamos para sacar el conteo de calaveras ACTUALIZADO
+                skull_reac = next((r for r in orig_msg.reactions if str(r.emoji) == skull_emoji), None)
+                if skull_reac: count = skull_reac.count
+        except discord.NotFound:
+            # Si el usuario borró el mensaje original, no podemos sacar su ID pura.
+            # Nos conformamos con lo que habíamos raspado (fallback).
+            errores_borrados += 1
+        except Exception:
+            pass
+        
+        # Filtro Anti-Duplicados
+        if author_id:
+            if orig_msg_id in registros_dict:
+                if count > registros_dict[orig_msg_id]["skull_count"]:
+                    registros_dict[orig_msg_id]["skull_count"] = count
+                    registros_dict[orig_msg_id]["skullboard_message_id"] = data["sb_msg_id"]
+            else:
+                registros_dict[orig_msg_id] = {
+                    "message_id": str(orig_msg_id),
+                    "skullboard_message_id": data["sb_msg_id"],
+                    "skull_count": count,
+                    "author_id": str(author_id),
+                    "guild_id": gid
+                }
+
+        procesados += 1
+        # Actualizar el embed cada 30 mensajes para que veas que sigue vivo
+        if procesados % 30 == 0:
+            await msg_status.edit(embed=discord.Embed(
+                title="⏳ Paso 2/3 — Obteniendo IDs Puras...",
+                description=f"Progreso: **{procesados}/{len(enlaces)}** mensajes procesados...\n(Vamos lento a propósito)",
+                color=0x8b5cf6
+            ))
+        
+        # FRENO DE MANO: Medio segundo de espera para que Discord no crashee el bot
+        await asyncio.sleep(0.5)
+
+    registros_a_subir = list(registros_dict.values())
+
+    await msg_status.edit(embed=discord.Embed(
+        title="⏳ Paso 3/3 — Subiendo a BD...",
+        description=f"Guardando **{len(registros_a_subir)}** IDs verificadas en Supabase...",
+        color=0x8b5cf6
+    ))
+
+    # PASO 3: Subir a Supabase
     exitosos = 0
     chunk_size = 100
     for i in range(0, len(registros_a_subir), chunk_size):
@@ -785,12 +823,12 @@ async def backfill_cmd(ctx):
         await asyncio.sleep(0.5)
 
     await msg_status.edit(embed=discord.Embed(
-        title="✅ Resurrección Completada",
+        title="✅ Backfill de IDs Completado",
         description=(
-            f"📖 Mensajes totales leídos del canal: **{leidos}**\n"
-            f"♻️ Registros restaurados en la BD: **{exitosos}**\n"
-            f"⚠️ Ignorados (formato muy viejo/roto): **{errores_parseo}**\n\n"
-            "**¡Tus datos están a salvo! Usa /top o /stats para comprobarlo.**"
+            f"📖 Mensajes procesados: **{leidos}**\n"
+            f"🛡️ IDs puras restauradas: **{exitosos}**\n"
+            f"⚠️ Originales borrados (se usó fallback): **{errores_borrados}**\n\n"
+            "**¡Listo! Todos asignados por su ID única. Fero ya debería tener sus 114.**"
         ),
         color=0x57f287
     ))
