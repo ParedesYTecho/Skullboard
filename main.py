@@ -649,102 +649,130 @@ async def backfill_cmd(ctx):
         embed = discord.Embed(title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245)
         return await ctx.send(embed=embed)
 
-    # Obtener registros de GuilleVGX sin skull_count o sin author_id
-    def _fetch_pending():
+    # Sacar todos los pendientes via SQL directo para evitar bugs del SDK
+    def _fetch_all():
         return supabase.table("tracked_messages") \
-            .select("message_id,skullboard_message_id") \
-            .eq("guild_id", "608285778337988619") \
-            .or_("skull_count.eq.0,author_id.is.null") \
+            .select("message_id,skullboard_message_id,skull_count,author_id") \
+            .eq("guild_id", GUILD_ID) \
             .execute()
-    pending_resp = await asyncio.to_thread(_fetch_pending)
+    all_resp = await asyncio.to_thread(_fetch_all)
 
-    if not pending_resp.data:
+    if not all_resp.data:
+        embed = discord.Embed(title="✅ Sin datos", description="No hay registros para este servidor.", color=0x4e5058)
+        return await ctx.send(embed=embed)
+
+    # Filtrar manualmente los incompletos
+    pending = [
+        r for r in all_resp.data
+        if (r.get("skull_count") or 0) == 0 or not r.get("author_id")
+    ]
+
+    if not pending:
         embed = discord.Embed(title="✅ Nada que actualizar", description="Todos los registros ya tienen datos.", color=0x57f287)
         return await ctx.send(embed=embed)
 
-    total        = len(pending_resp.data)
+    total        = len(pending)
     actualizados = 0
-    ignorados    = 0
+    borrados     = 0
     errores      = 0
 
     msg_status = await ctx.send(embed=discord.Embed(
         title="⏳ Backfill iniciado",
-        description=f"Procesando **{total}** registros pendientes...",
+        description=f"Procesando **{total}** registros pendientes de {len(all_resp.data)} totales...",
         color=0x8b5cf6
     ))
 
-    for i, row in enumerate(pending_resp.data):
-        sb_msg_id = row.get("skullboard_message_id")
+    for i, row in enumerate(pending):
+        sb_msg_id  = row.get("skullboard_message_id")
+        message_id = row["message_id"]
+
         if not sb_msg_id:
-            ignorados += 1
+            errores += 1
             continue
 
         try:
             sb_msg = await channel.fetch_message(int(sb_msg_id))
 
-            if not sb_msg.embeds or not sb_msg.content:
-                ignorados += 1
+            if not sb_msg.content or not sb_msg.embeds:
+                errores += 1
                 continue
 
-            # Parsear count
-            parts = sb_msg.content.split("**")
-            if len(parts) < 3:
-                ignorados += 1
+            # Parsear count: "💀 **6** | #canal" o "☠️ **24** | #canal"
+            try:
+                count = int(sb_msg.content.split("**")[1].strip())
+            except Exception:
+                errores += 1
                 continue
-            count = int(parts[1].strip())
 
-            # Extraer author_id del icon_url
-            embed     = sb_msg.embeds[0]
-            author_id = None
-            if embed.author and embed.author.icon_url:
-                icon_url = str(embed.author.icon_url)
-                if "cdn.discordapp.com/avatars/" in icon_url:
+            # Extraer author_id del icon_url del avatar
+            # Formato: https://cdn.discordapp.com/avatars/USER_ID/hash.webp
+            embed_    = sb_msg.embeds[0]
+            author_id = row.get("author_id")  # mantener si ya existe
+            if not author_id and embed_.author and embed_.author.icon_url:
+                icon_url = str(embed_.author.icon_url)
+                if "/avatars/" in icon_url:
                     try:
                         author_id = icon_url.split("/avatars/")[1].split("/")[0]
+                        # Validar que sea un número (user_id válido)
+                        int(author_id)
                     except Exception:
-                        pass
+                        author_id = None
 
-            updates = {"guild_id": GUILD_ID, "skull_count": count}
+            updates = {}
+            if count > 0:
+                updates["skull_count"] = count
             if author_id:
                 updates["author_id"] = author_id
 
-            def _update(mid=row["message_id"]):
-                return supabase.table("tracked_messages") \
-                    .update(updates) \
-                    .eq("message_id", mid).execute()
+            if not updates:
+                errores += 1
+                continue
+
+            mid = message_id
+            def _update(m=mid, u=updates):
+                return supabase.table("tracked_messages").update(u).eq("message_id", m).execute()
             await asyncio.to_thread(_update)
             actualizados += 1
 
         except discord.NotFound:
-            # Mensaje borrado del canal — limpiar de la BD
-            def _del(mid=row["message_id"]):
-                return supabase.table("tracked_messages") \
-                    .delete().eq("message_id", mid).execute()
+            # Mensaje borrado del canal skullboard → limpiar de la BD
+            def _del(m=message_id):
+                return supabase.table("tracked_messages").delete().eq("message_id", m).execute()
             await asyncio.to_thread(_del)
-            ignorados += 1
-        except Exception as e:
-            logger.error(f"Backfill error en {sb_msg_id}: {e}")
+            borrados += 1
+
+        except discord.Forbidden:
             errores += 1
 
-        # Actualizar progreso cada 50 mensajes
-        if (i + 1) % 50 == 0:
+        except Exception as e:
+            logger.error(f"Backfill error en sb_msg {sb_msg_id}: {e}")
+            errores += 1
+
+        # Actualizar progreso cada 100 mensajes
+        if (i + 1) % 100 == 0:
             try:
                 await msg_status.edit(embed=discord.Embed(
                     title="⏳ Backfill en progreso...",
-                    description=f"**{i+1}/{total}** procesados · ✅ {actualizados} · ❌ {errores}",
+                    description=(
+                        f"**{i+1}/{total}** procesados\n"
+                        f"✅ Actualizados: {actualizados}\n"
+                        f"🗑️ Borrados: {borrados}\n"
+                        f"❌ Errores: {errores}"
+                    ),
                     color=0x8b5cf6
                 ))
             except Exception:
                 pass
 
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.5)  # Conservador para evitar rate limit
 
     embed_result = discord.Embed(
         title="✅ Backfill completado",
         description=(
             f"✅ Actualizados: **{actualizados}**\n"
-            f"⏭️ Ignorados/Borrados: **{ignorados}**\n"
-            f"❌ Errores: **{errores}**"
+            f"🗑️ Borrados (ya no existen): **{borrados}**\n"
+            f"❌ Errores: **{errores}**\n"
+            f"📊 Total procesados: **{total}**"
         ),
         color=0x57f287
     )
