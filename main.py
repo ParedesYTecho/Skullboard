@@ -649,12 +649,12 @@ async def backfill_cmd(ctx):
         embed = discord.Embed(title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245)
         return await ctx.send(embed=embed)
 
-    # Obtener todos los registros sin guild_id que sí tienen skullboard_message_id
+    # Obtener registros de GuilleVGX sin skull_count o sin author_id
     def _fetch_pending():
         return supabase.table("tracked_messages") \
             .select("message_id,skullboard_message_id") \
-            .is_("guild_id", "null") \
-            .not_.is_("skullboard_message_id", "null") \
+            .eq("guild_id", "608285778337988619") \
+            .or_("skull_count.eq.0,author_id.is.null") \
             .execute()
     pending_resp = await asyncio.to_thread(_fetch_pending)
 
