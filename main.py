@@ -347,6 +347,51 @@ async def _check(msg: discord.Message):
     except Exception as e:
         logger.error(f"Error en _check: {e}")
 
+# ─── Borrado de mensajes ──────────────────────────────────────────────────────
+@bot.event
+async def on_raw_message_delete(payload):
+    mid = str(payload.message_id)
+
+    # Caso 1: Se borró el mensaje original → borrar del skullboard y de la BD
+    def _find_by_original():
+        return supabase.table("tracked_messages") \
+            .select("skullboard_message_id,guild_id") \
+            .eq("message_id", mid).execute()
+    resp = await asyncio.to_thread(_find_by_original)
+
+    if resp.data:
+        row    = resp.data[0]
+        sb_id  = row.get("skullboard_message_id")
+        gid    = row.get("guild_id")
+        # Intentar borrar el mensaje del skullboard
+        if sb_id and gid:
+            try:
+                cfg      = await get_guild_config(int(gid))
+                sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
+                if sb_chan:
+                    sb_msg = await sb_chan.fetch_message(sb_id)
+                    await sb_msg.delete()
+            except Exception:
+                pass
+        # Borrar de la BD
+        def _del():
+            return supabase.table("tracked_messages").delete().eq("message_id", mid).execute()
+        await asyncio.to_thread(_del)
+        return
+
+    # Caso 2: Se borró el mensaje del skullboard → solo borrar de la BD
+    def _find_by_sb():
+        return supabase.table("tracked_messages") \
+            .select("message_id") \
+            .eq("skullboard_message_id", payload.message_id).execute()
+    resp2 = await asyncio.to_thread(_find_by_sb)
+
+    if resp2.data:
+        def _del2():
+            return supabase.table("tracked_messages") \
+                .delete().eq("skullboard_message_id", payload.message_id).execute()
+        await asyncio.to_thread(_del2)
+
 # ─── COMANDOS DE TEXTO ────────────────────────────────────────────────────────
 
 @bot.command(name="prefix", aliases=["set_prefix"])
@@ -596,10 +641,10 @@ async def backfill_cmd(ctx):
         except: pass
         return
 
-    GUILD_ID      = "608285778337988619"
-    CHANNEL_ID    = 1372902731022598284
-    guild         = bot.get_guild(int(GUILD_ID))
-    channel       = bot.get_channel(CHANNEL_ID)
+    GUILD_ID   = "608285778337988619"
+    CHANNEL_ID = 1372902731022598284
+    guild      = bot.get_guild(int(GUILD_ID))
+    channel    = bot.get_channel(CHANNEL_ID)
 
     if not guild or not channel:
         embed = discord.Embed(title="❌ Error", description="No se encontró el servidor o el canal.", color=0xed4245)
@@ -617,44 +662,42 @@ async def backfill_cmd(ctx):
 
     try:
         async for sb_msg in channel.history(limit=None, oldest_first=True):
-            # Solo mensajes del bot con el formato correcto
             if sb_msg.author.id != bot.user.id: continue
             if not sb_msg.embeds: continue
             if not sb_msg.content: continue
 
             try:
-                # Parsear count del texto: "💀 **6** | #canal" o "☠️ **24** | #canal"
-                content = sb_msg.content
-                parts   = content.split("**")
+                # Parsear count del texto: "💀 **6** | #canal"
+                parts = sb_msg.content.split("**")
                 if len(parts) < 3: continue
                 count = int(parts[1].strip())
 
-                embed  = sb_msg.embeds[0]
-                # author_id desde el embed — buscar miembro por display_name
-                author_name = embed.author.name if embed.author else None
-                author_id   = None
-                if author_name:
-                    member = discord.utils.find(lambda m: m.display_name == author_name, guild.members)
-                    if member:
-                        author_id = str(member.id)
+                # Extraer author_id del icon_url del avatar
+                # Formato: https://cdn.discordapp.com/avatars/USER_ID/hash.ext
+                embed     = sb_msg.embeds[0]
+                author_id = None
+                if embed.author and embed.author.icon_url:
+                    icon_url = embed.author.icon_url
+                    if "cdn.discordapp.com/avatars/" in icon_url:
+                        try:
+                            author_id = icon_url.split("/avatars/")[1].split("/")[0]
+                        except Exception:
+                            pass
+                    elif "cdn.discordapp.com/embed/avatars/" in icon_url:
+                        # Avatar por defecto — no tiene user_id, buscar por nombre
+                        author_name = embed.author.name
+                        member = discord.utils.find(lambda m: m.display_name == author_name, guild.members)
+                        if member:
+                            author_id = str(member.id)
 
-                # skullboard_message_id es el ID del mensaje del bot en el canal
-                sb_msg_id = sb_msg.id
-
-                # Buscar el message_id original en tracked_messages por skullboard_message_id
+                # Buscar registro en tracked_messages por skullboard_message_id
                 def _find():
                     return supabase.table("tracked_messages") \
                         .select("message_id,guild_id") \
-                        .eq("skullboard_message_id", sb_msg_id).execute()
+                        .eq("skullboard_message_id", sb_msg.id).execute()
                 resp = await asyncio.to_thread(_find)
 
                 if not resp.data:
-                    ignorados += 1
-                    continue
-
-                row = resp.data[0]
-                # Solo actualizar si no tiene guild_id ya
-                if row.get("guild_id"):
                     ignorados += 1
                     continue
 
@@ -665,7 +708,7 @@ async def backfill_cmd(ctx):
                 def _update():
                     return supabase.table("tracked_messages") \
                         .update(updates) \
-                        .eq("skullboard_message_id", sb_msg_id).execute()
+                        .eq("skullboard_message_id", sb_msg.id).execute()
                 await asyncio.to_thread(_update)
                 actualizados += 1
 
@@ -673,7 +716,7 @@ async def backfill_cmd(ctx):
                 logger.error(f"Backfill error en msg {sb_msg.id}: {e}")
                 errores += 1
 
-            await asyncio.sleep(0.1)  # Rate limit seguro
+            await asyncio.sleep(0.1)
 
     except Exception as e:
         logger.error(f"Backfill error general: {e}")
@@ -682,7 +725,7 @@ async def backfill_cmd(ctx):
         title="✅ Backfill completado",
         description=(
             f"✅ Actualizados: **{actualizados}**\n"
-            f"⏭️ Ya tenían datos: **{ignorados}**\n"
+            f"⏭️ Ignorados: **{ignorados}**\n"
             f"❌ Errores: **{errores}**"
         ),
         color=0x57f287
