@@ -1,6 +1,7 @@
 import discord
 import logging
 import os
+import re
 import webserver
 import asyncio
 import random
@@ -8,7 +9,6 @@ from datetime import datetime, timezone
 from discord.ext import commands, tasks
 from discord import app_commands
 from supabase import create_client
-from types import SimpleNamespace
 import discord.abc
 from typing import Optional
 
@@ -654,59 +654,79 @@ async def backfill_cmd(ctx):
         except: pass
         return
 
-    GUILD_ID   = "608285778337988619"
-    CHANNEL_ID = 1372902731022598284
-    channel    = bot.get_channel(CHANNEL_ID)
+    gid = str(ctx.guild.id)
+    cfg = await get_guild_config(ctx.guild.id)
+    sb_channel_id = cfg["skullboard_channel_id"]
 
+    if not sb_channel_id:
+        return await ctx.send(embed=discord.Embed(
+            title="❌ Error", description="No hay canal skullboard configurado.", color=0xed4245
+        ))
+
+    channel = bot.get_channel(sb_channel_id)
     if not channel:
-        embed = discord.Embed(title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245)
-        return await ctx.send(embed=embed)
+        return await ctx.send(embed=discord.Embed(
+            title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245
+        ))
 
     msg_status = await ctx.send(embed=discord.Embed(
-        title="⏳ Paso 1/2 — Leyendo canal...",
-        description="Leyendo historial del canal skullboard en batch...",
+        title="⏳ Paso 1/3 — Leyendo canal...",
+        description="Leyendo historial del canal skullboard...",
         color=0x8b5cf6
     ))
 
-    # PASO 1: Leer TODO el canal de una vez con history() → mucho más eficiente
-    sb_map = {}  # skullboard_message_id (str) → {count, author_id}
+    # PASO 1: Leer mensajes del bot en el canal skullboard
+    # Extraer: count del contenido, y jump_url del embed para localizar el mensaje original
+    sb_map = {}  # skullboard_message_id (str) → {count, orig_channel_id, orig_message_id}
     leidos = 0
 
     async for sb_msg in channel.history(limit=None, oldest_first=False):
-        if sb_msg.author.id != bot.user.id: continue
-        if not sb_msg.content or not sb_msg.embeds: continue
+        if sb_msg.author.id != bot.user.id:
+            continue
+        if not sb_msg.content or not sb_msg.embeds:
+            continue
 
         try:
             count = int(sb_msg.content.split("**")[1].strip())
         except Exception:
             continue
 
-        author_id = None
+        orig_channel_id = None
+        orig_message_id = None
         emb = sb_msg.embeds[0]
-        if emb.author and emb.author.icon_url:
-            icon_url = str(emb.author.icon_url)
-            if "/avatars/" in icon_url:
-                try:
-                    candidate = icon_url.split("/avatars/")[1].split("/")[0]
-                    int(candidate)
-                    author_id = candidate
-                except Exception:
-                    pass
+        for field in emb.fields:
+            if field.value and "discord.com/channels/" in field.value:
+                match = re.search(r'discord\.com/channels/\d+/(\d+)/(\d+)', field.value)
+                if match:
+                    orig_channel_id = int(match.group(1))
+                    orig_message_id = match.group(2)
+                break
 
-        sb_map[str(sb_msg.id)] = {"count": count, "author_id": author_id}
+        sb_map[str(sb_msg.id)] = {
+            "count": count,
+            "orig_channel_id": orig_channel_id,
+            "orig_message_id": orig_message_id,
+        }
         leidos += 1
 
+        if leidos % 100 == 0:
+            await msg_status.edit(embed=discord.Embed(
+                title="⏳ Paso 1/3 — Leyendo canal...",
+                description=f"Leídos **{leidos}** mensajes...",
+                color=0x8b5cf6
+            ))
+
+    # PASO 2: Obtener registros pendientes de la BD
     await msg_status.edit(embed=discord.Embed(
-        title="⏳ Paso 2/2 — Actualizando BD...",
-        description=f"Leídos **{leidos}** mensajes del canal. Actualizando base de datos...",
+        title="⏳ Paso 2/3 — Consultando BD...",
+        description=f"Leídos **{leidos}** mensajes del canal. Buscando registros pendientes...",
         color=0x8b5cf6
     ))
 
-    # PASO 2: Obtener registros pendientes de la BD
     def _fetch_all():
         return supabase.table("tracked_messages") \
             .select("message_id,skullboard_message_id,skull_count,author_id") \
-            .eq("guild_id", GUILD_ID).execute()
+            .eq("guild_id", gid).execute()
     all_resp = await asyncio.to_thread(_fetch_all)
 
     pending = [
@@ -717,50 +737,76 @@ async def backfill_cmd(ctx):
     if not pending:
         await msg_status.edit(embed=discord.Embed(
             title="✅ Nada que actualizar",
-            description="Todos los registros ya tienen datos.",
+            description=f"Leídos **{leidos}** mensajes. Todos los registros ya tienen datos completos.",
             color=0x57f287
         ))
         return
 
+    # PASO 3: Actualizar registros pendientes
+    await msg_status.edit(embed=discord.Embed(
+        title="⏳ Paso 3/3 — Actualizando registros...",
+        description=f"**{len(pending)}** registros pendientes de {len(all_resp.data or [])} totales.",
+        color=0x8b5cf6
+    ))
+
     actualizados = 0
     borrados     = 0
-    sin_datos    = 0
+    errores      = 0
 
-    for row in pending:
+    for i, row in enumerate(pending):
         sb_id      = str(row.get("skullboard_message_id") or "")
         message_id = row["message_id"]
 
-        if sb_id in sb_map:
-            datos     = sb_map[sb_id]
-            updates   = {}
-            if datos["count"] > 0:
-                updates["skull_count"] = datos["count"]
-            if datos["author_id"] and not row.get("author_id"):
-                updates["author_id"] = datos["author_id"]
-
-            if updates:
-                def _update(m=message_id, u=updates):
-                    return supabase.table("tracked_messages").update(u).eq("message_id", m).execute()
-                await asyncio.to_thread(_update)
-                actualizados += 1
-            else:
-                sin_datos += 1
-        else:
-            # No está en el canal → fue borrado, limpiar de BD
+        if sb_id not in sb_map:
             def _del(m=message_id):
                 return supabase.table("tracked_messages").delete().eq("message_id", m).execute()
             await asyncio.to_thread(_del)
             borrados += 1
+            continue
 
-        await asyncio.sleep(0.05)
+        datos   = sb_map[sb_id]
+        updates = {}
+
+        if datos["count"] > 0 and (row.get("skull_count") or 0) == 0:
+            updates["skull_count"] = datos["count"]
+
+        if not row.get("author_id") and datos["orig_channel_id"] and datos["orig_message_id"]:
+            try:
+                orig_chan = bot.get_channel(datos["orig_channel_id"])
+                if orig_chan:
+                    orig_msg = await orig_chan.fetch_message(int(datos["orig_message_id"]))
+                    updates["author_id"] = str(orig_msg.author.id)
+                    skull_reac = next((r for r in orig_msg.reactions if str(r.emoji) == skull_emoji), None)
+                    if skull_reac and skull_reac.count > 0:
+                        updates["skull_count"] = skull_reac.count
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass
+            except Exception as e:
+                logger.warning(f"Backfill: error fetching original {datos['orig_message_id']}: {e}")
+                errores += 1
+
+        if updates:
+            def _update(m=message_id, u=updates):
+                return supabase.table("tracked_messages").update(u).eq("message_id", m).execute()
+            await asyncio.to_thread(_update)
+            actualizados += 1
+
+        if (i + 1) % 25 == 0:
+            await msg_status.edit(embed=discord.Embed(
+                title="⏳ Paso 3/3 — Actualizando registros...",
+                description=f"Progreso: **{i + 1}/{len(pending)}**",
+                color=0x8b5cf6
+            ))
+        await asyncio.sleep(0.5)
 
     await msg_status.edit(embed=discord.Embed(
         title="✅ Backfill completado",
         description=(
             f"📖 Mensajes leídos del canal: **{leidos}**\n"
+            f"📋 Registros pendientes: **{len(pending)}**\n"
             f"✅ Actualizados: **{actualizados}**\n"
-            f"🗑️ Borrados (no existen): **{borrados}**\n"
-            f"⚠️ Sin datos recuperables: **{sin_datos}**"
+            f"🗑️ Borrados (no existen en canal): **{borrados}**\n"
+            f"❌ Errores: **{errores}**"
         ),
         color=0x57f287
     ))
