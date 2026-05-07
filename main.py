@@ -676,7 +676,7 @@ async def ignored_cmd(ctx):
     embed.set_footer(text=f"{len(channels)} canal(es) ignorado(s) · Usa {p}unignore para desbloquear")
     await ctx.send(embed=embed)
 
-# ─── Comandos privados del owner (BACKFILL IDs PURAS) ─────────────────────────
+# ─── Comandos privados del owner (BACKFILL IDs PURAS - 1 a 1) ─────────────────────────
 @bot.command(name="backfill", hidden=True)
 async def backfill_cmd(ctx):
     if ctx.author.id != OWNER_ID:
@@ -716,18 +716,15 @@ async def backfill_cmd(ctx):
         emb = sb_msg.embeds[0]
         embed_str = str(emb.to_dict())
         
-        # Extraer el enlace original a través del texto del embed
         match_msg = re.search(r'discord\.com/channels/\d+/(\d+)/(\d+)', embed_str)
         if match_msg:
             orig_chan_id = int(match_msg.group(1))
             orig_msg_id = match_msg.group(2)
             
-            # Raspamos calaveras por si acaso el mensaje original fue borrado
             count = 0
             nums = re.findall(r'\d+', sb_msg.content)
             if nums: count = int(nums[0])
             
-            # Raspamos ID del avatar como ÚLTIMO recurso (por si borraron el original)
             fallback_author = None
             if emb.author and emb.author.icon_url:
                 match_auth = re.search(r'(?:avatars|users)/(\d+)/', str(emb.author.icon_url))
@@ -743,7 +740,7 @@ async def backfill_cmd(ctx):
 
     await msg_status.edit(embed=discord.Embed(
         title="⏳ Paso 2/3 — Obteniendo IDs Puras...",
-        description=f"Se extrajeron {len(enlaces)} enlaces.\nVisitando los mensajes originales para sacar la ID real... ☕ (Esto tomará unos minutos para que Discord no nos bloquee)",
+        description=f"Se extrajeron {len(enlaces)} enlaces.\nVisitando los mensajes originales para sacar la ID real... ☕ (Iremos lento para que Discord no nos bloquee)",
         color=0x8b5cf6
     ))
 
@@ -751,7 +748,7 @@ async def backfill_cmd(ctx):
     procesados = 0
     errores_borrados = 0
 
-    # PASO 2: Fetch seguro (LA VERDAD ABSOLUTA)
+    # PASO 2: Fetch seguro
     for orig_msg_id, data in enlaces.items():
         author_id = data["author_fallback"]
         count = data["count_fallback"]
@@ -759,21 +756,16 @@ async def backfill_cmd(ctx):
         try:
             orig_chan = bot.get_channel(data["orig_chan_id"])
             if orig_chan:
-                # FETCH AL MENSAJE ORIGINAL -> Sacamos la ID Pura inmutable
                 orig_msg = await orig_chan.fetch_message(int(orig_msg_id))
                 author_id = str(orig_msg.author.id)
                 
-                # Aprovechamos para sacar el conteo de calaveras ACTUALIZADO
                 skull_reac = next((r for r in orig_msg.reactions if str(r.emoji) == skull_emoji), None)
                 if skull_reac: count = skull_reac.count
         except discord.NotFound:
-            # Si el usuario borró el mensaje original, no podemos sacar su ID pura.
-            # Nos conformamos con lo que habíamos raspado (fallback).
             errores_borrados += 1
         except Exception:
             pass
         
-        # Filtro Anti-Duplicados
         if author_id:
             if orig_msg_id in registros_dict:
                 if count > registros_dict[orig_msg_id]["skull_count"]:
@@ -789,46 +781,47 @@ async def backfill_cmd(ctx):
                 }
 
         procesados += 1
-        # Actualizar el embed cada 30 mensajes para que veas que sigue vivo
         if procesados % 30 == 0:
             await msg_status.edit(embed=discord.Embed(
                 title="⏳ Paso 2/3 — Obteniendo IDs Puras...",
-                description=f"Progreso: **{procesados}/{len(enlaces)}** mensajes procesados...\n(Vamos lento a propósito)",
+                description=f"Progreso: **{procesados}/{len(enlaces)}** mensajes procesados...",
                 color=0x8b5cf6
             ))
         
-        # FRENO DE MANO: Medio segundo de espera para que Discord no crashee el bot
         await asyncio.sleep(0.5)
 
     registros_a_subir = list(registros_dict.values())
 
     await msg_status.edit(embed=discord.Embed(
         title="⏳ Paso 3/3 — Subiendo a BD...",
-        description=f"Guardando **{len(registros_a_subir)}** IDs verificadas en Supabase...",
+        description=f"Guardando **{len(registros_a_subir)}** IDs en Supabase 1 a 1 para evitar bloqueos...",
         color=0x8b5cf6
     ))
 
-    # PASO 3: Subir a Supabase
+    # PASO 3: Subir a Supabase DE 1 EN 1 (Anti-Errores de Bloque)
     exitosos = 0
-    chunk_size = 100
-    for i in range(0, len(registros_a_subir), chunk_size):
-        chunk = registros_a_subir[i:i+chunk_size]
+    errores_db = 0
+    for registro in registros_a_subir:
         try:
-            def _upsert_chunk(c=chunk):
-                return supabase.table("tracked_messages").upsert(c).execute()
-            await asyncio.to_thread(_upsert_chunk)
-            exitosos += len(chunk)
+            # Función auxiliar necesaria para que no se pise la variable en el loop async
+            def _upsert(r=registro):
+                return supabase.table("tracked_messages").upsert(r).execute()
+            await asyncio.to_thread(_upsert)
+            exitosos += 1
         except Exception as e:
-            logger.error(f"Error en upsert chunk: {e}")
-        await asyncio.sleep(0.5)
+            logger.error(f"Error guardando msg {registro['message_id']}: {e}")
+            errores_db += 1
+            
+        await asyncio.sleep(0.05) # Pequeñísima pausa para cuidar la BD
 
     await msg_status.edit(embed=discord.Embed(
         title="✅ Backfill de IDs Completado",
         description=(
-            f"📖 Mensajes procesados: **{leidos}**\n"
-            f"🛡️ IDs puras restauradas: **{exitosos}**\n"
-            f"⚠️ Originales borrados (se usó fallback): **{errores_borrados}**\n\n"
-            "**¡Listo! Todos asignados por su ID única. Fero ya debería tener sus 114.**"
+            f"📖 Mensajes leídos: **{leidos}**\n"
+            f"🛡️ Guardados con éxito: **{exitosos}**\n"
+            f"⚠️ Originales borrados (usado fallback): **{errores_borrados}**\n"
+            f"❌ Conflictos de BD ignorados: **{errores_db}**\n\n"
+            "**¡Listo! Base de datos limpia y asignada a las IDs inmutables.**"
         ),
         color=0x57f287
     ))
