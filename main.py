@@ -1,6 +1,7 @@
 import discord
 import logging
 import os
+import re
 import webserver
 import asyncio
 import random
@@ -8,7 +9,6 @@ from datetime import datetime, timezone
 from discord.ext import commands, tasks
 from discord import app_commands
 from supabase import create_client
-from types import SimpleNamespace
 import discord.abc
 from typing import Optional
 
@@ -28,6 +28,11 @@ supabase      = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 OWNER_ID    = 561225979389804544
 skull_emoji = '💀'
+
+_prefix_cache: dict[str, tuple[str, float]] = {}
+PREFIX_CACHE_TTL = 120
+
+_check_locks: dict[str, asyncio.Lock] = {}
 
 # ─── Wrappers Async ───────────────────────────────────────────────────────────
 async def db_select(table: str, match_col: str, match_val: str, select_cols: str = "*"):
@@ -88,7 +93,7 @@ async def get_guild_record(guild_id: str) -> int:
             .eq("guild_id", guild_id).order("skull_count", desc=True).limit(1).execute()
     resp = await asyncio.to_thread(_op)
     if resp.data:
-        return resp.data[0]["skull_count"]
+        return resp.data[0]["skull_count"] or 0
     return 0
 
 # ─── Ignored channels ─────────────────────────────────────────────────────────
@@ -122,8 +127,17 @@ async def get_ignored_channels(guild_id: str) -> list:
 async def get_prefix(bot, message):
     if not message.guild:
         return "sk!"
+    import time
+    gid = str(message.guild.id)
+    now = time.time()
+    if gid in _prefix_cache:
+        cached_prefix, cached_at = _prefix_cache[gid]
+        if now - cached_at < PREFIX_CACHE_TTL:
+            return cached_prefix
     cfg = await get_guild_config(message.guild.id)
-    return cfg.get("prefix", "sk!")
+    prefix = cfg.get("prefix", "sk!")
+    _prefix_cache[gid] = (prefix, now)
+    return prefix
 
 # ─── Bot ──────────────────────────────────────────────────────────────────────
 intents = discord.Intents.default()
@@ -143,7 +157,6 @@ class SkullBot(commands.Bot):
 bot  = SkullBot(command_prefix=get_prefix, intents=intents, help_command=None)
 tree = bot.tree
 
-# Cooldown inteligente: mid -> TimerHandle
 processing_messages: dict = {}
 
 async def get_formatted_prefix(ctx_or_interaction) -> str:
@@ -194,7 +207,7 @@ async def build_ajustes_embed(guild_id) -> discord.Embed:
     embed.add_field(name="🏓 Latencia", value=f"{ping_estado(ms)} · {ms}ms",                                   inline=True)
     embed.add_field(name="\u200b",      value="\u200b",                                                        inline=True)
     embed.add_field(name="\u200b",      value="\u200b",                                                        inline=True)
-    embed.add_field(name="🔗 Invitar",  value=f"[Invitar SkullBoard]({get_invite_url()})",                      inline=False)
+    embed.add_field(name="🔗 Invitar",  value=f"[Invitar SkullBoard]({get_invite_url()})",                       inline=False)
     return embed
 
 # ─── Help paginado (slash) ────────────────────────────────────────────────────
@@ -242,7 +255,7 @@ def build_slash_help_pages() -> list:
     p3.add_field(name="/set_channel 🔒", value="📌 Configura el canal del skullboard", inline=True)
     p3.add_field(name="/set_min 🔒",     value="💀 Mínimo de reacciones",               inline=True)
     p3.add_field(name="/prefix 🔒",      value="✏️ Cambia el prefijo",                 inline=True)
-    p3.add_field(name="/ignore 🔒",      value="🚫 Ignora un canal",                    inline=True)
+    p3.add_field(name="/ignore 🔒",      value="🚫 Ignora un canal",                   inline=True)
     p3.add_field(name="/unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
     p3.set_footer(text=footer_admin)
 
@@ -270,7 +283,7 @@ async def _schedule_check(channel_id: int, message_id: int):
     mid = str(message_id)
     if mid in processing_messages:
         processing_messages[mid].cancel()
-    loop   = asyncio.get_event_loop()
+    loop   = asyncio.get_running_loop()
     handle = loop.call_later(
         2.0,
         lambda: asyncio.ensure_future(_run_check(channel_id, message_id))
@@ -289,70 +302,75 @@ async def _run_check(channel_id: int, message_id: int):
 
 # ─── Core logic ───────────────────────────────────────────────────────────────
 async def _check(msg: discord.Message):
-    try:
-        cfg = await get_guild_config(msg.guild.id)
-        gid = str(msg.guild.id)
+    mid = str(msg.id)
 
-        # Ignorar canal skullboard
-        if msg.channel.id == cfg["skullboard_channel_id"]: return
-        # Ignorar canales excluidos
-        if await is_channel_ignored(gid, str(msg.channel.id)): return
+    if mid not in _check_locks:
+        _check_locks[mid] = asyncio.Lock()
+    lock = _check_locks[mid]
 
-        skull_reac = next((r for r in msg.reactions if str(r.emoji) == skull_emoji), None)
-        count      = skull_reac.count if skull_reac else 0
-        if count < cfg["min_skulls"]: return
+    async with lock:
+        try:
+            cfg = await get_guild_config(msg.guild.id)
+            gid = str(msg.guild.id)
 
-        dest_chan = bot.get_channel(cfg["skullboard_channel_id"])
-        if not isinstance(dest_chan, discord.abc.Messageable): return
+            if msg.channel.id == cfg["skullboard_channel_id"]: return
+            if await is_channel_ignored(gid, str(msg.channel.id)): return
 
-        emoji  = "☠️" if count >= cfg["min_skulls"] * 2 else "💀"
-        record = await get_guild_record(gid)
+            skull_reac = next((r for r in msg.reactions if str(r.emoji) == skull_emoji), None)
+            count      = skull_reac.count if skull_reac else 0
+            if count < cfg["min_skulls"]: return
 
-        content = msg.content or ""
-        if len(content) > 1800:
-            content = content[:1800] + "...\n*(mensaje truncado)*"
+            dest_chan = bot.get_channel(cfg["skullboard_channel_id"])
+            if not isinstance(dest_chan, discord.abc.Messageable): return
 
-        embed = discord.Embed(description=content, color=discord.Color.dark_gray())
-        embed.set_author(
-            name=msg.author.display_name,
-            icon_url=(msg.author.avatar.url if msg.author.avatar else msg.author.default_avatar.url)
-        )
-        img = next((a for a in msg.attachments if a.content_type and a.content_type.startswith("image/")), None)
-        if img:
-            embed.set_image(url=img.url)
+            emoji  = "☠️" if count >= cfg["min_skulls"] * 2 else "💀"
+            record = await get_guild_record(gid)
 
-        embed.add_field(name="🔗 Enlace", value=f"[Saltar al mensaje]({msg.jump_url})", inline=False)
+            content = msg.content or ""
+            if len(content) > 1800:
+                content = content[:1800] + "...\n*(mensaje truncado)*"
 
-        footer = f"{count} {emoji}  •  {formatear_fecha(msg.created_at)}"
-        if count >= record and count > 0:
-            footer += "  •  🏆 Récord del servidor"
-        embed.set_footer(text=footer)
+            embed = discord.Embed(description=content, color=discord.Color.dark_gray())
+            embed.set_author(
+                name=msg.author.display_name,
+                icon_url=(msg.author.avatar.url if msg.author.avatar else msg.author.default_avatar.url)
+            )
+            img = next((a for a in msg.attachments if a.content_type and a.content_type.startswith("image/")), None)
+            if img:
+                embed.set_image(url=img.url)
 
-        texto = f"{emoji} **{count}** | {msg.channel.mention}"
-        mid   = str(msg.id)
+            embed.add_field(name="🔗 Enlace", value=f"[Saltar al mensaje]({msg.jump_url})", inline=False)
 
-        existing_id = await get_tracked_message(mid)
-        if existing_id:
-            try:
-                old = await dest_chan.fetch_message(existing_id)
-                await old.edit(content=texto, embed=embed)
-                await update_tracked_count(mid, count)
-                return
-            except discord.NotFound:
-                pass
+            footer = f"{count} {emoji}  •  {formatear_fecha(msg.created_at)}"
+            if count >= record and count > 0:
+                footer += "  •  🏆 Récord del servidor"
+            embed.set_footer(text=footer)
 
-        sent = await dest_chan.send(content=texto, embed=embed)
-        await set_tracked_message(mid, sent.id, count, msg.author.id, gid)
+            texto = f"{emoji} **{count}** | {msg.channel.mention}"
 
-    except Exception as e:
-        logger.error(f"Error en _check: {e}")
+            existing_id = await get_tracked_message(mid)
+            if existing_id:
+                try:
+                    old = await dest_chan.fetch_message(existing_id)
+                    await old.edit(content=texto, embed=embed)
+                    await update_tracked_count(mid, count)
+                    return
+                except discord.NotFound:
+                    pass
+
+            sent = await dest_chan.send(content=texto, embed=embed)
+            await set_tracked_message(mid, sent.id, count, msg.author.id, gid)
+
+        except Exception as e:
+            logger.error(f"Error en _check: {e}")
+
+    _check_locks.pop(mid, None)
 
 # ─── Borrado de mensajes ──────────────────────────────────────────────────────
 @bot.event
 async def on_raw_message_delete(payload):
     mid = str(payload.message_id)
 
-    # Caso 1: Se borró el mensaje original → borrar del skullboard y de la BD
     def _find_by_original():
         return supabase.table("tracked_messages") \
             .select("skullboard_message_id,guild_id") \
@@ -363,7 +381,6 @@ async def on_raw_message_delete(payload):
         row    = resp.data[0]
         sb_id  = row.get("skullboard_message_id")
         gid    = row.get("guild_id")
-        # Intentar borrar el mensaje del skullboard
         if sb_id and gid:
             try:
                 cfg      = await get_guild_config(int(gid))
@@ -373,38 +390,40 @@ async def on_raw_message_delete(payload):
                     await sb_msg.delete()
             except Exception:
                 pass
-        # Borrar de la BD
         def _del():
             return supabase.table("tracked_messages").delete().eq("message_id", mid).execute()
         await asyncio.to_thread(_del)
         return
 
-    # Caso 2: Se borró el mensaje del skullboard → solo borrar de la BD
+    sb_mid = str(payload.message_id)
     def _find_by_sb():
         return supabase.table("tracked_messages") \
             .select("message_id") \
-            .eq("skullboard_message_id", payload.message_id).execute()
+            .eq("skullboard_message_id", sb_mid).execute()
     resp2 = await asyncio.to_thread(_find_by_sb)
 
     if resp2.data:
         def _del2():
             return supabase.table("tracked_messages") \
-                .delete().eq("skullboard_message_id", payload.message_id).execute()
+                .delete().eq("skullboard_message_id", sb_mid).execute()
         await asyncio.to_thread(_del2)
 
 # ─── COMANDOS DE TEXTO ────────────────────────────────────────────────────────
 
 @bot.command(name="prefix", aliases=["set_prefix"])
+@commands.guild_only()
 @commands.has_permissions(administrator=True)
 async def prefix_cmd(ctx, nuevo_prefijo: str = None):
     if not nuevo_prefijo:
         embed = discord.Embed(title="❌ Falta el prefijo", description="Indica el nuevo prefijo.", color=0xed4245)
         return await ctx.send(embed=embed)
     await update_guild_config(ctx.guild.id, {"prefix": nuevo_prefijo})
+    _prefix_cache.pop(str(ctx.guild.id), None)
     embed = discord.Embed(title="✅ Prefijo actualizado", description=f"Ahora puedes usar comandos con `{nuevo_prefijo}`", color=0x57f287)
     await ctx.send(embed=embed)
 
 @bot.command(name="set_channel", aliases=["channel"])
+@commands.guild_only()
 @commands.has_permissions(administrator=True)
 async def set_channel_cmd(ctx, canal: discord.TextChannel = None):
     if not canal:
@@ -415,6 +434,7 @@ async def set_channel_cmd(ctx, canal: discord.TextChannel = None):
     await ctx.send(embed=embed)
 
 @bot.command(name="set_min", aliases=["min"])
+@commands.guild_only()
 @commands.has_permissions(administrator=True)
 async def set_min_cmd(ctx, n: int = None):
     if not n or n < 1:
@@ -425,11 +445,13 @@ async def set_min_cmd(ctx, n: int = None):
     await ctx.send(embed=embed)
 
 @bot.command(name="ajustes", aliases=["settings"])
+@commands.guild_only()
 async def ajustes_cmd(ctx):
     embed = await build_ajustes_embed(ctx.guild.id)
     await ctx.send(embed=embed)
 
 @bot.command()
+@commands.guild_only()
 async def ping(ctx):
     ms    = round(bot.latency * 1000)
     embed = discord.Embed(title="🏓 Pong!", color=0x5865F2)
@@ -438,6 +460,7 @@ async def ping(ctx):
     await ctx.send(embed=embed)
 
 @bot.command()
+@commands.guild_only()
 async def invite(ctx):
     embed = discord.Embed(title="💀 SkullBoard", description="Añade este Bot a tu servidor y disfruta!", color=0x8b5cf6)
     embed.add_field(name="🔗 Invitar al servidor", value=f"[Haz click aquí para invitarme]({get_invite_url()})", inline=False)
@@ -445,6 +468,7 @@ async def invite(ctx):
     await ctx.send(embed=embed)
 
 @bot.command(name="help", aliases=["ayuda", "comandos"])
+@commands.guild_only()
 async def help_cmd(ctx):
     p = await get_formatted_prefix(ctx)
     footer_nav   = f"Usa /help para ver los comandos de barra"
@@ -467,7 +491,7 @@ async def help_cmd(ctx):
     p3.add_field(name=f"{p}set_channel 🔒", value="📌 Configura el canal del skullboard", inline=True)
     p3.add_field(name=f"{p}set_min 🔒",     value="💀 Mínimo de reacciones",               inline=True)
     p3.add_field(name=f"{p}prefix 🔒",      value="✏️ Cambia el prefijo",                 inline=True)
-    p3.add_field(name=f"{p}ignore 🔒",      value="🚫 Ignora un canal",                    inline=True)
+    p3.add_field(name=f"{p}ignore 🔒",      value="🚫 Ignora un canal",                   inline=True)
     p3.add_field(name=f"{p}unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
     p3.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard",             inline=True)
     p3.set_footer(text=footer_admin)
@@ -477,6 +501,7 @@ async def help_cmd(ctx):
     await ctx.send(embed=pages[0], view=view)
 
 @bot.command(name="reset", hidden=True)
+@commands.guild_only()
 @commands.has_permissions(administrator=True)
 async def reset_cmd(ctx):
     gid        = str(ctx.guild.id)
@@ -512,6 +537,7 @@ async def reset_cmd(ctx):
     await ctx.send(embed=embed)
 
 @bot.command(name="ignore")
+@commands.guild_only()
 @commands.has_permissions(administrator=True)
 async def ignore_cmd(ctx, canal: discord.TextChannel = None):
     if not canal:
@@ -522,6 +548,7 @@ async def ignore_cmd(ctx, canal: discord.TextChannel = None):
     await ctx.send(embed=embed)
 
 @bot.command(name="unignore")
+@commands.guild_only()
 @commands.has_permissions(administrator=True)
 async def unignore_cmd(ctx, canal: discord.TextChannel = None):
     if not canal:
@@ -532,6 +559,7 @@ async def unignore_cmd(ctx, canal: discord.TextChannel = None):
     await ctx.send(embed=embed)
 
 @bot.command(name="top")
+@commands.guild_only()
 async def top_cmd(ctx):
     gid = str(ctx.guild.id)
     def _op():
@@ -548,9 +576,9 @@ async def top_cmd(ctx):
     lines  = []
     for i, row in enumerate(resp.data):
         pos   = medals[i] if i < 3 else f"{i+1}."
-        count = row["skull_count"]
+        count = row.get("skull_count") or 0
         try:
-            m    = ctx.guild.get_member(int(row["author_id"])) if row["author_id"] else None
+            m    = ctx.guild.get_member(int(row["author_id"])) if row.get("author_id") else None
             name = m.display_name if m else "Usuario desconocido"
         except Exception:
             name = "Usuario desconocido"
@@ -566,6 +594,7 @@ async def top_cmd(ctx):
     await ctx.send(embed=embed)
 
 @bot.command(name="random")
+@commands.guild_only()
 async def random_cmd(ctx):
     gid = str(ctx.guild.id)
     def _op():
@@ -585,15 +614,15 @@ async def random_cmd(ctx):
     except Exception:
         sb_msg = None
 
-    header = discord.Embed(title="🎲 Mensaje aleatorio del skullboard", color=0x8b5cf6)
-    await ctx.send(embed=header)
-
-    if sb_msg:
-        await ctx.send(content=sb_msg.content, embed=sb_msg.embeds[0] if sb_msg.embeds else None)
+    if sb_msg and sb_msg.embeds:
+        embed = sb_msg.embeds[0].copy()
+        embed.title = "🎲 Mensaje aleatorio del skullboard"
+        await ctx.send(content=sb_msg.content, embed=embed)
     else:
-        await ctx.send(embed=discord.Embed(description="No se pudo recuperar el mensaje.", color=0x4e5058))
+        await ctx.send(embed=discord.Embed(title="🎲 Mensaje aleatorio", description="No se pudo recuperar el mensaje.", color=0x4e5058))
 
 @bot.command(name="stats")
+@commands.guild_only()
 async def stats_cmd(ctx, member: discord.Member = None):
     member = member or ctx.author
     gid    = str(ctx.guild.id)
@@ -614,9 +643,9 @@ async def stats_cmd(ctx, member: discord.Member = None):
         return await ctx.send(embed=embed)
 
     total_msgs   = len(resp.data)
-    total_skulls = sum(r["skull_count"] for r in resp.data)
-    best_row     = max(resp.data, key=lambda r: r["skull_count"])
-    best_count   = best_row["skull_count"]
+    total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
+    best_row     = max(resp.data, key=lambda r: r.get("skull_count") or 0)
+    best_count   = best_row.get("skull_count") or 0
     best_sb_id   = best_row.get("skullboard_message_id")
     cfg          = await get_guild_config(ctx.guild.id)
     link         = None
@@ -634,6 +663,7 @@ async def stats_cmd(ctx, member: discord.Member = None):
     await ctx.send(embed=embed)
 
 @bot.command(name="ignored")
+@commands.guild_only()
 async def ignored_cmd(ctx):
     gid      = str(ctx.guild.id)
     channels = await get_ignored_channels(gid)
@@ -646,7 +676,7 @@ async def ignored_cmd(ctx):
     embed.set_footer(text=f"{len(channels)} canal(es) ignorado(s) · Usa {p}unignore para desbloquear")
     await ctx.send(embed=embed)
 
-# ─── Comandos privados del owner ──────────────────────────────────────────────
+# ─── Comandos privados del owner (BACKFILL ARREGLADO) ─────────────────────────
 @bot.command(name="backfill", hidden=True)
 async def backfill_cmd(ctx):
     if ctx.author.id != OWNER_ID:
@@ -654,22 +684,29 @@ async def backfill_cmd(ctx):
         except: pass
         return
 
-    GUILD_ID   = "608285778337988619"
-    CHANNEL_ID = 1372902731022598284
-    channel    = bot.get_channel(CHANNEL_ID)
+    gid = str(ctx.guild.id)
+    cfg = await get_guild_config(ctx.guild.id)
+    sb_channel_id = cfg.get("skullboard_channel_id")
 
+    if not sb_channel_id:
+        return await ctx.send(embed=discord.Embed(
+            title="❌ Error", description="No hay canal skullboard configurado en este servidor.", color=0xed4245
+        ))
+
+    channel = bot.get_channel(sb_channel_id)
     if not channel:
-        embed = discord.Embed(title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245)
-        return await ctx.send(embed=embed)
+        return await ctx.send(embed=discord.Embed(
+            title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245
+        ))
 
     msg_status = await ctx.send(embed=discord.Embed(
         title="⏳ Paso 1/2 — Leyendo canal...",
-        description="Leyendo historial del canal skullboard en batch...",
+        description="Leyendo historial del canal skullboard en batch... Esto será rapidísimo ⚡",
         color=0x8b5cf6
     ))
 
-    # PASO 1: Leer TODO el canal de una vez con history() → mucho más eficiente
-    sb_map = {}  # skullboard_message_id (str) → {count, author_id}
+    # PASO 1: Leer TODO el canal de una vez usando el truco de la URL del Avatar
+    sb_map = {} 
     leidos = 0
 
     async for sb_msg in channel.history(limit=None, oldest_first=False):
@@ -683,12 +720,14 @@ async def backfill_cmd(ctx):
 
         author_id = None
         emb = sb_msg.embeds[0]
+        
+        # El truco maestro: extraer la ID directamente de la imagen dibujada
         if emb.author and emb.author.icon_url:
             icon_url = str(emb.author.icon_url)
             if "/avatars/" in icon_url:
                 try:
                     candidate = icon_url.split("/avatars/")[1].split("/")[0]
-                    int(candidate)
+                    int(candidate) # Verificamos que sea un número válido
                     author_id = candidate
                 except Exception:
                     pass
@@ -702,11 +741,11 @@ async def backfill_cmd(ctx):
         color=0x8b5cf6
     ))
 
-    # PASO 2: Obtener registros pendientes de la BD
+    # PASO 2: Obtener registros pendientes de la BD correspondientes A ESTE SERVIDOR
     def _fetch_all():
         return supabase.table("tracked_messages") \
             .select("message_id,skullboard_message_id,skull_count,author_id") \
-            .eq("guild_id", GUILD_ID).execute()
+            .eq("guild_id", gid).execute()
     all_resp = await asyncio.to_thread(_fetch_all)
 
     pending = [
@@ -715,12 +754,11 @@ async def backfill_cmd(ctx):
     ]
 
     if not pending:
-        await msg_status.edit(embed=discord.Embed(
+        return await msg_status.edit(embed=discord.Embed(
             title="✅ Nada que actualizar",
-            description="Todos los registros ya tienen datos.",
+            description="Todos los registros ya tienen sus datos (calaveras y autores) completos.",
             color=0x57f287
         ))
-        return
 
     actualizados = 0
     borrados     = 0
@@ -731,9 +769,9 @@ async def backfill_cmd(ctx):
         message_id = row["message_id"]
 
         if sb_id in sb_map:
-            datos     = sb_map[sb_id]
-            updates   = {}
-            if datos["count"] > 0:
+            datos   = sb_map[sb_id]
+            updates = {}
+            if datos["count"] > 0 and (row.get("skull_count") or 0) == 0:
                 updates["skull_count"] = datos["count"]
             if datos["author_id"] and not row.get("author_id"):
                 updates["author_id"] = datos["author_id"]
@@ -746,20 +784,21 @@ async def backfill_cmd(ctx):
             else:
                 sin_datos += 1
         else:
-            # No está en el canal → fue borrado, limpiar de BD
+            # No está en el canal → el mensaje original o del board fue borrado, limpiar de BD
             def _del(m=message_id):
                 return supabase.table("tracked_messages").delete().eq("message_id", m).execute()
             await asyncio.to_thread(_del)
             borrados += 1
 
+        # Pequeña pausa para no enojar a la API de Supabase
         await asyncio.sleep(0.05)
 
     await msg_status.edit(embed=discord.Embed(
-        title="✅ Backfill completado",
+        title="✅ Backfill completado exitosamente",
         description=(
             f"📖 Mensajes leídos del canal: **{leidos}**\n"
-            f"✅ Actualizados: **{actualizados}**\n"
-            f"🗑️ Borrados (no existen): **{borrados}**\n"
+            f"✅ Registros actualizados: **{actualizados}**\n"
+            f"🗑️ Mensajes fantasmas borrados: **{borrados}**\n"
             f"⚠️ Sin datos recuperables: **{sin_datos}**"
         ),
         color=0x57f287
@@ -881,6 +920,7 @@ async def prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
         embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     await update_guild_config(interaction.guild.id, {"prefix": nuevo_prefijo})
+    _prefix_cache.pop(str(interaction.guild.id), None)
     embed = discord.Embed(title="✅ Prefijo actualizado", description=f"Ahora puedes usar comandos con `{nuevo_prefijo}`", color=0x57f287)
     await interaction.response.send_message(embed=embed)
 
@@ -990,13 +1030,12 @@ async def random_slash(interaction: discord.Interaction):
     except Exception:
         sb_msg = None
 
-    header = discord.Embed(title="🎲 Mensaje aleatorio del skullboard", color=0x8b5cf6)
-    await interaction.followup.send(embed=header)
-
-    if sb_msg:
-        await interaction.followup.send(content=sb_msg.content, embed=sb_msg.embeds[0] if sb_msg.embeds else None)
+    if sb_msg and sb_msg.embeds:
+        embed = sb_msg.embeds[0].copy()
+        embed.title = "🎲 Mensaje aleatorio del skullboard"
+        await interaction.followup.send(content=sb_msg.content, embed=embed)
     else:
-        await interaction.followup.send(embed=discord.Embed(description="No se pudo recuperar el mensaje.", color=0x4e5058))
+        await interaction.followup.send(embed=discord.Embed(title="🎲 Mensaje aleatorio", description="No se pudo recuperar el mensaje.", color=0x4e5058))
 
 @tree.command(name="stats", description="Estadísticas de un usuario en el skullboard")
 @app_commands.describe(usuario="Usuario del que ver las estadísticas")
@@ -1080,6 +1119,8 @@ async def ignored_slash(interaction: discord.Interaction):
 # ─── Manejo de errores global ─────────────────────────────────────────────────
 @bot.event
 async def on_command_error(ctx, error):
+    if isinstance(error, commands.NoPrivateMessage):
+        return
     if isinstance(error, commands.MissingPermissions):
         embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador** para usar este comando.", color=0xed4245)
         return await ctx.send(embed=embed)
