@@ -22,8 +22,8 @@ logger = logging.getLogger("SkullBoard")
 # ─── Configuración de Supabase ───────────────────────────────────────────────
 DISCORD_TOKEN  = os.getenv("DISCORD_TOKEN")
 SUPABASE_URL   = os.getenv("SUPABASE_URL")
-SUPABASE_SERVICE_ROLE_KEY   = os.getenv("SUPABASE_SERVICE_ROLE_SERVICE_ROLE_KEY")
-supabase       = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+SUPABASE_KEY   = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+supabase       = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # ─── Wrappers Async para Supabase ────────────────────────────────────────────
 # Para evitar bloquear el event loop principal con peticiones HTTP síncronas
@@ -209,8 +209,11 @@ async def on_raw_reaction_remove(payload):
 # ── Core logic ────────────────────────────────────────────────────────────────
 async def _check(reaction):
     chan = reaction.message.channel
-    msg  = reaction.message
-    mid  = str(msg.id)
+    try:
+        msg = await chan.fetch_message(reaction.message.id)
+    except Exception: return
+
+    mid = str(msg.id)
     
     if str(reaction.emoji) != skull_emoji: return
     if mid in processing_messages: return
