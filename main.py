@@ -203,22 +203,22 @@ class HelpView(discord.ui.View):
         super().__init__(timeout=120)
         self.pages   = pages
         self.current = 0
-        self._refresh()
+        self._update_buttons()
 
-    def _refresh(self):
+    def _update_buttons(self):
         self.prev_btn.disabled = self.current == 0
         self.next_btn.disabled = self.current == len(self.pages) - 1
 
     @discord.ui.button(label="◀ Anterior", style=discord.ButtonStyle.secondary)
     async def prev_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current -= 1
-        self._refresh()
+        self._update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.current], view=self)
 
     @discord.ui.button(label="Siguiente ▶", style=discord.ButtonStyle.secondary)
     async def next_btn(self, interaction: discord.Interaction, button: discord.ui.Button):
         self.current += 1
-        self._refresh()
+        self._update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.current], view=self)
 
 def build_slash_help_pages() -> list:
@@ -589,6 +589,106 @@ async def ignored_cmd(ctx):
     await ctx.send(embed=embed)
 
 # ─── Comandos privados del owner ──────────────────────────────────────────────
+@bot.command(name="backfill", hidden=True)
+async def backfill_cmd(ctx):
+    if ctx.author.id != OWNER_ID:
+        try: await ctx.message.add_reaction("❓")
+        except: pass
+        return
+
+    GUILD_ID      = "608285778337988619"
+    CHANNEL_ID    = 1372902731022598284
+    guild         = bot.get_guild(int(GUILD_ID))
+    channel       = bot.get_channel(CHANNEL_ID)
+
+    if not guild or not channel:
+        embed = discord.Embed(title="❌ Error", description="No se encontró el servidor o el canal.", color=0xed4245)
+        return await ctx.send(embed=embed)
+
+    msg_status = await ctx.send(embed=discord.Embed(
+        title="⏳ Backfill iniciado",
+        description="Leyendo historial del canal skullboard de GuilleVGX...",
+        color=0x8b5cf6
+    ))
+
+    actualizados = 0
+    ignorados    = 0
+    errores      = 0
+
+    try:
+        async for sb_msg in channel.history(limit=None, oldest_first=True):
+            # Solo mensajes del bot con el formato correcto
+            if sb_msg.author.id != bot.user.id: continue
+            if not sb_msg.embeds: continue
+            if not sb_msg.content: continue
+
+            try:
+                # Parsear count del texto: "💀 **6** | #canal" o "☠️ **24** | #canal"
+                content = sb_msg.content
+                parts   = content.split("**")
+                if len(parts) < 3: continue
+                count = int(parts[1].strip())
+
+                embed  = sb_msg.embeds[0]
+                # author_id desde el embed — buscar miembro por display_name
+                author_name = embed.author.name if embed.author else None
+                author_id   = None
+                if author_name:
+                    member = discord.utils.find(lambda m: m.display_name == author_name, guild.members)
+                    if member:
+                        author_id = str(member.id)
+
+                # skullboard_message_id es el ID del mensaje del bot en el canal
+                sb_msg_id = sb_msg.id
+
+                # Buscar el message_id original en tracked_messages por skullboard_message_id
+                def _find():
+                    return supabase.table("tracked_messages") \
+                        .select("message_id,guild_id") \
+                        .eq("skullboard_message_id", sb_msg_id).execute()
+                resp = await asyncio.to_thread(_find)
+
+                if not resp.data:
+                    ignorados += 1
+                    continue
+
+                row = resp.data[0]
+                # Solo actualizar si no tiene guild_id ya
+                if row.get("guild_id"):
+                    ignorados += 1
+                    continue
+
+                updates = {"guild_id": GUILD_ID, "skull_count": count}
+                if author_id:
+                    updates["author_id"] = author_id
+
+                def _update():
+                    return supabase.table("tracked_messages") \
+                        .update(updates) \
+                        .eq("skullboard_message_id", sb_msg_id).execute()
+                await asyncio.to_thread(_update)
+                actualizados += 1
+
+            except Exception as e:
+                logger.error(f"Backfill error en msg {sb_msg.id}: {e}")
+                errores += 1
+
+            await asyncio.sleep(0.1)  # Rate limit seguro
+
+    except Exception as e:
+        logger.error(f"Backfill error general: {e}")
+
+    embed_result = discord.Embed(
+        title="✅ Backfill completado",
+        description=(
+            f"✅ Actualizados: **{actualizados}**\n"
+            f"⏭️ Ya tenían datos: **{ignorados}**\n"
+            f"❌ Errores: **{errores}**"
+        ),
+        color=0x57f287
+    )
+    await msg_status.edit(embed=embed_result)
+
 @bot.command(name="announce", hidden=True)
 async def announce_cmd(ctx):
     if ctx.author.id != OWNER_ID:
@@ -759,7 +859,13 @@ async def top_slash(interaction: discord.Interaction):
         return supabase.table("tracked_messages") \
             .select("skull_count,author_id,skullboard_message_id") \
             .eq("guild_id", gid).order("skull_count", desc=True).limit(10).execute()
-    resp = await asyncio.to_thread(_op)
+    try:
+        resp = await asyncio.to_thread(_op)
+    except Exception as e:
+        logger.error(f"Error en /top: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudo obtener el top.", color=0xed4245)
+        return await interaction.followup.send(embed=embed)
+
     if not resp.data:
         embed = discord.Embed(title="🏆 Top Skullboard", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
         return await interaction.followup.send(embed=embed)
@@ -769,9 +875,9 @@ async def top_slash(interaction: discord.Interaction):
     lines  = []
     for i, row in enumerate(resp.data):
         pos   = medals[i] if i < 3 else f"{i+1}."
-        count = row["skull_count"]
+        count = row.get("skull_count") or 0
         try:
-            m    = interaction.guild.get_member(int(row["author_id"])) if row["author_id"] else None
+            m    = interaction.guild.get_member(int(row["author_id"])) if row.get("author_id") else None
             name = m.display_name if m else "Usuario desconocido"
         except Exception:
             name = "Usuario desconocido"
@@ -827,7 +933,12 @@ async def stats_slash(interaction: discord.Interaction, usuario: discord.Member 
         return supabase.table("tracked_messages") \
             .select("skull_count,skullboard_message_id") \
             .eq("guild_id", gid).eq("author_id", uid).execute()
-    resp = await asyncio.to_thread(_op)
+    try:
+        resp = await asyncio.to_thread(_op)
+    except Exception as e:
+        logger.error(f"Error en /stats: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas.", color=0xed4245)
+        return await interaction.followup.send(embed=embed)
 
     if not resp.data:
         embed = discord.Embed(
@@ -838,9 +949,9 @@ async def stats_slash(interaction: discord.Interaction, usuario: discord.Member 
         return await interaction.followup.send(embed=embed)
 
     total_msgs   = len(resp.data)
-    total_skulls = sum(r["skull_count"] for r in resp.data)
-    best_row     = max(resp.data, key=lambda r: r["skull_count"])
-    best_count   = best_row["skull_count"]
+    total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
+    best_row     = max(resp.data, key=lambda r: r.get("skull_count") or 0)
+    best_count   = best_row.get("skull_count") or 0
     best_sb_id   = best_row.get("skullboard_message_id")
     cfg          = await get_guild_config(interaction.guild.id)
     link         = None
