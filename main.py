@@ -446,22 +446,35 @@ async def invite(ctx):
 
 @bot.command(name="help", aliases=["ayuda", "comandos"])
 async def help_cmd(ctx):
-    p     = await get_formatted_prefix(ctx)
-    embed = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Comandos de texto disponibles:", color=0x8b5cf6)
-    embed.add_field(name=f"{p}ajustes",        value="⚙️ Ver configuración",       inline=True)
-    embed.add_field(name=f"{p}ping",           value="🏓 Latencia del bot",         inline=True)
-    embed.add_field(name=f"{p}invite",         value="🔗 Enlace de invitación",     inline=True)
-    embed.add_field(name=f"{p}top",            value="🏆 Top mensajes más 💀",       inline=True)
-    embed.add_field(name=f"{p}random",         value="🎲 Mensaje aleatorio",         inline=True)
-    embed.add_field(name=f"{p}stats @usuario", value="📊 Estadísticas de usuario",  inline=True)
-    embed.add_field(name=f"{p}set_channel 🔒", value="📌 Configura el canal",        inline=True)
-    embed.add_field(name=f"{p}set_min 🔒",     value="💀 Mínimo de reacciones",      inline=True)
-    embed.add_field(name=f"{p}prefix 🔒",      value="✏️ Cambia el prefijo",        inline=True)
-    embed.add_field(name=f"{p}ignore 🔒",      value="🚫 Ignora un canal",           inline=True)
-    embed.add_field(name=f"{p}unignore 🔒",    value="✅ Deja de ignorar un canal", inline=True)
-    embed.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard",    inline=True)
-    embed.set_footer(text="Usa /help para ver los comandos de barra.")
-    await ctx.send(embed=embed)
+    p = await get_formatted_prefix(ctx)
+    footer_nav   = f"Usa /help para ver los comandos de barra"
+    footer_admin = "🔒 Requiere permisos de administrador"
+
+    p1 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 1 de 3 · General", color=0x8b5cf6)
+    p1.add_field(name=f"{p}ajustes", value="⚙️ Ver configuración actual", inline=True)
+    p1.add_field(name=f"{p}ping",    value="🏓 Latencia del bot",          inline=True)
+    p1.add_field(name=f"{p}invite",  value="🔗 Enlace de invitación",      inline=True)
+    p1.set_footer(text=footer_nav)
+
+    p2 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 2 de 3 · Skullboard", color=0x8b5cf6)
+    p2.add_field(name=f"{p}top",            value="🏆 Top mensajes más 💀",        inline=True)
+    p2.add_field(name=f"{p}stats @usuario", value="📊 Estadísticas de un usuario", inline=True)
+    p2.add_field(name=f"{p}random",         value="🎲 Mensaje aleatorio",          inline=True)
+    p2.add_field(name=f"{p}ignored",        value="🚫 Ver canales ignorados",      inline=True)
+    p2.set_footer(text=footer_nav)
+
+    p3 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 3 de 3 · Configuración", color=0x8b5cf6)
+    p3.add_field(name=f"{p}set_channel 🔒", value="📌 Configura el canal del skullboard", inline=True)
+    p3.add_field(name=f"{p}set_min 🔒",     value="💀 Mínimo de reacciones",               inline=True)
+    p3.add_field(name=f"{p}prefix 🔒",      value="✏️ Cambia el prefijo",                 inline=True)
+    p3.add_field(name=f"{p}ignore 🔒",      value="🚫 Ignora un canal",                    inline=True)
+    p3.add_field(name=f"{p}unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
+    p3.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard",             inline=True)
+    p3.set_footer(text=footer_admin)
+
+    pages = [p1, p2, p3]
+    view  = HelpView(pages)
+    await ctx.send(embed=pages[0], view=view)
 
 @bot.command(name="reset", hidden=True)
 @commands.has_permissions(administrator=True)
@@ -572,13 +585,13 @@ async def random_cmd(ctx):
     except Exception:
         sb_msg = None
 
-    if sb_msg and sb_msg.embeds:
-        embed = sb_msg.embeds[0].copy()
-    else:
-        embed = discord.Embed(color=discord.Color.dark_gray())
+    header = discord.Embed(title="🎲 Mensaje aleatorio del skullboard", color=0x8b5cf6)
+    await ctx.send(embed=header)
 
-    embed.title = "🎲 Mensaje aleatorio del skullboard"
-    await ctx.send(embed=embed)
+    if sb_msg:
+        await ctx.send(content=sb_msg.content, embed=sb_msg.embeds[0] if sb_msg.embeds else None)
+    else:
+        await ctx.send(embed=discord.Embed(description="No se pudo recuperar el mensaje.", color=0x4e5058))
 
 @bot.command(name="stats")
 async def stats_cmd(ctx, member: discord.Member = None):
@@ -649,141 +662,109 @@ async def backfill_cmd(ctx):
         embed = discord.Embed(title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245)
         return await ctx.send(embed=embed)
 
-    # Sacar todos los pendientes via SQL directo para evitar bugs del SDK
+    msg_status = await ctx.send(embed=discord.Embed(
+        title="⏳ Paso 1/2 — Leyendo canal...",
+        description="Leyendo historial del canal skullboard en batch...",
+        color=0x8b5cf6
+    ))
+
+    # PASO 1: Leer TODO el canal de una vez con history() → mucho más eficiente
+    sb_map = {}  # skullboard_message_id (str) → {count, author_id}
+    leidos = 0
+
+    async for sb_msg in channel.history(limit=None, oldest_first=False):
+        if sb_msg.author.id != bot.user.id: continue
+        if not sb_msg.content or not sb_msg.embeds: continue
+
+        try:
+            count = int(sb_msg.content.split("**")[1].strip())
+        except Exception:
+            continue
+
+        author_id = None
+        emb = sb_msg.embeds[0]
+        if emb.author and emb.author.icon_url:
+            icon_url = str(emb.author.icon_url)
+            if "/avatars/" in icon_url:
+                try:
+                    candidate = icon_url.split("/avatars/")[1].split("/")[0]
+                    int(candidate)
+                    author_id = candidate
+                except Exception:
+                    pass
+
+        sb_map[str(sb_msg.id)] = {"count": count, "author_id": author_id}
+        leidos += 1
+
+    await msg_status.edit(embed=discord.Embed(
+        title="⏳ Paso 2/2 — Actualizando BD...",
+        description=f"Leídos **{leidos}** mensajes del canal. Actualizando base de datos...",
+        color=0x8b5cf6
+    ))
+
+    # PASO 2: Obtener registros pendientes de la BD
     def _fetch_all():
         return supabase.table("tracked_messages") \
             .select("message_id,skullboard_message_id,skull_count,author_id") \
-            .eq("guild_id", GUILD_ID) \
-            .execute()
+            .eq("guild_id", GUILD_ID).execute()
     all_resp = await asyncio.to_thread(_fetch_all)
 
-    if not all_resp.data:
-        embed = discord.Embed(title="✅ Sin datos", description="No hay registros para este servidor.", color=0x4e5058)
-        return await ctx.send(embed=embed)
-
-    # Filtrar manualmente los incompletos
     pending = [
-        r for r in all_resp.data
+        r for r in (all_resp.data or [])
         if (r.get("skull_count") or 0) == 0 or not r.get("author_id")
     ]
 
     if not pending:
-        embed = discord.Embed(title="✅ Nada que actualizar", description="Todos los registros ya tienen datos.", color=0x57f287)
-        return await ctx.send(embed=embed)
+        await msg_status.edit(embed=discord.Embed(
+            title="✅ Nada que actualizar",
+            description="Todos los registros ya tienen datos.",
+            color=0x57f287
+        ))
+        return
 
-    total        = len(pending)
     actualizados = 0
     borrados     = 0
-    errores      = 0
+    sin_datos    = 0
 
-    msg_status = await ctx.send(embed=discord.Embed(
-        title="⏳ Backfill iniciado",
-        description=f"Procesando **{total}** registros pendientes de {len(all_resp.data)} totales...",
-        color=0x8b5cf6
-    ))
-
-    for i, row in enumerate(pending):
-        sb_msg_id  = row.get("skullboard_message_id")
+    for row in pending:
+        sb_id      = str(row.get("skullboard_message_id") or "")
         message_id = row["message_id"]
 
-        if not sb_msg_id:
-            errores += 1
-            continue
+        if sb_id in sb_map:
+            datos     = sb_map[sb_id]
+            updates   = {}
+            if datos["count"] > 0:
+                updates["skull_count"] = datos["count"]
+            if datos["author_id"] and not row.get("author_id"):
+                updates["author_id"] = datos["author_id"]
 
-        try:
-            sb_msg = await asyncio.wait_for(
-                channel.fetch_message(int(sb_msg_id)),
-                timeout=10.0
-            )
-
-            if not sb_msg.content or not sb_msg.embeds:
-                errores += 1
-                continue
-
-            # Parsear count: "💀 **6** | #canal" o "☠️ **24** | #canal"
-            try:
-                count = int(sb_msg.content.split("**")[1].strip())
-            except Exception:
-                errores += 1
-                continue
-
-            # Extraer author_id del icon_url del avatar
-            # Formato: https://cdn.discordapp.com/avatars/USER_ID/hash.webp
-            embed_    = sb_msg.embeds[0]
-            author_id = row.get("author_id")  # mantener si ya existe
-            if not author_id and embed_.author and embed_.author.icon_url:
-                icon_url = str(embed_.author.icon_url)
-                if "/avatars/" in icon_url:
-                    try:
-                        author_id = icon_url.split("/avatars/")[1].split("/")[0]
-                        # Validar que sea un número (user_id válido)
-                        int(author_id)
-                    except Exception:
-                        author_id = None
-
-            updates = {}
-            if count > 0:
-                updates["skull_count"] = count
-            if author_id:
-                updates["author_id"] = author_id
-
-            if not updates:
-                errores += 1
-                continue
-
-            mid = message_id
-            def _update(m=mid, u=updates):
-                return supabase.table("tracked_messages").update(u).eq("message_id", m).execute()
-            await asyncio.to_thread(_update)
-            actualizados += 1
-
-        except asyncio.TimeoutError:
-            logger.warning(f"Timeout en fetch_message {sb_msg_id}")
-            errores += 1
-
-        except discord.NotFound:
-            # Mensaje borrado del canal skullboard → limpiar de la BD
+            if updates:
+                def _update(m=message_id, u=updates):
+                    return supabase.table("tracked_messages").update(u).eq("message_id", m).execute()
+                await asyncio.to_thread(_update)
+                actualizados += 1
+            else:
+                sin_datos += 1
+        else:
+            # No está en el canal → fue borrado, limpiar de BD
             def _del(m=message_id):
                 return supabase.table("tracked_messages").delete().eq("message_id", m).execute()
             await asyncio.to_thread(_del)
             borrados += 1
 
-        except discord.Forbidden:
-            errores += 1
+        await asyncio.sleep(0.05)
 
-        except Exception as e:
-            logger.error(f"Backfill error en sb_msg {sb_msg_id}: {e}")
-            errores += 1
-
-        # Actualizar progreso cada 50 mensajes
-        if (i + 1) % 50 == 0:
-            try:
-                await msg_status.edit(embed=discord.Embed(
-                    title="⏳ Backfill en progreso...",
-                    description=(
-                        f"**{i+1}/{total}** procesados\n"
-                        f"✅ Actualizados: {actualizados}\n"
-                        f"🗑️ Borrados: {borrados}\n"
-                        f"❌ Errores: {errores}"
-                    ),
-                    color=0x8b5cf6
-                ))
-            except Exception:
-                pass
-
-        await asyncio.sleep(0.2)
-
-    embed_result = discord.Embed(
+    await msg_status.edit(embed=discord.Embed(
         title="✅ Backfill completado",
         description=(
+            f"📖 Mensajes leídos del canal: **{leidos}**\n"
             f"✅ Actualizados: **{actualizados}**\n"
-            f"🗑️ Borrados (ya no existen): **{borrados}**\n"
-            f"❌ Errores: **{errores}**\n"
-            f"📊 Total procesados: **{total}**"
+            f"🗑️ Borrados (no existen): **{borrados}**\n"
+            f"⚠️ Sin datos recuperables: **{sin_datos}**"
         ),
         color=0x57f287
-    )
-    await msg_status.edit(embed=embed_result)
+    ))
+
 
 @bot.command(name="announce", hidden=True)
 async def announce_cmd(ctx):
@@ -999,23 +980,23 @@ async def random_slash(interaction: discord.Interaction):
         embed = discord.Embed(title="🎲 Mensaje aleatorio", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
         return await interaction.followup.send(embed=embed)
 
-    row    = random.choice(resp.data)
-    cfg    = await get_guild_config(interaction.guild.id)
-    sb_chan = bot.get_channel(cfg["skullboard_channel_id"])
-    sb_id  = row.get("skullboard_message_id")
+    row     = random.choice(resp.data)
+    cfg     = await get_guild_config(interaction.guild.id)
+    sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
+    sb_id   = row.get("skullboard_message_id")
 
     try:
         sb_msg = await sb_chan.fetch_message(sb_id) if sb_chan and sb_id else None
     except Exception:
         sb_msg = None
 
-    if sb_msg and sb_msg.embeds:
-        embed = sb_msg.embeds[0].copy()
-    else:
-        embed = discord.Embed(color=discord.Color.dark_gray())
+    header = discord.Embed(title="🎲 Mensaje aleatorio del skullboard", color=0x8b5cf6)
+    await interaction.followup.send(embed=header)
 
-    embed.title = "🎲 Mensaje aleatorio del skullboard"
-    await interaction.followup.send(embed=embed)
+    if sb_msg:
+        await interaction.followup.send(content=sb_msg.content, embed=sb_msg.embeds[0] if sb_msg.embeds else None)
+    else:
+        await interaction.followup.send(embed=discord.Embed(description="No se pudo recuperar el mensaje.", color=0x4e5058))
 
 @tree.command(name="stats", description="Estadísticas de un usuario en el skullboard")
 @app_commands.describe(usuario="Usuario del que ver las estadísticas")
