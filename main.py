@@ -22,8 +22,8 @@ logger = logging.getLogger("SkullBoard")
 # ─── Configuración de Supabase ───────────────────────────────────────────────
 DISCORD_TOKEN  = os.getenv("DISCORD_TOKEN")
 SUPABASE_URL   = os.getenv("SUPABASE_URL")
-SUPABASE_KEY   = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase       = create_client(SUPABASE_URL, SUPABASE_KEY)
+SUPABASE_SERVICE_ROLE_KEY   = os.getenv("SUPABASE_SERVICE_ROLE_SERVICE_ROLE_KEY")
+supabase       = create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
 
 # ─── Wrappers Async para Supabase ────────────────────────────────────────────
 # Para evitar bloquear el event loop principal con peticiones HTTP síncronas
