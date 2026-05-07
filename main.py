@@ -691,7 +691,10 @@ async def backfill_cmd(ctx):
             continue
 
         try:
-            sb_msg = await channel.fetch_message(int(sb_msg_id))
+            sb_msg = await asyncio.wait_for(
+                channel.fetch_message(int(sb_msg_id)),
+                timeout=10.0
+            )
 
             if not sb_msg.content or not sb_msg.embeds:
                 errores += 1
@@ -734,6 +737,10 @@ async def backfill_cmd(ctx):
             await asyncio.to_thread(_update)
             actualizados += 1
 
+        except asyncio.TimeoutError:
+            logger.warning(f"Timeout en fetch_message {sb_msg_id}")
+            errores += 1
+
         except discord.NotFound:
             # Mensaje borrado del canal skullboard → limpiar de la BD
             def _del(m=message_id):
@@ -748,8 +755,8 @@ async def backfill_cmd(ctx):
             logger.error(f"Backfill error en sb_msg {sb_msg_id}: {e}")
             errores += 1
 
-        # Actualizar progreso cada 100 mensajes
-        if (i + 1) % 100 == 0:
+        # Actualizar progreso cada 50 mensajes
+        if (i + 1) % 50 == 0:
             try:
                 await msg_status.edit(embed=discord.Embed(
                     title="⏳ Backfill en progreso...",
@@ -764,7 +771,7 @@ async def backfill_cmd(ctx):
             except Exception:
                 pass
 
-        await asyncio.sleep(0.5)  # Conservador para evitar rate limit
+        await asyncio.sleep(0.2)
 
     embed_result = discord.Embed(
         title="✅ Backfill completado",
