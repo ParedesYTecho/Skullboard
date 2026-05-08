@@ -123,6 +123,36 @@ async def get_ignored_channels(guild_id: str) -> list:
     resp = await asyncio.to_thread(_op)
     return [r["channel_id"] for r in resp.data] if resp.data else []
 
+# ─── Notify settings (con caché en memoria) ───────────────────────────────────
+notify_disabled_cache: set = set()
+
+async def load_notify_cache():
+    def _op():
+        return supabase.table("notify_settings").select("guild_id,user_id").eq("enabled", False).execute()
+    try:
+        resp = await asyncio.to_thread(_op)
+        for row in (resp.data or []):
+            notify_disabled_cache.add((str(row["guild_id"]), str(row["user_id"])))
+        logger.info(f"📬 Notify cache cargada: {len(notify_disabled_cache)} usuarios con notificaciones desactivadas")
+    except Exception as e:
+        logger.error(f"Error cargando notify cache: {e}")
+
+def is_notify_enabled(guild_id, user_id) -> bool:
+    return (str(guild_id), str(user_id)) not in notify_disabled_cache
+
+async def set_notify(guild_id, user_id, enabled: bool):
+    gid = str(guild_id)
+    uid = str(user_id)
+    def _op():
+        return supabase.table("notify_settings").upsert({
+            "guild_id": gid, "user_id": uid, "enabled": enabled
+        }).execute()
+    await asyncio.to_thread(_op)
+    if enabled:
+        notify_disabled_cache.discard((gid, uid))
+    else:
+        notify_disabled_cache.add((gid, uid))
+
 # ─── Prefijo dinámico ─────────────────────────────────────────────────────────
 async def get_prefix(bot, message):
     if not message.guild:
@@ -151,6 +181,7 @@ class SkullBot(commands.Bot):
     async def setup_hook(self):
         synced = await self.tree.sync()
         logger.info(f"✅ Slash commands sincronizados: {len(synced)}")
+        await load_notify_cache()
         if not status_loop.is_running():
             status_loop.start()
 
@@ -238,28 +269,35 @@ def build_slash_help_pages() -> list:
     footer_nav   = "Usa /help para ver los comandos de barra"
     footer_admin = "🔒 Requiere permisos de administrador"
 
-    p1 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 1 de 3 · General", color=0x8b5cf6)
+    p1 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 1 de 4 · General", color=0x8b5cf6)
     p1.add_field(name="/ajustes", value="⚙️ Ver configuración actual", inline=True)
     p1.add_field(name="/ping",    value="🏓 Latencia del bot",          inline=True)
     p1.add_field(name="/invite",  value="🔗 Enlace de invitación",      inline=True)
+    p1.add_field(name="/notify",  value="📬 Activa/desactiva tus DMs",   inline=True)
     p1.set_footer(text=footer_nav)
 
-    p2 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 2 de 3 · Skullboard", color=0x8b5cf6)
+    p2 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 2 de 4 · Skullboard", color=0x8b5cf6)
     p2.add_field(name="/top",     value="🏆 Top mensajes más 💀",        inline=True)
     p2.add_field(name="/stats",   value="📊 Estadísticas de un usuario", inline=True)
     p2.add_field(name="/random",  value="🎲 Mensaje aleatorio",          inline=True)
     p2.add_field(name="/ignored", value="🚫 Ver canales ignorados",      inline=True)
     p2.set_footer(text=footer_nav)
 
-    p3 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 3 de 3 · Configuración", color=0x8b5cf6)
-    p3.add_field(name="/set_channel 🔒", value="📌 Configura el canal del skullboard", inline=True)
-    p3.add_field(name="/set_min 🔒",     value="💀 Mínimo de reacciones",               inline=True)
-    p3.add_field(name="/prefix 🔒",      value="✏️ Cambia el prefijo",                 inline=True)
-    p3.add_field(name="/ignore 🔒",      value="🚫 Ignora un canal",                   inline=True)
-    p3.add_field(name="/unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
-    p3.set_footer(text=footer_admin)
+    p3 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 3 de 4 · Estadísticas", color=0x8b5cf6)
+    p3.add_field(name="/leaderboard",  value="👑 Top usuarios del servidor",  inline=True)
+    p3.add_field(name="/server_stats", value="📊 Stats globales del servidor", inline=True)
+    p3.set_footer(text=footer_nav)
 
-    return [p1, p2, p3]
+    p4 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 4 de 4 · Configuración", color=0x8b5cf6)
+    p4.add_field(name="/set_channel 🔒", value="📌 Configura el canal del skullboard", inline=True)
+    p4.add_field(name="/set_min 🔒",     value="💀 Mínimo de reacciones",               inline=True)
+    p4.add_field(name="/prefix 🔒",      value="✏️ Cambia el prefijo",                 inline=True)
+    p4.add_field(name="/ignore 🔒",      value="🚫 Ignora un canal",                   inline=True)
+    p4.add_field(name="/unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
+    p4.add_field(name="/setup_pin 🔒",   value="📌 Auto-pin de mensajes",               inline=True)
+    p4.set_footer(text=footer_admin)
+
+    return [p1, p2, p3, p4]
 
 # ─── On Ready ─────────────────────────────────────────────────────────────────
 @bot.event
@@ -360,6 +398,52 @@ async def _check(msg: discord.Message):
 
             sent = await dest_chan.send(content=texto, embed=embed)
             await set_tracked_message(mid, sent.id, count, msg.author.id, gid)
+
+            # ─── DM de notificación al autor (solo primera vez) ───
+            if is_notify_enabled(gid, msg.author.id):
+                try:
+                    dm_embed = discord.Embed(
+                        title="💀 ¡Tu mensaje ha llegado al skullboard!",
+                        description=(
+                            f"Tu mensaje en el servidor **{msg.guild.name}** ha alcanzado las "
+                            f"**{count} 💀** y ha sido destacado en el skullboard."
+                        ),
+                        color=0x8b5cf6
+                    )
+                    dm_embed.add_field(
+                        name="🔗 Ver mensaje",
+                        value=f"[Saltar al skullboard]({sent.jump_url})",
+                        inline=False
+                    )
+                    dm_embed.set_footer(text="Si no quieres recibir estas notificaciones usa /notify off")
+                    await msg.author.send(embed=dm_embed)
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
+                except Exception as e:
+                    logger.warning(f"Error enviando DM a {msg.author.id}: {e}")
+
+            # ─── Auto-pin si supera el threshold ───
+            threshold = cfg.get("pin_threshold", 0) or 0
+            if threshold > 0 and count >= threshold and not sent.pinned:
+                try:
+                    await sent.pin(reason=f"Auto-pin: superó {threshold} 💀")
+                except discord.HTTPException as e:
+                    logger.warning(f"No se pudo pinear en {gid}: {e}")
+                    await update_guild_config(msg.guild.id, {"pin_threshold": 0})
+                    try:
+                        err_embed = discord.Embed(
+                            title="⚠️ Auto-pin desactivado",
+                            description=(
+                                "No se ha podido pinear el último mensaje en este canal "
+                                "(probablemente se ha alcanzado el límite de 50 pins).\n\n"
+                                "El **auto-pin se ha desactivado automáticamente**. "
+                                "Libera pins y vuelve a configurarlo con `/setup_pin`."
+                            ),
+                            color=0xed4245
+                        )
+                        await dest_chan.send(embed=err_embed)
+                    except Exception:
+                        pass
 
         except Exception as e:
             logger.error(f"Error en _check: {e}")
@@ -474,29 +558,36 @@ async def help_cmd(ctx):
     footer_nav   = f"Usa /help para ver los comandos de barra"
     footer_admin = "🔒 Requiere permisos de administrador"
 
-    p1 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 1 de 3 · General", color=0x8b5cf6)
+    p1 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 1 de 4 · General", color=0x8b5cf6)
     p1.add_field(name=f"{p}ajustes", value="⚙️ Ver configuración actual", inline=True)
     p1.add_field(name=f"{p}ping",    value="🏓 Latencia del bot",          inline=True)
     p1.add_field(name=f"{p}invite",  value="🔗 Enlace de invitación",      inline=True)
+    p1.add_field(name=f"{p}notify",  value="📬 Activa/desactiva tus DMs",   inline=True)
     p1.set_footer(text=footer_nav)
 
-    p2 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 2 de 3 · Skullboard", color=0x8b5cf6)
+    p2 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 2 de 4 · Skullboard", color=0x8b5cf6)
     p2.add_field(name=f"{p}top",            value="🏆 Top mensajes más 💀",        inline=True)
     p2.add_field(name=f"{p}stats @usuario", value="📊 Estadísticas de un usuario", inline=True)
     p2.add_field(name=f"{p}random",         value="🎲 Mensaje aleatorio",          inline=True)
     p2.add_field(name=f"{p}ignored",        value="🚫 Ver canales ignorados",      inline=True)
     p2.set_footer(text=footer_nav)
 
-    p3 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 3 de 3 · Configuración", color=0x8b5cf6)
-    p3.add_field(name=f"{p}set_channel 🔒", value="📌 Configura el canal del skullboard", inline=True)
-    p3.add_field(name=f"{p}set_min 🔒",     value="💀 Mínimo de reacciones",               inline=True)
-    p3.add_field(name=f"{p}prefix 🔒",      value="✏️ Cambia el prefijo",                 inline=True)
-    p3.add_field(name=f"{p}ignore 🔒",      value="🚫 Ignora un canal",                   inline=True)
-    p3.add_field(name=f"{p}unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
-    p3.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard",             inline=True)
-    p3.set_footer(text=footer_admin)
+    p3 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 3 de 4 · Estadísticas", color=0x8b5cf6)
+    p3.add_field(name=f"{p}leaderboard", value="👑 Top usuarios del servidor",  inline=True)
+    p3.add_field(name=f"{p}serverstats", value="📊 Stats globales del servidor", inline=True)
+    p3.set_footer(text=footer_nav)
 
-    pages = [p1, p2, p3]
+    p4 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 4 de 4 · Configuración", color=0x8b5cf6)
+    p4.add_field(name=f"{p}set_channel 🔒", value="📌 Configura el canal del skullboard", inline=True)
+    p4.add_field(name=f"{p}set_min 🔒",     value="💀 Mínimo de reacciones",               inline=True)
+    p4.add_field(name=f"{p}prefix 🔒",      value="✏️ Cambia el prefijo",                 inline=True)
+    p4.add_field(name=f"{p}ignore 🔒",      value="🚫 Ignora un canal",                    inline=True)
+    p4.add_field(name=f"{p}unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
+    p4.add_field(name=f"{p}setuppin 🔒",    value="📌 Auto-pin de mensajes",               inline=True)
+    p4.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard",             inline=True)
+    p4.set_footer(text=footer_admin)
+
+    pages = [p1, p2, p3, p4]
     view  = HelpView(pages)
     await ctx.send(embed=pages[0], view=view)
 
@@ -674,6 +765,171 @@ async def ignored_cmd(ctx):
     p     = await get_formatted_prefix(ctx)
     embed = discord.Embed(title="🚫 Canales ignorados", description="\n".join(lines), color=0x8b5cf6)
     embed.set_footer(text=f"{len(channels)} canal(es) ignorado(s) · Usa {p}unignore para desbloquear")
+    await ctx.send(embed=embed)
+
+@bot.command(name="notify")
+@commands.guild_only()
+async def notify_cmd(ctx, estado: str = None):
+    if not estado or estado.lower() not in ("on", "off"):
+        enabled = is_notify_enabled(ctx.guild.id, ctx.author.id)
+        actual  = "🔔 Activadas" if enabled else "🔕 Desactivadas"
+        p       = await get_formatted_prefix(ctx)
+        embed = discord.Embed(
+            title="📬 Notificaciones del Skullboard",
+            description=(
+                f"Tus notificaciones en este servidor están: **{actual}**\n\n"
+                f"Usa `{p}notify on` o `{p}notify off` para cambiarlo."
+            ),
+            color=0x8b5cf6
+        )
+        return await ctx.send(embed=embed)
+
+    enable = estado.lower() == "on"
+    await set_notify(ctx.guild.id, ctx.author.id, enable)
+    if enable:
+        embed = discord.Embed(
+            title="🔔 Notificaciones activadas",
+            description=f"Recibirás un MD cuando un mensaje tuyo llegue al skullboard de **{ctx.guild.name}**.",
+            color=0x57f287
+        )
+    else:
+        embed = discord.Embed(
+            title="🔕 Notificaciones desactivadas",
+            description=f"No recibirás más MDs del skullboard de **{ctx.guild.name}**.",
+            color=0x4e5058
+        )
+    await ctx.send(embed=embed)
+
+@bot.command(name="setuppin", aliases=["setup_pin"])
+@commands.guild_only()
+@commands.has_permissions(administrator=True)
+async def setuppin_cmd(ctx, threshold: int = None):
+    if threshold is None:
+        cfg = await get_guild_config(ctx.guild.id)
+        actual = cfg.get("pin_threshold", 0) or 0
+        if actual == 0:
+            desc = "El auto-pin está **desactivado** en este servidor."
+        else:
+            desc = f"El auto-pin está activado a partir de **{actual} 💀**."
+        p = await get_formatted_prefix(ctx)
+        embed = discord.Embed(
+            title="📌 Auto-pin",
+            description=f"{desc}\n\nUsa `{p}setuppin <número>` para configurar.\nUsa `{p}setuppin 0` para desactivar.",
+            color=0x8b5cf6
+        )
+        return await ctx.send(embed=embed)
+
+    if threshold < 0:
+        embed = discord.Embed(title="❌ Número inválido", description="El threshold no puede ser negativo.", color=0xed4245)
+        return await ctx.send(embed=embed)
+
+    cfg = await get_guild_config(ctx.guild.id)
+    min_skulls = cfg.get("min_skulls", 1)
+
+    if threshold > 0 and threshold < min_skulls:
+        embed = discord.Embed(
+            title="❌ Threshold demasiado bajo",
+            description=f"El threshold de auto-pin debe ser **mayor o igual al mínimo** del skullboard ({min_skulls} 💀).\n\nUsa un número ≥ {min_skulls} o `0` para desactivar.",
+            color=0xed4245
+        )
+        return await ctx.send(embed=embed)
+
+    await update_guild_config(ctx.guild.id, {"pin_threshold": threshold})
+    if threshold == 0:
+        embed = discord.Embed(
+            title="📌 Auto-pin desactivado",
+            description="Ya no se pinearán mensajes automáticamente en el skullboard.",
+            color=0x4e5058
+        )
+    else:
+        embed = discord.Embed(
+            title="✅ Auto-pin configurado",
+            description=f"Los mensajes con **{threshold}** o más 💀 se pinearán automáticamente.",
+            color=0x57f287
+        )
+    await ctx.send(embed=embed)
+
+@bot.command(name="leaderboard", aliases=["lb", "topusers"])
+@commands.guild_only()
+async def leaderboard_cmd(ctx):
+    gid = str(ctx.guild.id)
+    def _op():
+        return supabase.table("tracked_messages") \
+            .select("skull_count,author_id") \
+            .eq("guild_id", gid).execute()
+    resp = await asyncio.to_thread(_op)
+    if not resp.data:
+        embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos en el skullboard.", color=0x4e5058)
+        return await ctx.send(embed=embed)
+
+    totals = {}
+    for r in resp.data:
+        uid = r.get("author_id")
+        if not uid: continue
+        totals[uid] = totals.get(uid, 0) + (r.get("skull_count") or 0)
+
+    if not totals:
+        embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos suficientes.", color=0x4e5058)
+        return await ctx.send(embed=embed)
+
+    ranking = sorted(totals.items(), key=lambda x: x[1], reverse=True)[:10]
+    medals  = ["🥇", "🥈", "🥉"]
+    lines   = []
+    for i, (uid, total) in enumerate(ranking):
+        pos  = medals[i] if i < 3 else f"{i+1}."
+        try:
+            m    = ctx.guild.get_member(int(uid))
+            name = m.display_name if m else "Usuario desconocido"
+        except Exception:
+            name = "Usuario desconocido"
+        lines.append(f"{pos} **{name}** — {total} 💀")
+
+    embed = discord.Embed(title="🏆 Top Usuarios — Skullboard", description="\n".join(lines), color=0xfaa61a)
+    embed.set_footer(text=f"Top {len(ranking)} usuarios por calaveras totales")
+    await ctx.send(embed=embed)
+
+@bot.command(name="serverstats", aliases=["sstats"])
+@commands.guild_only()
+async def serverstats_cmd(ctx):
+    gid = str(ctx.guild.id)
+    def _op():
+        return supabase.table("tracked_messages") \
+            .select("skull_count,author_id") \
+            .eq("guild_id", gid).execute()
+    resp = await asyncio.to_thread(_op)
+
+    if not resp.data:
+        embed = discord.Embed(title="📊 Stats del Servidor", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
+        return await ctx.send(embed=embed)
+
+    total_msgs   = len(resp.data)
+    total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
+    totals = {}
+    for r in resp.data:
+        uid = r.get("author_id")
+        if not uid: continue
+        totals[uid] = totals.get(uid, 0) + (r.get("skull_count") or 0)
+    top_user_name = "—"
+    top_user_count = 0
+    if totals:
+        top_uid, top_user_count = max(totals.items(), key=lambda x: x[1])
+        try:
+            m = ctx.guild.get_member(int(top_uid))
+            top_user_name = m.display_name if m else "Usuario desconocido"
+        except Exception:
+            top_user_name = "Usuario desconocido"
+
+    record = max(resp.data, key=lambda r: r.get("skull_count") or 0)
+    record_count = record.get("skull_count") or 0
+
+    embed = discord.Embed(title=f"📊 Stats de {ctx.guild.name}", color=0x8b5cf6)
+    if ctx.guild.icon:
+        embed.set_thumbnail(url=ctx.guild.icon.url)
+    embed.add_field(name="📌 Mensajes en el board", value=str(total_msgs),    inline=True)
+    embed.add_field(name="💀 Calaveras totales",     value=str(total_skulls), inline=True)
+    embed.add_field(name="🏆 Récord",                value=f"{record_count} 💀", inline=True)
+    embed.add_field(name="👑 Usuario más reaccionado", value=f"{top_user_name} · {top_user_count} 💀", inline=False)
+    embed.set_footer(text="Estadísticas globales del servidor")
     await ctx.send(embed=embed)
 
 # ─── Comandos privados del owner (BACKFILL IDs PURAS - 1 a 1) ─────────────────────────
@@ -1136,6 +1392,162 @@ async def ignored_slash(interaction: discord.Interaction):
     embed = discord.Embed(title="🚫 Canales ignorados", description="\n".join(lines), color=0x8b5cf6)
     embed.set_footer(text=f"{len(channels)} canal(es) ignorado(s) · Usa /unignore para desbloquear")
     await interaction.response.send_message(embed=embed)
+
+@tree.command(name="notify", description="Activa o desactiva las notificaciones por DM del skullboard")
+@app_commands.describe(estado="Activa (on) o desactiva (off) tus notificaciones en este servidor")
+@app_commands.choices(estado=[
+    app_commands.Choice(name="on",  value="on"),
+    app_commands.Choice(name="off", value="off"),
+])
+async def notify_slash(interaction: discord.Interaction, estado: app_commands.Choice[str] = None):
+    if estado is None:
+        enabled = is_notify_enabled(interaction.guild.id, interaction.user.id)
+        actual  = "🔔 Activadas" if enabled else "🔕 Desactivadas"
+        embed = discord.Embed(
+            title="📬 Notificaciones del Skullboard",
+            description=(
+                f"Tus notificaciones en este servidor están: **{actual}**\n\n"
+                "Usa `/notify on` o `/notify off` para cambiarlo."
+            ),
+            color=0x8b5cf6
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    enable = estado.value == "on"
+    await set_notify(interaction.guild.id, interaction.user.id, enable)
+    if enable:
+        embed = discord.Embed(
+            title="🔔 Notificaciones activadas",
+            description=f"Recibirás un MD cuando un mensaje tuyo llegue al skullboard de **{interaction.guild.name}**.",
+            color=0x57f287
+        )
+    else:
+        embed = discord.Embed(
+            title="🔕 Notificaciones desactivadas",
+            description=f"No recibirás más MDs del skullboard de **{interaction.guild.name}**.",
+            color=0x4e5058
+        )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@tree.command(name="setup_pin", description="Configura el auto-pin de mensajes (admin)")
+@app_commands.describe(threshold="Mínimo de 💀 para pinear automáticamente. 0 = desactivado")
+async def setup_pin_slash(interaction: discord.Interaction, threshold: int):
+    if not interaction.user.guild_permissions.administrator:
+        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    if threshold < 0:
+        embed = discord.Embed(title="❌ Número inválido", description="El threshold no puede ser negativo.", color=0xed4245)
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    cfg = await get_guild_config(interaction.guild.id)
+    min_skulls = cfg.get("min_skulls", 1)
+
+    if threshold > 0 and threshold < min_skulls:
+        embed = discord.Embed(
+            title="❌ Threshold demasiado bajo",
+            description=f"El threshold de auto-pin debe ser **mayor o igual al mínimo** del skullboard ({min_skulls} 💀).\n\nUsa un número ≥ {min_skulls} o `0` para desactivar.",
+            color=0xed4245
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    await update_guild_config(interaction.guild.id, {"pin_threshold": threshold})
+    if threshold == 0:
+        embed = discord.Embed(
+            title="📌 Auto-pin desactivado",
+            description="Ya no se pinearán mensajes automáticamente en el skullboard.",
+            color=0x4e5058
+        )
+    else:
+        embed = discord.Embed(
+            title="✅ Auto-pin configurado",
+            description=f"Los mensajes con **{threshold}** o más 💀 se pinearán automáticamente.",
+            color=0x57f287
+        )
+    await interaction.response.send_message(embed=embed)
+
+@tree.command(name="leaderboard", description="Top usuarios con más calaveras totales del servidor")
+async def leaderboard_slash(interaction: discord.Interaction):
+    await interaction.response.defer()
+    gid = str(interaction.guild.id)
+    def _op():
+        return supabase.table("tracked_messages") \
+            .select("skull_count,author_id") \
+            .eq("guild_id", gid).execute()
+    resp = await asyncio.to_thread(_op)
+    if not resp.data:
+        embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos en el skullboard.", color=0x4e5058)
+        return await interaction.followup.send(embed=embed)
+
+    totals = {}
+    for r in resp.data:
+        uid = r.get("author_id")
+        if not uid: continue
+        totals[uid] = totals.get(uid, 0) + (r.get("skull_count") or 0)
+
+    if not totals:
+        embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos suficientes.", color=0x4e5058)
+        return await interaction.followup.send(embed=embed)
+
+    ranking = sorted(totals.items(), key=lambda x: x[1], reverse=True)[:10]
+    medals  = ["🥇", "🥈", "🥉"]
+    lines   = []
+    for i, (uid, total) in enumerate(ranking):
+        pos  = medals[i] if i < 3 else f"{i+1}."
+        try:
+            m    = interaction.guild.get_member(int(uid))
+            name = m.display_name if m else "Usuario desconocido"
+        except Exception:
+            name = "Usuario desconocido"
+        lines.append(f"{pos} **{name}** — {total} 💀")
+
+    embed = discord.Embed(title="🏆 Top Usuarios — Skullboard", description="\n".join(lines), color=0xfaa61a)
+    embed.set_footer(text=f"Top {len(ranking)} usuarios por calaveras totales")
+    await interaction.followup.send(embed=embed)
+
+@tree.command(name="server_stats", description="Estadísticas globales del skullboard del servidor")
+async def server_stats_slash(interaction: discord.Interaction):
+    await interaction.response.defer()
+    gid = str(interaction.guild.id)
+    def _op():
+        return supabase.table("tracked_messages") \
+            .select("skull_count,author_id") \
+            .eq("guild_id", gid).execute()
+    resp = await asyncio.to_thread(_op)
+
+    if not resp.data:
+        embed = discord.Embed(title="📊 Stats del Servidor", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
+        return await interaction.followup.send(embed=embed)
+
+    total_msgs   = len(resp.data)
+    total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
+    totals = {}
+    for r in resp.data:
+        uid = r.get("author_id")
+        if not uid: continue
+        totals[uid] = totals.get(uid, 0) + (r.get("skull_count") or 0)
+    top_user_name = "—"
+    top_user_count = 0
+    if totals:
+        top_uid, top_user_count = max(totals.items(), key=lambda x: x[1])
+        try:
+            m = interaction.guild.get_member(int(top_uid))
+            top_user_name = m.display_name if m else "Usuario desconocido"
+        except Exception:
+            top_user_name = "Usuario desconocido"
+
+    record = max(resp.data, key=lambda r: r.get("skull_count") or 0)
+    record_count = record.get("skull_count") or 0
+
+    embed = discord.Embed(title=f"📊 Stats de {interaction.guild.name}", color=0x8b5cf6)
+    if interaction.guild.icon:
+        embed.set_thumbnail(url=interaction.guild.icon.url)
+    embed.add_field(name="📌 Mensajes en el board", value=str(total_msgs),    inline=True)
+    embed.add_field(name="💀 Calaveras totales",     value=str(total_skulls), inline=True)
+    embed.add_field(name="🏆 Récord",                value=f"{record_count} 💀", inline=True)
+    embed.add_field(name="👑 Usuario más reaccionado", value=f"{top_user_name} · {top_user_count} 💀", inline=False)
+    embed.set_footer(text="Estadísticas globales del servidor")
+    await interaction.followup.send(embed=embed)
 
 # ─── Manejo de errores global ─────────────────────────────────────────────────
 @bot.event
