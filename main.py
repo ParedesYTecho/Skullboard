@@ -286,6 +286,8 @@ def build_slash_help_pages() -> list:
     p3 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 3 de 4 · Estadísticas", color=0x8b5cf6)
     p3.add_field(name="/leaderboard",  value="👑 Top usuarios del servidor",  inline=True)
     p3.add_field(name="/server_stats", value="📊 Stats globales del servidor", inline=True)
+    p3.add_field(name="/top_month",    value="📅 Top mensajes del mes",        inline=True)
+    p3.add_field(name="/top_year",     value="🗓️ Top mensajes del año",       inline=True)
     p3.set_footer(text=footer_nav)
 
     p4 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 4 de 4 · Configuración", color=0x8b5cf6)
@@ -575,6 +577,8 @@ async def help_cmd(ctx):
     p3 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 3 de 4 · Estadísticas", color=0x8b5cf6)
     p3.add_field(name=f"{p}leaderboard", value="👑 Top usuarios del servidor",  inline=True)
     p3.add_field(name=f"{p}serverstats", value="📊 Stats globales del servidor", inline=True)
+    p3.add_field(name=f"{p}topmonth",    value="📅 Top mensajes del mes",        inline=True)
+    p3.add_field(name=f"{p}topyear",     value="🗓️ Top mensajes del año",       inline=True)
     p3.set_footer(text=footer_nav)
 
     p4 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 4 de 4 · Configuración", color=0x8b5cf6)
@@ -930,6 +934,75 @@ async def serverstats_cmd(ctx):
     embed.add_field(name="🏆 Récord",                value=f"{record_count} 💀", inline=True)
     embed.add_field(name="👑 Usuario más reaccionado", value=f"{top_user_name} · {top_user_count} 💀", inline=False)
     embed.set_footer(text="Estadísticas globales del servidor")
+    await ctx.send(embed=embed)
+
+# ─── Helper para top por periodo (snowflake timestamp) ────────────────────────
+def snowflake_to_datetime(snowflake_id: int) -> datetime:
+    """Convierte un Discord snowflake ID a datetime UTC."""
+    timestamp_ms = (snowflake_id >> 22) + 1420070400000
+    return datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+
+async def get_top_periodo(guild: discord.Guild, desde: datetime, titulo: str) -> discord.Embed:
+    """Devuelve un embed con el top de mensajes en el periodo dado."""
+    gid = str(guild.id)
+    def _op():
+        return supabase.table("tracked_messages") \
+            .select("message_id,skull_count,author_id,skullboard_message_id") \
+            .eq("guild_id", gid).order("skull_count", desc=True).execute()
+    resp = await asyncio.to_thread(_op)
+
+    if not resp.data:
+        return discord.Embed(title=titulo, description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
+
+    # Filtrar por periodo usando el snowflake del message_id
+    filtrados = []
+    for r in resp.data:
+        try:
+            msg_dt = snowflake_to_datetime(int(r["message_id"]))
+            if msg_dt >= desde:
+                filtrados.append(r)
+        except Exception:
+            continue
+
+    if not filtrados:
+        return discord.Embed(title=titulo, description="No hay mensajes en este periodo.", color=0x4e5058)
+
+    medals = ["🥇", "🥈", "🥉"]
+    cfg    = await get_guild_config(guild.id)
+    lines  = []
+    for i, row in enumerate(filtrados[:10]):
+        pos   = medals[i] if i < 3 else f"{i+1}."
+        count = row.get("skull_count") or 0
+        try:
+            m    = guild.get_member(int(row["author_id"])) if row.get("author_id") else None
+            name = m.display_name if m else "Usuario desconocido"
+        except Exception:
+            name = "Usuario desconocido"
+        sb_id = row.get("skullboard_message_id")
+        if cfg["skullboard_channel_id"] and sb_id:
+            link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{sb_id}"
+            lines.append(f"{pos} [{name}]({link}) — **{count} 💀**")
+        else:
+            lines.append(f"{pos} {name} — **{count} 💀**")
+
+    embed = discord.Embed(title=titulo, description="\n".join(lines), color=0xfaa61a)
+    embed.set_footer(text=f"Top {len(filtrados[:10])} mensajes del periodo · {filtrados[0].get('skull_count', 0)} 💀 el más reaccionado")
+    return embed
+
+@bot.command(name="topmonth", aliases=["monthly"])
+@commands.guild_only()
+async def topmonth_cmd(ctx):
+    ahora = datetime.now(timezone.utc)
+    desde = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    embed = await get_top_periodo(ctx.guild, desde, f"🏆 Top del mes — {ahora.strftime('%B %Y')}")
+    await ctx.send(embed=embed)
+
+@bot.command(name="topyear", aliases=["yearly"])
+@commands.guild_only()
+async def topyear_cmd(ctx):
+    ahora = datetime.now(timezone.utc)
+    desde = ahora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    embed = await get_top_periodo(ctx.guild, desde, f"🏆 Top del año — {ahora.year}")
     await ctx.send(embed=embed)
 
 # ─── Comandos privados del owner (BACKFILL IDs PURAS - 1 a 1) ─────────────────────────
@@ -1547,6 +1620,22 @@ async def server_stats_slash(interaction: discord.Interaction):
     embed.add_field(name="🏆 Récord",                value=f"{record_count} 💀", inline=True)
     embed.add_field(name="👑 Usuario más reaccionado", value=f"{top_user_name} · {top_user_count} 💀", inline=False)
     embed.set_footer(text="Estadísticas globales del servidor")
+    await interaction.followup.send(embed=embed)
+
+@tree.command(name="top_month", description="Top mensajes más reaccionados del mes actual")
+async def top_month_slash(interaction: discord.Interaction):
+    await interaction.response.defer()
+    ahora = datetime.now(timezone.utc)
+    desde = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    embed = await get_top_periodo(interaction.guild, desde, f"🏆 Top del mes — {ahora.strftime('%B %Y')}")
+    await interaction.followup.send(embed=embed)
+
+@tree.command(name="top_year", description="Top mensajes más reaccionados del año actual")
+async def top_year_slash(interaction: discord.Interaction):
+    await interaction.response.defer()
+    ahora = datetime.now(timezone.utc)
+    desde = ahora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+    embed = await get_top_periodo(interaction.guild, desde, f"🏆 Top del año — {ahora.year}")
     await interaction.followup.send(embed=embed)
 
 # ─── Manejo de errores global ─────────────────────────────────────────────────
