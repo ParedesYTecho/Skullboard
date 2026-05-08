@@ -1165,17 +1165,115 @@ async def announce_cmd(ctx):
     embed = discord.Embed(
         title="💀 SkullBoard — Novedades",
         description=(
-            "Se han añadido nuevas funciones y mejorado el diseño.\n"
+            "Se han añadido nuevas funciones al bot.\n"
             "Usa `/help` o `sk!help` para ver todos los comandos disponibles.\n\n"
             "**✨ Novedades principales:**\n"
-            "• `/top` — Top mensajes más reaccionados\n"
-            "• `/stats` — Estadísticas de usuarios\n"
-            "• `/random` — Mensaje aleatorio del board\n"
-            "• `/ignore` — Excluye canales del skullboard\n"
-            "• Embeds rediseñados y más limpios"
+            "• `/notify` — Activa o desactiva notificaciones por DM cuando tu mensaje llegue al skullboard\n"
+            "• `/leaderboard` — Top usuarios con más 💀 totales del servidor\n"
+            "• `/server_stats` — Estadísticas globales del servidor\n"
+            "• `/top_month` — Top mensajes del mes actual\n"
+            "• `/top_year` — Top mensajes del año\n"
+            "• `Auto-pin` — Los admins pueden configurar que los mensajes más reaccionados se pineen automáticamente con `/setup_pin`"
         ),
         color=0x8b5cf6
     )
+
+    enviados = 0
+    fallidos = 0
+
+    for guild in bot.guilds:
+        canal = None
+        try:
+            cfg = await get_guild_config(guild.id)
+            cid = cfg.get("skullboard_channel_id", 0)
+            if cid:
+                canal = bot.get_channel(cid)
+        except Exception:
+            pass
+        if not canal:
+            canal = guild.system_channel
+        if canal:
+            try:
+                await canal.send(embed=embed)
+                enviados += 1
+                await asyncio.sleep(1)
+            except Exception:
+                fallidos += 1
+        else:
+            fallidos += 1
+
+    resultado = discord.Embed(
+        title="📊 Anuncio enviado",
+        description=f"✅ Enviado: **{enviados}** servidores\n❌ Sin canal: **{fallidos}** servidores",
+        color=0x57f287
+    )
+    await ctx.send(embed=resultado)
+
+@bot.command(name="editannounce", hidden=True)
+async def editannounce_cmd(ctx):
+    if ctx.author.id != OWNER_ID:
+        try: await ctx.message.add_reaction("❓")
+        except: pass
+        return
+
+    nuevo_embed = discord.Embed(
+        title="💀 SkullBoard — Novedades",
+        description=(
+            "Se han añadido nuevas funciones al bot.\n"
+            "Usa `/help` o `sk!help` para ver todos los comandos disponibles.\n\n"
+            "**✨ Novedades principales:**\n"
+            "• `/notify` — Activa o desactiva notificaciones por DM cuando tu mensaje llegue al skullboard\n"
+            "• `/leaderboard` — Top usuarios con más 💀 totales del servidor\n"
+            "• `/server_stats` — Estadísticas globales del servidor\n"
+            "• `/top_month` — Top mensajes del mes actual\n"
+            "• `/top_year` — Top mensajes del año\n"
+            "• `Auto-pin` — Los admins pueden configurar que los mensajes más reaccionados se pineen automáticamente con `/setup_pin`"
+        ),
+        color=0x8b5cf6
+    )
+
+    editados = 0
+    fallidos = 0
+
+    for guild in bot.guilds:
+        canal = None
+        try:
+            cfg = await get_guild_config(guild.id)
+            cid = cfg.get("skullboard_channel_id", 0)
+            if cid:
+                canal = bot.get_channel(cid)
+        except Exception:
+            pass
+        if not canal:
+            canal = guild.system_channel
+        if not canal:
+            fallidos += 1
+            continue
+
+        try:
+            # history() va del más reciente al más antiguo
+            # El primero que encontremos del bot con embed de novedades es el más reciente
+            encontrado = False
+            async for msg in canal.history(limit=50):
+                if msg.author.id == bot.user.id and msg.embeds:
+                    titulo = msg.embeds[0].title or ""
+                    if "Novedades" in titulo or "SkullBoard" in titulo:
+                        await msg.edit(embed=nuevo_embed)
+                        editados += 1
+                        encontrado = True
+                        break
+            if not encontrado:
+                fallidos += 1
+            await asyncio.sleep(0.5)
+        except Exception:
+            fallidos += 1
+
+    resultado = discord.Embed(
+        title="📊 Anuncio editado",
+        description=f"✅ Editados: **{editados}** servidores\n❌ No encontrado/error: **{fallidos}** servidores",
+        color=0x57f287
+    )
+    await ctx.send(embed=resultado)
 
     enviados = 0
     fallidos = 0
