@@ -297,6 +297,7 @@ def build_slash_help_pages() -> list:
     p4.add_field(name="/ignore 🔒",      value="🚫 Ignora un canal",                   inline=True)
     p4.add_field(name="/unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
     p4.add_field(name="/setup_pin 🔒",   value="📌 Auto-pin de mensajes",               inline=True)
+    p4.add_field(name="/resync 🔒",      value="🔄 Resincroniza los conteos de 💀",     inline=True)
     p4.set_footer(text=footer_admin)
 
     return [p1, p2, p3, p4]
@@ -341,6 +342,28 @@ async def _run_check(channel_id: int, message_id: int):
     await _check(msg)
 
 # ─── Core logic ───────────────────────────────────────────────────────────────
+def _build_repost(msg: discord.Message, count: int, record: int, min_skulls: int):
+    """Construye el (contenido, embed) de un mensaje destacado del skullboard."""
+    emoji   = "☠️" if count >= min_skulls * 2 else "💀"
+    content = msg.content or ""
+    if len(content) > 1800:
+        content = content[:1800] + "...\n*(mensaje truncado)*"
+    embed = discord.Embed(description=content, color=discord.Color.dark_gray())
+    embed.set_author(
+        name=msg.author.display_name,
+        icon_url=(msg.author.avatar.url if msg.author.avatar else msg.author.default_avatar.url)
+    )
+    img = next((a for a in msg.attachments if a.content_type and a.content_type.startswith("image/")), None)
+    if img:
+        embed.set_image(url=img.url)
+    embed.add_field(name="🔗 Enlace", value=f"[Saltar al mensaje]({msg.jump_url})", inline=False)
+    footer = f"{count} {emoji}  •  {formatear_fecha(msg.created_at)}"
+    if count >= record and count > 0:
+        footer += "  •  🏆 Récord del servidor"
+    embed.set_footer(text=footer)
+    texto = f"{emoji} **{count}** | {msg.channel.mention}"
+    return texto, embed
+
 async def _check(msg: discord.Message):
     mid = str(msg.id)
 
@@ -358,37 +381,20 @@ async def _check(msg: discord.Message):
 
             skull_reac = next((r for r in msg.reactions if str(r.emoji) == skull_emoji), None)
             count      = skull_reac.count if skull_reac else 0
-            if count < cfg["min_skulls"]: return
+
+            existing_id = await get_tracked_message(mid)
+
+            # No crear entradas nuevas para mensajes que no alcanzan el mínimo.
+            # (Si ya estaba trackeado seguimos para mantener el conteo sincronizado.)
+            if count < cfg["min_skulls"] and not existing_id:
+                return
 
             dest_chan = bot.get_channel(cfg["skullboard_channel_id"])
             if not isinstance(dest_chan, discord.abc.Messageable): return
 
-            emoji  = "☠️" if count >= cfg["min_skulls"] * 2 else "💀"
-            record = await get_guild_record(gid)
+            record       = await get_guild_record(gid)
+            texto, embed = _build_repost(msg, count, record, cfg["min_skulls"])
 
-            content = msg.content or ""
-            if len(content) > 1800:
-                content = content[:1800] + "...\n*(mensaje truncado)*"
-
-            embed = discord.Embed(description=content, color=discord.Color.dark_gray())
-            embed.set_author(
-                name=msg.author.display_name,
-                icon_url=(msg.author.avatar.url if msg.author.avatar else msg.author.default_avatar.url)
-            )
-            img = next((a for a in msg.attachments if a.content_type and a.content_type.startswith("image/")), None)
-            if img:
-                embed.set_image(url=img.url)
-
-            embed.add_field(name="🔗 Enlace", value=f"[Saltar al mensaje]({msg.jump_url})", inline=False)
-
-            footer = f"{count} {emoji}  •  {formatear_fecha(msg.created_at)}"
-            if count >= record and count > 0:
-                footer += "  •  🏆 Récord del servidor"
-            embed.set_footer(text=footer)
-
-            texto = f"{emoji} **{count}** | {msg.channel.mention}"
-
-            existing_id = await get_tracked_message(mid)
             if existing_id:
                 try:
                     old = await dest_chan.fetch_message(existing_id)
@@ -396,7 +402,16 @@ async def _check(msg: discord.Message):
                     await update_tracked_count(mid, count)
                     return
                 except discord.NotFound:
-                    pass
+                    # El repost fue borrado manualmente.
+                    if count < cfg["min_skulls"]:
+                        # Ya no califica: sincroniza el conteo y no recrees nada.
+                        await update_tracked_count(mid, count)
+                        return
+                    # Aún califica: cae abajo y se recrea el repost.
+
+            # Crear un repost nuevo (solo si alcanza el mínimo).
+            if count < cfg["min_skulls"]:
+                return
 
             sent = await dest_chan.send(content=texto, embed=embed)
             await set_tracked_message(mid, sent.id, count, msg.author.id, gid)
@@ -588,7 +603,8 @@ async def help_cmd(ctx):
     p4.add_field(name=f"{p}ignore 🔒",      value="🚫 Ignora un canal",                    inline=True)
     p4.add_field(name=f"{p}unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
     p4.add_field(name=f"{p}setuppin 🔒",    value="📌 Auto-pin de mensajes",               inline=True)
-    p4.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard",             inline=True)
+    p4.add_field(name=f"{p}resync 🔒",      value="🔄 Resincroniza los conteos de 💀",     inline=True)
+    p4.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard · solo el dueño del servidor", inline=True)
     p4.set_footer(text=footer_admin)
 
     pages = [p1, p2, p3, p4]
@@ -597,8 +613,14 @@ async def help_cmd(ctx):
 
 @bot.command(name="reset", hidden=True)
 @commands.guild_only()
-@commands.has_permissions(administrator=True)
 async def reset_cmd(ctx):
+    if ctx.author.id != ctx.guild.owner_id:
+        embed = discord.Embed(
+            title="❌ Solo el dueño del servidor",
+            description="Únicamente el **propietario del servidor** puede usar este comando.",
+            color=0xed4245
+        )
+        return await ctx.send(embed=embed)
     gid        = str(ctx.guild.id)
     embed_warn = discord.Embed(
         title="⚠️ ¿Estás seguro?",
@@ -1005,6 +1027,163 @@ async def topyear_cmd(ctx):
     embed = await get_top_periodo(ctx.guild, desde, f"🏆 Top del año — {ahora.year}")
     await ctx.send(embed=embed)
 
+# ─── Resync: deduplica el canal y reconcilia la BD con la realidad ────────────
+async def _delete_rows_by_sb_id(gid: str, sb_id):
+    """Borra de la BD cualquier fila que apunte a un repost concreto."""
+    def _op():
+        return supabase.table("tracked_messages").delete() \
+            .eq("guild_id", gid).eq("skullboard_message_id", sb_id).execute()
+    try:
+        await asyncio.to_thread(_op)
+    except Exception:
+        pass
+
+async def _resync_guild(guild: discord.Guild) -> dict:
+    """Reconstruye el skullboard a partir del propio canal:
+
+    1. Agrupa todos los reposts por su mensaje original.
+    2. Elimina los reposts DUPLICADOS (deja solo uno por mensaje original).
+    3. Recuenta las 💀 reales del original y actualiza el repost superviviente.
+    4. Deja en la BD una única fila por mensaje, con el conteo real.
+
+    No toca el esquema: solo borra reposts duplicados/huérfanos y reescribe
+    la columna skull_count y el skullboard_message_id de cada fila.
+    """
+    gid           = str(guild.id)
+    cfg           = await get_guild_config(guild.id)
+    min_skulls    = cfg.get("min_skulls", 1)
+    sb_channel_id = cfg.get("skullboard_channel_id")
+    sb_chan       = bot.get_channel(sb_channel_id) if sb_channel_id else None
+
+    res = {"originales": 0, "duplicados_borrados": 0, "huerfanos_borrados": 0,
+           "sincronizados": 0, "no_localizables": 0}
+    if sb_chan is None:
+        return res
+
+    # 1) Escanear el canal y agrupar reposts por mensaje original
+    grupos: dict[str, list] = {}
+    async for sb_msg in sb_chan.history(limit=None):
+        if sb_msg.author.id != bot.user.id: continue
+        if not sb_msg.embeds: continue
+        emb_str = str(sb_msg.embeds[0].to_dict())
+        m = re.search(r'discord\.com/channels/(\d+)/(\d+)/(\d+)', emb_str)
+        if not m: continue
+        orig_chan_id = int(m.group(2))
+        orig_msg_id  = m.group(3)
+        grupos.setdefault(orig_msg_id, []).append((sb_msg, orig_chan_id))
+
+    res["originales"] = len(grupos)
+    record = await get_guild_record(gid)
+
+    for orig_msg_id, reposts in grupos.items():
+        # El superviviente es el repost más reciente; el resto son duplicados.
+        reposts.sort(key=lambda t: t[0].created_at, reverse=True)
+        survivor, orig_chan_id = reposts[0]
+        extras = reposts[1:]
+
+        # Recontar las 💀 reales del mensaje original.
+        # IMPORTANTE: solo borramos si Discord CONFIRMA que el original ya no
+        # existe (NotFound). Ante cualquier otro fallo (rate limit, canal no
+        # cacheado, permisos) saltamos SIN borrar nada para no perder reposts buenos.
+        original   = None
+        real_count = None
+        author_id  = None
+        confirmado_borrado = False
+
+        orig_chan = bot.get_channel(orig_chan_id)
+        if orig_chan is None:
+            res["no_localizables"] += 1
+            await asyncio.sleep(0.05)
+            continue
+
+        try:
+            original   = await orig_chan.fetch_message(int(orig_msg_id))
+            skull_reac = next((r for r in original.reactions if str(r.emoji) == skull_emoji), None)
+            real_count = skull_reac.count if skull_reac else 0
+            author_id  = str(original.author.id)
+        except discord.NotFound:
+            confirmado_borrado = True
+        except Exception:
+            res["no_localizables"] += 1
+            await asyncio.sleep(0.1)
+            continue
+
+        # El original fue borrado (confirmado) → eliminar TODOS sus reposts y filas
+        if confirmado_borrado:
+            for rp, _ in reposts:
+                try: await rp.delete()
+                except Exception: pass
+                await _delete_rows_by_sb_id(gid, rp.id)
+                await asyncio.sleep(0.3)
+            def _del_orig(mm=orig_msg_id):
+                return supabase.table("tracked_messages").delete() \
+                    .eq("message_id", mm).eq("guild_id", gid).execute()
+            try: await asyncio.to_thread(_del_orig)
+            except Exception: pass
+            res["huerfanos_borrados"] += 1
+            continue
+
+        # Borrar los reposts duplicados (queda solo el superviviente)
+        for rp, _ in extras:
+            try:
+                await rp.delete()
+                res["duplicados_borrados"] += 1
+            except Exception:
+                pass
+            await _delete_rows_by_sb_id(gid, rp.id)
+            await asyncio.sleep(0.3)
+
+        # Reescribir el superviviente con el conteo real
+        try:
+            texto, embed = _build_repost(original, real_count, record, min_skulls)
+            await survivor.edit(content=texto, embed=embed)
+        except Exception:
+            pass
+
+        # Dejar una única fila en la BD para este mensaje
+        await db_upsert("tracked_messages", {
+            "message_id":            str(orig_msg_id),
+            "skullboard_message_id": survivor.id,
+            "skull_count":           real_count,
+            "author_id":             author_id or "0",
+            "guild_id":              gid,
+        })
+        res["sincronizados"] += 1
+        await asyncio.sleep(0.3)
+
+    return res
+
+def _resync_result_embed(res: dict) -> discord.Embed:
+    return discord.Embed(
+        title="✅ Resincronización completada",
+        description=(
+            f"📊 Mensajes únicos: **{res['originales']}**\n"
+            f"🔄 Sincronizados con su conteo real: **{res['sincronizados']}**\n"
+            f"🧹 Reposts duplicados eliminados: **{res['duplicados_borrados']}**\n"
+            f"🗑️ Entradas obsoletas eliminadas (originales borrados): **{res['huerfanos_borrados']}**"
+        ),
+        color=0x57f287
+    )
+
+@bot.command(name="resync", aliases=["sync"])
+@commands.guild_only()
+@commands.has_permissions(administrator=True)
+async def resync_cmd(ctx):
+    cfg = await get_guild_config(ctx.guild.id)
+    if not cfg.get("skullboard_channel_id"):
+        return await ctx.send(embed=discord.Embed(
+            title="❌ Sin canal configurado",
+            description="Configura primero el canal del skullboard con `set_channel`.",
+            color=0xed4245
+        ))
+    status = await ctx.send(embed=discord.Embed(
+        title="⏳ Resincronizando...",
+        description="Recontando las 💀 reales de cada mensaje. Esto puede tardar un poco. ☕",
+        color=0x8b5cf6
+    ))
+    res = await _resync_guild(ctx.guild)
+    await status.edit(embed=_resync_result_embed(res))
+
 # ─── Comandos privados del owner (BACKFILL IDs PURAS - 1 a 1) ─────────────────────────
 @bot.command(name="backfill", hidden=True)
 async def backfill_cmd(ctx):
@@ -1155,6 +1334,26 @@ async def backfill_cmd(ctx):
         color=0x57f287
     ))
     
+def _build_announce_embed() -> discord.Embed:
+    return discord.Embed(
+        title="💀 SkullBoard — Actualización",
+        description=(
+            "¡Hemos pulido el bot por dentro! Estos son los cambios de esta versión:\n\n"
+            "**🔧 Correcciones**\n"
+            "• Los conteos de 💀 ahora se mantienen **sincronizados** con la realidad: "
+            "se acabaron los números desactualizados en `/top`, `/stats` y `/leaderboard`.\n"
+            "• Eliminados los **mensajes duplicados** que a veces aparecían repetidos en el skullboard.\n"
+            "• El botón **«Saltar al mejor mensaje»** ahora te lleva siempre al mensaje correcto.\n\n"
+            "**✨ Nuevo para administradores**\n"
+            "• `/resync` (o `sk!resync`) — recuenta las 💀 reales de todos los mensajes, "
+            "borra duplicados y corrige cualquier descuadre de golpe.\n\n"
+            "**🔒 Permisos**\n"
+            "• `sk!reset` ahora **solo puede usarlo el dueño del servidor**.\n\n"
+            "Usa `/help` o `sk!help` para ver todos los comandos. ¡Gracias por usar SkullBoard! 💀"
+        ),
+        color=0x8b5cf6
+    )
+
 @bot.command(name="announce", hidden=True)
 async def announce_cmd(ctx):
     if ctx.author.id != OWNER_ID:
@@ -1162,21 +1361,7 @@ async def announce_cmd(ctx):
         except: pass
         return
 
-    embed = discord.Embed(
-        title="💀 SkullBoard — Novedades",
-        description=(
-            "Se han añadido nuevas funciones al bot.\n"
-            "Usa `/help` o `sk!help` para ver todos los comandos disponibles.\n\n"
-            "**✨ Novedades principales:**\n"
-            "• `/notify` — Activa o desactiva notificaciones por DM cuando tu mensaje llegue al skullboard\n"
-            "• `/leaderboard` — Top usuarios con más 💀 totales del servidor\n"
-            "• `/server_stats` — Estadísticas globales del servidor\n"
-            "• `/top_month` — Top mensajes del mes actual\n"
-            "• `/top_year` — Top mensajes del año\n"
-            "• `Auto-pin` — Los admins pueden configurar que los mensajes más reaccionados se pineen automáticamente con `/setup_pin`"
-        ),
-        color=0x8b5cf6
-    )
+    embed = _build_announce_embed()
 
     enviados = 0
     fallidos = 0
@@ -1216,21 +1401,7 @@ async def editannounce_cmd(ctx):
         except: pass
         return
 
-    nuevo_embed = discord.Embed(
-        title="💀 SkullBoard — Novedades",
-        description=(
-            "Se han añadido nuevas funciones al bot.\n"
-            "Usa `/help` o `sk!help` para ver todos los comandos disponibles.\n\n"
-            "**✨ Novedades principales:**\n"
-            "• `/notify` — Activa o desactiva notificaciones por DM cuando tu mensaje llegue al skullboard\n"
-            "• `/leaderboard` — Top usuarios con más 💀 totales del servidor\n"
-            "• `/server_stats` — Estadísticas globales del servidor\n"
-            "• `/top_month` — Top mensajes del mes actual\n"
-            "• `/top_year` — Top mensajes del año\n"
-            "• `Auto-pin` — Los admins pueden configurar que los mensajes más reaccionados se pineen automáticamente con `/setup_pin`"
-        ),
-        color=0x8b5cf6
-    )
+    nuevo_embed = _build_announce_embed()
 
     editados = 0
     fallidos = 0
@@ -1735,6 +1906,27 @@ async def top_year_slash(interaction: discord.Interaction):
     desde = ahora.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
     embed = await get_top_periodo(interaction.guild, desde, f"🏆 Top del año — {ahora.year}")
     await interaction.followup.send(embed=embed)
+
+@tree.command(name="resync", description="Resincroniza los conteos de 💀 con la realidad (admin)")
+async def resync_slash(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    cfg = await get_guild_config(interaction.guild.id)
+    if not cfg.get("skullboard_channel_id"):
+        return await interaction.response.send_message(embed=discord.Embed(
+            title="❌ Sin canal configurado",
+            description="Configura primero el canal del skullboard con `/set_channel`.",
+            color=0xed4245
+        ), ephemeral=True)
+    await interaction.response.defer()
+    await interaction.followup.send(embed=discord.Embed(
+        title="⏳ Resincronizando...",
+        description="Recontando las 💀 reales de cada mensaje. Esto puede tardar un poco. ☕",
+        color=0x8b5cf6
+    ))
+    res = await _resync_guild(interaction.guild)
+    await interaction.followup.send(embed=_resync_result_embed(res))
 
 # ─── Manejo de errores global ─────────────────────────────────────────────────
 @bot.event
