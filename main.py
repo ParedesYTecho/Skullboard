@@ -1338,7 +1338,7 @@ def _build_announce_embed() -> discord.Embed:
     return discord.Embed(
         title="💀 SkullBoard — Actualización",
         description=(
-            "¡Hemos pulido el bot por dentro! Estos son los cambios de esta versión:\n\n"
+            "¡Se ha pulido el bot por dentro! Estos son los cambios de esta versión:\n\n"
             "**🔧 Correcciones**\n"
             "• Los conteos de 💀 ahora se mantienen **sincronizados** con la realidad: "
             "se acabaron los números desactualizados en `/top`, `/stats` y `/leaderboard`.\n"
