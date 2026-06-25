@@ -1,18 +1,30 @@
-from flask import Flask, request
+from flask import Flask, request, send_from_directory
 from threading import Thread
 import requests
 import os
 
 app = Flask(__name__)
 
-APPLICATION_ID = "1367463352774955059"
+APPLICATION_ID = os.getenv("DISCORD_APPLICATION_ID", "1367463352774955059")
 DISCORD_BOT_TOKEN = os.getenv("DISCORD_TOKEN")
 DISCORD_CLIENT_SECRET = os.getenv("DISCORD_CLIENT_SECRET")
-REDIRECT_URI = "https://skullboard-fqf1.onrender.com/callback"
+REDIRECT_URI = os.getenv("DISCORD_REDIRECT_URI", "https://skullboard-fqf1.onrender.com/callback")
 
 @app.route('/')
 def index():
-    return "Hello, I am alive!"
+    try:
+        return send_from_directory('legal', 'index.html')
+    except Exception:
+        return "Hello, I am alive!"
+
+@app.route('/<path:filename>')
+def serve_legal_files(filename):
+    try:
+        return send_from_directory('legal', filename)
+    except Exception:
+        return "❌ Archivo no encontrado.", 404
+
+OWNER_ID = os.getenv("BOT_OWNER_ID", "561225979389804544")
 
 # Linked Role Connection
 @app.route('/callback')
@@ -44,7 +56,7 @@ def callback():
         headers={"Authorization": f"Bearer {access_token}"}
     ).json()
 
-    if user_info.get("id") != "561225979389804544": # ID del propietario del bot
+    if user_info.get("id") != OWNER_ID: # ID del propietario del bot
         return "❌ No estás autorizado para vincular este rol.", 403
 
     # Asignar datos de rol
@@ -91,6 +103,9 @@ def register_metadata():
 def run():
     try:
         register_metadata()
+    except Exception as e:
+        print(f"⚠️ Error al registrar metadata: {e}")
+    try:
         app.run(host='0.0.0.0', port=8080)
     except Exception as e:
         print(f"❌ Error al iniciar el servidor: {e}")
