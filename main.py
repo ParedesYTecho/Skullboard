@@ -5,10 +5,11 @@ import re
 import webserver
 import asyncio
 import random
+import time
 from datetime import datetime, timezone
 from discord.ext import commands, tasks
 from discord import app_commands
-from supabase import create_client
+from supabase import acreate_client, AsyncClient
 import discord.abc
 from typing import Optional
 
@@ -24,113 +25,193 @@ logger = logging.getLogger("SkullBoard")
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 SUPABASE_URL  = os.getenv("SUPABASE_URL")
 SUPABASE_KEY  = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-supabase      = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase: Optional[AsyncClient] = None
 
 OWNER_ID    = 561225979389804544
 skull_emoji = '💀'
 
+# ─── Cachés y Locks en memoria ────────────────────────────────────────────────
 _prefix_cache: dict[str, tuple[str, float]] = {}
 PREFIX_CACHE_TTL = 120
 
+_guild_config_cache: dict[str, tuple[dict, float]] = {}
+_ignored_channels_cache: dict[str, tuple[set[str], float]] = {}
+_guild_record_cache: dict[str, tuple[int, float]] = {}
+CACHE_TTL = 300  # 5 minutos
+
 _check_locks: dict[str, asyncio.Lock] = {}
+_check_counts: dict[str, int] = {}
+
+SPANISH_MONTHS = {
+    1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
+    7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
+}
 
 # ─── Wrappers Async ───────────────────────────────────────────────────────────
 async def db_select(table: str, match_col: str, match_val: str, select_cols: str = "*"):
-    def _op():
-        return supabase.table(table).select(select_cols).eq(match_col, match_val).execute()
-    return await asyncio.to_thread(_op)
+    try:
+        return await supabase.table(table).select(select_cols).eq(match_col, match_val).execute()
+    except Exception as e:
+        logger.error(f"Error en db_select ({table}.{match_col}={match_val}): {e}")
+        raise
 
 async def db_insert(table: str, data: dict):
-    def _op():
-        return supabase.table(table).insert(data).execute()
-    return await asyncio.to_thread(_op)
+    try:
+        data_copy = data.copy()
+        if "skull_count" in data_copy:
+            data_copy["skull_count"] = min(data_copy["skull_count"], 32767)
+        return await supabase.table(table).insert(data_copy).execute()
+    except Exception as e:
+        logger.error(f"Error en db_insert en tabla {table}: {e}")
+        raise
 
 async def db_update(table: str, updates: dict, match_col: str, match_val: str):
-    def _op():
-        return supabase.table(table).update(updates).eq(match_col, match_val).execute()
-    return await asyncio.to_thread(_op)
+    try:
+        updates_copy = updates.copy()
+        updates_copy.pop("guild_id", None)  # Prevent updating guild_id primary key
+        if "skull_count" in updates_copy:
+            updates_copy["skull_count"] = min(updates_copy["skull_count"], 32767)
+        return await supabase.table(table).update(updates_copy).eq(match_col, match_val).execute()
+    except Exception as e:
+        logger.error(f"Error en db_update ({table}.{match_col}={match_val}): {e}")
+        raise
 
 async def db_upsert(table: str, data: dict):
-    def _op():
-        return supabase.table(table).upsert(data).execute()
-    return await asyncio.to_thread(_op)
+    try:
+        data_copy = data.copy()
+        if "skull_count" in data_copy:
+            data_copy["skull_count"] = min(data_copy["skull_count"], 32767)
+        return await supabase.table(table).upsert(data_copy).execute()
+    except Exception as e:
+        logger.error(f"Error en db_upsert en tabla {table}: {e}")
+        raise
 
 # ─── Config ───────────────────────────────────────────────────────────────────
 async def get_guild_config(guild_id) -> dict:
-    gid  = str(guild_id)
-    resp = await db_select("settings", "guild_id", gid)
-    if resp.data:
-        return resp.data[0]
-    default = {"guild_id": gid, "skullboard_channel_id": 0, "min_skulls": 1, "prefix": "sk!"}
-    await db_insert("settings", default)
-    return default
+    gid = str(guild_id)
+    now = time.time()
+    if gid in _guild_config_cache:
+        cached_cfg, cached_at = _guild_config_cache[gid]
+        if now - cached_at < CACHE_TTL:
+            return cached_cfg
+    try:
+        resp = await db_select("settings", "guild_id", gid)
+        if resp.data:
+            cfg = resp.data[0]
+        else:
+            cfg = {"guild_id": gid, "skullboard_channel_id": 0, "min_skulls": 1, "prefix": "sk!"}
+            await db_insert("settings", cfg)
+        _guild_config_cache[gid] = (cfg, now)
+        return cfg
+    except Exception as e:
+        logger.error(f"Error al obtener configuración de guild {gid}: {e}")
+        return {"guild_id": gid, "skullboard_channel_id": 0, "min_skulls": 1, "prefix": "sk!"}
 
 async def update_guild_config(guild_id, updates: dict):
-    await db_update("settings", updates, "guild_id", str(guild_id))
+    gid = str(guild_id)
+    try:
+        await db_update("settings", updates, "guild_id", gid)
+        _guild_config_cache.pop(gid, None)  # Invalidate config cache
+        _prefix_cache.pop(gid, None)        # Invalidate prefix cache
+    except Exception as e:
+        logger.error(f"Error al actualizar configuración de guild {gid}: {e}")
+        raise
 
 # ─── Tracked messages ─────────────────────────────────────────────────────────
 async def get_tracked_message(message_id: str) -> Optional[int]:
-    resp = await db_select("tracked_messages", "message_id", str(message_id), "skullboard_message_id")
-    if resp.data:
-        return resp.data[0]["skullboard_message_id"]
+    try:
+        resp = await db_select("tracked_messages", "message_id", str(message_id), "skullboard_message_id")
+        if resp.data:
+            return resp.data[0]["skullboard_message_id"]
+    except Exception as e:
+        logger.error(f"Error en get_tracked_message ({message_id}): {e}")
     return None
 
 async def set_tracked_message(message_id: str, skullboard_id: int, count: int, author_id: str, guild_id: str):
-    await db_upsert("tracked_messages", {
-        "message_id":          str(message_id),
-        "skullboard_message_id": skullboard_id,
-        "skull_count":         count,
-        "author_id":           str(author_id),
-        "guild_id":            str(guild_id)
-    })
+    try:
+        await db_upsert("tracked_messages", {
+            "message_id":            str(message_id),
+            "skullboard_message_id": skullboard_id,
+            "skull_count":           count,
+            "author_id":             str(author_id),
+            "guild_id":              str(guild_id)
+        })
+        _guild_record_cache.pop(str(guild_id), None)  # Invalidate record cache
+    except Exception as e:
+        logger.error(f"Error en set_tracked_message ({message_id}): {e}")
 
 async def update_tracked_count(message_id: str, count: int):
-    await db_update("tracked_messages", {"skull_count": count}, "message_id", str(message_id))
+    try:
+        await db_update("tracked_messages", {"skull_count": count}, "message_id", str(message_id))
+    except Exception as e:
+        logger.error(f"Error en update_tracked_count ({message_id}): {e}")
 
 async def get_guild_record(guild_id: str) -> int:
-    def _op():
-        return supabase.table("tracked_messages").select("skull_count") \
-            .eq("guild_id", guild_id).order("skull_count", desc=True).limit(1).execute()
-    resp = await asyncio.to_thread(_op)
-    if resp.data:
-        return resp.data[0]["skull_count"] or 0
-    return 0
+    gid = str(guild_id)
+    now = time.time()
+    if gid in _guild_record_cache:
+        cached_rec, cached_at = _guild_record_cache[gid]
+        if now - cached_at < CACHE_TTL:
+            return cached_rec
+    try:
+        resp = await supabase.table("tracked_messages").select("skull_count") \
+            .eq("guild_id", gid).order("skull_count", desc=True).limit(1).execute()
+        rec = 0
+        if resp.data:
+            rec = resp.data[0]["skull_count"] or 0
+        _guild_record_cache[gid] = (rec, now)
+        return rec
+    except Exception as e:
+        logger.error(f"Error al obtener récord de guild {gid}: {e}")
+        return 0
 
 # ─── Ignored channels ─────────────────────────────────────────────────────────
+async def get_ignored_channels(guild_id: str) -> list:
+    gid = str(guild_id)
+    now = time.time()
+    if gid in _ignored_channels_cache:
+        cached_chans, cached_at = _ignored_channels_cache[gid]
+        if now - cached_at < CACHE_TTL:
+            return list(cached_chans)
+    try:
+        resp = await supabase.table("ignored_channels").select("channel_id").eq("guild_id", gid).execute()
+        chans = [r["channel_id"] for r in resp.data] if resp.data else []
+        _ignored_channels_cache[gid] = (set(chans), now)
+        return chans
+    except Exception as e:
+        logger.error(f"Error al obtener canales ignorados de guild {gid}: {e}")
+        return []
+
 async def is_channel_ignored(guild_id: str, channel_id: str) -> bool:
-    def _op():
-        return supabase.table("ignored_channels").select("channel_id") \
-            .eq("guild_id", guild_id).eq("channel_id", channel_id).execute()
-    resp = await asyncio.to_thread(_op)
-    return bool(resp.data)
+    chans = await get_ignored_channels(guild_id)
+    return str(channel_id) in chans
 
 async def add_ignored_channel(guild_id: str, channel_id: str):
-    def _op():
-        return supabase.table("ignored_channels").upsert(
-            {"guild_id": guild_id, "channel_id": channel_id}
-        ).execute()
-    await asyncio.to_thread(_op)
+    gid = str(guild_id)
+    cid = str(channel_id)
+    try:
+        await supabase.table("ignored_channels").upsert({"guild_id": gid, "channel_id": cid}).execute()
+        _ignored_channels_cache.pop(gid, None)
+    except Exception as e:
+        logger.error(f"Error al añadir canal ignorado {cid} en guild {gid}: {e}")
+        raise
 
 async def remove_ignored_channel(guild_id: str, channel_id: str):
-    def _op():
-        return supabase.table("ignored_channels").delete() \
-            .eq("guild_id", guild_id).eq("channel_id", channel_id).execute()
-    await asyncio.to_thread(_op)
-
-async def get_ignored_channels(guild_id: str) -> list:
-    def _op():
-        return supabase.table("ignored_channels").select("channel_id").eq("guild_id", guild_id).execute()
-    resp = await asyncio.to_thread(_op)
-    return [r["channel_id"] for r in resp.data] if resp.data else []
+    gid = str(guild_id)
+    cid = str(channel_id)
+    try:
+        await supabase.table("ignored_channels").delete().eq("guild_id", gid).eq("channel_id", cid).execute()
+        _ignored_channels_cache.pop(gid, None)
+    except Exception as e:
+        logger.error(f"Error al eliminar canal ignorado {cid} en guild {gid}: {e}")
+        raise
 
 # ─── Notify settings (con caché en memoria) ───────────────────────────────────
 notify_disabled_cache: set = set()
 
 async def load_notify_cache():
-    def _op():
-        return supabase.table("notify_settings").select("guild_id,user_id").eq("enabled", False).execute()
     try:
-        resp = await asyncio.to_thread(_op)
+        resp = await supabase.table("notify_settings").select("guild_id,user_id").eq("enabled", False).execute()
         for row in (resp.data or []):
             notify_disabled_cache.add((str(row["guild_id"]), str(row["user_id"])))
         logger.info(f"📬 Notify cache cargada: {len(notify_disabled_cache)} usuarios con notificaciones desactivadas")
@@ -143,15 +224,17 @@ def is_notify_enabled(guild_id, user_id) -> bool:
 async def set_notify(guild_id, user_id, enabled: bool):
     gid = str(guild_id)
     uid = str(user_id)
-    def _op():
-        return supabase.table("notify_settings").upsert({
+    try:
+        await supabase.table("notify_settings").upsert({
             "guild_id": gid, "user_id": uid, "enabled": enabled
         }).execute()
-    await asyncio.to_thread(_op)
-    if enabled:
-        notify_disabled_cache.discard((gid, uid))
-    else:
-        notify_disabled_cache.add((gid, uid))
+        if enabled:
+            notify_disabled_cache.discard((gid, uid))
+        else:
+            notify_disabled_cache.add((gid, uid))
+    except Exception as e:
+        logger.error(f"Error al establecer notificación para {uid} en {gid}: {e}")
+        raise
 
 # ─── Prefijo dinámico ─────────────────────────────────────────────────────────
 async def get_prefix(bot, message):
@@ -179,6 +262,9 @@ intents.messages        = True
 
 class SkullBot(commands.Bot):
     async def setup_hook(self):
+        global supabase
+        supabase = await acreate_client(SUPABASE_URL, SUPABASE_KEY)
+        logger.info("✅ Cliente Supabase (async) inicializado")
         synced = await self.tree.sync()
         logger.info(f"✅ Slash commands sincronizados: {len(synced)}")
         await load_notify_cache()
@@ -298,6 +384,7 @@ def build_slash_help_pages() -> list:
     p4.add_field(name="/unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
     p4.add_field(name="/setup_pin 🔒",   value="📌 Auto-pin de mensajes",               inline=True)
     p4.add_field(name="/resync 🔒",      value="🔄 Resincroniza los conteos de 💀",     inline=True)
+    p4.add_field(name="/reset ⚠️",        value="⚠️ Resetea el skullboard · solo propietario", inline=True)
     p4.set_footer(text=footer_admin)
 
     return [p1, p2, p3, p4]
@@ -335,7 +422,11 @@ async def _run_check(channel_id: int, message_id: int):
     mid = str(message_id)
     processing_messages.pop(mid, None)
     chan = bot.get_channel(channel_id)
-    if chan is None: return
+    if chan is None:
+        try:
+            chan = await bot.fetch_channel(channel_id)
+        except Exception:
+            return
     try:
         msg = await chan.fetch_message(message_id)
     except Exception: return
@@ -365,10 +456,15 @@ def _build_repost(msg: discord.Message, count: int, record: int, min_skulls: int
     return texto, embed
 
 async def _check(msg: discord.Message):
+    if msg.guild is None:
+        return
+
     mid = str(msg.id)
 
     if mid not in _check_locks:
         _check_locks[mid] = asyncio.Lock()
+        _check_counts[mid] = 0
+    _check_counts[mid] += 1
     lock = _check_locks[mid]
 
     async with lock:
@@ -384,12 +480,15 @@ async def _check(msg: discord.Message):
 
             existing_id = await get_tracked_message(mid)
 
-            # No crear entradas nuevas para mensajes que no alcanzan el mínimo.
-            # (Si ya estaba trackeado seguimos para mantener el conteo sincronizado.)
             if count < cfg["min_skulls"] and not existing_id:
                 return
 
             dest_chan = bot.get_channel(cfg["skullboard_channel_id"])
+            if dest_chan is None:
+                try:
+                    dest_chan = await bot.fetch_channel(cfg["skullboard_channel_id"])
+                except Exception:
+                    pass
             if not isinstance(dest_chan, discord.abc.Messageable): return
 
             record       = await get_guild_record(gid)
@@ -400,23 +499,22 @@ async def _check(msg: discord.Message):
                     old = await dest_chan.fetch_message(existing_id)
                     await old.edit(content=texto, embed=embed)
                     await update_tracked_count(mid, count)
+                    _guild_record_cache.pop(gid, None)  # Invalidate record cache
                     return
                 except discord.NotFound:
-                    # El repost fue borrado manualmente.
                     if count < cfg["min_skulls"]:
-                        # Ya no califica: sincroniza el conteo y no recrees nada.
                         await update_tracked_count(mid, count)
+                        _guild_record_cache.pop(gid, None)
                         return
-                    # Aún califica: cae abajo y se recrea el repost.
 
-            # Crear un repost nuevo (solo si alcanza el mínimo).
             if count < cfg["min_skulls"]:
                 return
 
             sent = await dest_chan.send(content=texto, embed=embed)
             await set_tracked_message(mid, sent.id, count, msg.author.id, gid)
+            _guild_record_cache.pop(gid, None)
 
-            # ─── DM de notificación al autor (solo primera vez) ───
+            # DM de notificación al autor
             if is_notify_enabled(gid, msg.author.id):
                 try:
                     dm_embed = discord.Embed(
@@ -439,7 +537,7 @@ async def _check(msg: discord.Message):
                 except Exception as e:
                     logger.warning(f"Error enviando DM a {msg.author.id}: {e}")
 
-            # ─── Auto-pin si supera el threshold ───
+            # Auto-pin
             threshold = cfg.get("pin_threshold", 0) or 0
             if threshold > 0 and count >= threshold and not sent.pinned:
                 try:
@@ -457,57 +555,97 @@ async def _check(msg: discord.Message):
                                 "Libera pins y vuelve a configurarlo con `/setup_pin`."
                             ),
                             color=0xed4245
-                        )
+                           )
                         await dest_chan.send(embed=err_embed)
                     except Exception:
                         pass
 
         except Exception as e:
             logger.error(f"Error en _check: {e}")
-
-    _check_locks.pop(mid, None)
+        finally:
+            _check_counts[mid] -= 1
+            if _check_counts[mid] <= 0:
+                _check_locks.pop(mid, None)
+                _check_counts.pop(mid, None)
 
 # ─── Borrado de mensajes ──────────────────────────────────────────────────────
 @bot.event
 async def on_raw_message_delete(payload):
     mid = str(payload.message_id)
-
-    def _find_by_original():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("skullboard_message_id,guild_id") \
             .eq("message_id", mid).execute()
-    resp = await asyncio.to_thread(_find_by_original)
 
-    if resp.data:
-        row    = resp.data[0]
-        sb_id  = row.get("skullboard_message_id")
-        gid    = row.get("guild_id")
-        if sb_id and gid:
-            try:
-                cfg      = await get_guild_config(int(gid))
-                sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
-                if sb_chan:
-                    sb_msg = await sb_chan.fetch_message(sb_id)
-                    await sb_msg.delete()
-            except Exception:
-                pass
-        def _del():
-            return supabase.table("tracked_messages").delete().eq("message_id", mid).execute()
-        await asyncio.to_thread(_del)
-        return
+        if resp.data:
+            row    = resp.data[0]
+            sb_id  = row.get("skullboard_message_id")
+            gid    = row.get("guild_id")
+            if sb_id and gid:
+                try:
+                    cfg      = await get_guild_config(int(gid))
+                    sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
+                    if sb_chan is None:
+                        sb_chan = await bot.fetch_channel(cfg["skullboard_channel_id"])
+                    if sb_chan:
+                        try:
+                            sb_msg = await sb_chan.fetch_message(sb_id)
+                            await sb_msg.delete()
+                        except discord.NotFound:
+                            pass
+                except Exception:
+                    pass
+            await supabase.table("tracked_messages").delete().eq("message_id", mid).execute()
+            if gid:
+                _guild_record_cache.pop(str(gid), None)
+            return
 
-    sb_mid = str(payload.message_id)
-    def _find_by_sb():
-        return supabase.table("tracked_messages") \
-            .select("message_id") \
+        sb_mid = str(payload.message_id)
+        resp2 = await supabase.table("tracked_messages") \
+            .select("message_id,guild_id") \
             .eq("skullboard_message_id", sb_mid).execute()
-    resp2 = await asyncio.to_thread(_find_by_sb)
 
-    if resp2.data:
-        def _del2():
-            return supabase.table("tracked_messages") \
+        if resp2.data:
+            gid = resp2.data[0].get("guild_id")
+            await supabase.table("tracked_messages") \
                 .delete().eq("skullboard_message_id", sb_mid).execute()
-        await asyncio.to_thread(_del2)
+            if gid:
+                _guild_record_cache.pop(str(gid), None)
+    except Exception as e:
+        logger.error(f"Error en on_raw_message_delete para message {mid}: {e}")
+
+@bot.event
+async def on_raw_bulk_message_delete(payload):
+    for mid_int in payload.message_ids:
+        mid = str(mid_int)
+        try:
+            resp = await supabase.table("tracked_messages") \
+                .select("skullboard_message_id,guild_id") \
+                .eq("message_id", mid).execute()
+
+            if resp.data:
+                row    = resp.data[0]
+                sb_id  = row.get("skullboard_message_id")
+                gid    = row.get("guild_id")
+                if sb_id and gid:
+                    try:
+                        cfg      = await get_guild_config(int(gid))
+                        sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
+                        if sb_chan is None:
+                            sb_chan = await bot.fetch_channel(cfg["skullboard_channel_id"])
+                        if sb_chan:
+                            try:
+                                sb_msg = await sb_chan.fetch_message(sb_id)
+                                await sb_msg.delete()
+                            except discord.NotFound:
+                                pass
+                    except Exception:
+                        pass
+                await supabase.table("tracked_messages").delete().eq("message_id", mid).execute()
+                if gid:
+                    _guild_record_cache.pop(str(gid), None)
+        except Exception as e:
+            logger.error(f"Error en on_raw_bulk_message_delete para message {mid}: {e}")
 
 # ─── COMANDOS DE TEXTO ────────────────────────────────────────────────────────
 
@@ -555,15 +693,15 @@ async def ajustes_cmd(ctx):
 @commands.guild_only()
 async def ping(ctx):
     ms    = round(bot.latency * 1000)
-    embed = discord.Embed(title="🏓 Pong!", color=0x5865F2)
-    embed.add_field(name="Latencia", value=f"**{ms}ms**", inline=True)
-    embed.add_field(name="Estado",   value=ping_estado(ms),  inline=True)
+    embed = discord.Embed(title="🏓 Pong!", color=0x8b5cf6)
+    embed.add_field(name="⚡ Latencia", value=f"**{ms}ms**", inline=True)
+    embed.add_field(name="📡 Estado",   value=ping_estado(ms),  inline=True)
     await ctx.send(embed=embed)
 
 @bot.command()
 @commands.guild_only()
 async def invite(ctx):
-    embed = discord.Embed(title="💀 SkullBoard", description="Añade este Bot a tu servidor y disfruta!", color=0x8b5cf6)
+    embed = discord.Embed(title="💀 SkullBoard", description="Añade este bot a tu servidor y ¡disfruta!", color=0x8b5cf6)
     embed.add_field(name="🔗 Invitar al servidor", value=f"[Haz click aquí para invitarme]({get_invite_url()})", inline=False)
     embed.set_footer(text=f"Más de {len(bot.guilds)} servidores confían en SkullBoard")
     await ctx.send(embed=embed)
@@ -604,7 +742,7 @@ async def help_cmd(ctx):
     p4.add_field(name=f"{p}unignore 🔒",    value="✅ Deja de ignorar un canal",           inline=True)
     p4.add_field(name=f"{p}setuppin 🔒",    value="📌 Auto-pin de mensajes",               inline=True)
     p4.add_field(name=f"{p}resync 🔒",      value="🔄 Resincroniza los conteos de 💀",     inline=True)
-    p4.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard · solo el dueño del servidor", inline=True)
+    p4.add_field(name=f"{p}reset 🔒",       value="⚠️ Resetea el skullboard · solo el propietario del servidor", inline=True)
     p4.set_footer(text=footer_admin)
 
     pages = [p1, p2, p3, p4]
@@ -616,7 +754,7 @@ async def help_cmd(ctx):
 async def reset_cmd(ctx):
     if ctx.author.id != ctx.guild.owner_id:
         embed = discord.Embed(
-            title="❌ Solo el dueño del servidor",
+            title="❌ Solo el propietario del servidor",
             description="Únicamente el **propietario del servidor** puede usar este comando.",
             color=0xed4245
         )
@@ -642,16 +780,20 @@ async def reset_cmd(ctx):
         embed = discord.Embed(title="❌ Reset cancelado", description="No se recibió confirmación a tiempo.", color=0x4e5058)
         return await ctx.send(embed=embed)
 
-    def _del():
-        return supabase.table("tracked_messages").delete().eq("guild_id", gid).execute()
-    resp    = await asyncio.to_thread(_del)
-    deleted = len(resp.data) if resp.data else 0
-    embed   = discord.Embed(
-        title="✅ Skullboard reseteado",
-        description=f"Se han eliminado **{deleted} mensajes** del registro. El skullboard empieza de cero.",
-        color=0x57f287
-    )
-    await ctx.send(embed=embed)
+    try:
+        resp = await supabase.table("tracked_messages").delete().eq("guild_id", gid).execute()
+        deleted = len(resp.data) if resp.data else 0
+        _guild_record_cache.pop(gid, None)
+        embed = discord.Embed(
+            title="✅ Skullboard reseteado",
+            description=f"Se han eliminado **{deleted} mensajes** del registro. El skullboard empieza de cero.",
+            color=0x57f287
+        )
+        await ctx.send(embed=embed)
+    except Exception as e:
+        logger.error(f"Error reseteando tracked_messages en reset_cmd para guild {gid}: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudo resetear la base de datos.", color=0xed4245)
+        await ctx.send(embed=embed)
 
 @bot.command(name="ignore")
 @commands.guild_only()
@@ -661,7 +803,7 @@ async def ignore_cmd(ctx, canal: discord.TextChannel = None):
         embed = discord.Embed(title="❌ Falta el canal", description="Menciona el canal a ignorar.", color=0xed4245)
         return await ctx.send(embed=embed)
     await add_ignored_channel(str(ctx.guild.id), str(canal.id))
-    embed = discord.Embed(title="🚫 Canal ignorado", description=f"Los mensajes de {canal.mention} ya no podrán llegar al skullboard.", color=0xed4245)
+    embed = discord.Embed(title="🚫 Canal ignorado", description=f"Los mensajes de {canal.mention} ya no podrán llegar al skullboard.", color=0x57f287)
     await ctx.send(embed=embed)
 
 @bot.command(name="unignore")
@@ -679,11 +821,15 @@ async def unignore_cmd(ctx, canal: discord.TextChannel = None):
 @commands.guild_only()
 async def top_cmd(ctx):
     gid = str(ctx.guild.id)
-    def _op():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("skull_count,author_id,skullboard_message_id") \
             .eq("guild_id", gid).order("skull_count", desc=True).limit(10).execute()
-    resp = await asyncio.to_thread(_op)
+    except Exception as e:
+        logger.error(f"Error en top_cmd para guild {gid}: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudo obtener el top.", color=0xed4245)
+        return await ctx.send(embed=embed)
+
     if not resp.data:
         embed = discord.Embed(title="🏆 Top Skullboard", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
         return await ctx.send(embed=embed)
@@ -694,17 +840,23 @@ async def top_cmd(ctx):
     for i, row in enumerate(resp.data):
         pos   = medals[i] if i < 3 else f"{i+1}."
         count = row.get("skull_count") or 0
-        try:
-            m    = ctx.guild.get_member(int(row["author_id"])) if row.get("author_id") else None
-            name = m.display_name if m else "Usuario desconocido"
-        except Exception:
-            name = "Usuario desconocido"
+        name  = "Usuario desconocido"
+        author_id = row.get("author_id")
+        if author_id:
+            try:
+                m = ctx.guild.get_member(int(author_id))
+                if m is None:
+                    m = await ctx.guild.fetch_member(int(author_id))
+                if m:
+                    name = m.display_name
+            except Exception:
+                pass
         sb_id = row.get("skullboard_message_id")
         if cfg["skullboard_channel_id"] and sb_id:
             link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{sb_id}"
-            lines.append(f"{pos} [{name}]({link}) — **{count} 💀**")
+            lines.append(f"{pos} **[{name}]({link})** — **{count} 💀**")
         else:
-            lines.append(f"{pos} {name} — **{count} 💀**")
+            lines.append(f"{pos} **{name}** — **{count} 💀**")
 
     embed = discord.Embed(title="🏆 Top Skullboard", description="\n".join(lines), color=0xfaa61a)
     embed.set_footer(text=f"Top {len(resp.data)} mensajes del servidor")
@@ -714,18 +866,28 @@ async def top_cmd(ctx):
 @commands.guild_only()
 async def random_cmd(ctx):
     gid = str(ctx.guild.id)
-    def _op():
-        return supabase.table("tracked_messages").select("*").eq("guild_id", gid).execute()
-    resp = await asyncio.to_thread(_op)
+    try:
+        resp = await supabase.table("tracked_messages").select("*").eq("guild_id", gid).execute()
+    except Exception as e:
+        logger.error(f"Error en random_cmd para guild {gid}: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudo obtener un mensaje aleatorio.", color=0xed4245)
+        return await ctx.send(embed=embed)
+
     if not resp.data:
         embed = discord.Embed(title="🎲 Mensaje aleatorio", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
         return await ctx.send(embed=embed)
 
     row     = random.choice(resp.data)
     cfg     = await get_guild_config(ctx.guild.id)
-    sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
-    sb_id   = row.get("skullboard_message_id")
+    sb_channel_id = cfg.get("skullboard_channel_id")
+    sb_chan  = bot.get_channel(sb_channel_id) if sb_channel_id else None
+    if sb_chan is None and sb_channel_id:
+        try:
+            sb_chan = await bot.fetch_channel(sb_channel_id)
+        except Exception:
+            pass
 
+    sb_id = row.get("skullboard_message_id")
     try:
         sb_msg = await sb_chan.fetch_message(sb_id) if sb_chan and sb_id else None
     except Exception:
@@ -737,47 +899,6 @@ async def random_cmd(ctx):
         await ctx.send(content=sb_msg.content, embed=embed)
     else:
         await ctx.send(embed=discord.Embed(title="🎲 Mensaje aleatorio", description="No se pudo recuperar el mensaje.", color=0x4e5058))
-
-@bot.command(name="stats")
-@commands.guild_only()
-async def stats_cmd(ctx, member: discord.Member = None):
-    member = member or ctx.author
-    gid    = str(ctx.guild.id)
-    uid    = str(member.id)
-
-    def _op():
-        return supabase.table("tracked_messages") \
-            .select("skull_count,skullboard_message_id") \
-            .eq("guild_id", gid).eq("author_id", uid).execute()
-    resp = await asyncio.to_thread(_op)
-
-    if not resp.data:
-        embed = discord.Embed(
-            title=f"📊 Stats de {member.display_name}",
-            description="Este usuario no tiene ningún mensaje en el skullboard.",
-            color=0x4e5058
-        )
-        return await ctx.send(embed=embed)
-
-    total_msgs   = len(resp.data)
-    total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
-    best_row     = max(resp.data, key=lambda r: r.get("skull_count") or 0)
-    best_count   = best_row.get("skull_count") or 0
-    best_sb_id   = best_row.get("skullboard_message_id")
-    cfg          = await get_guild_config(ctx.guild.id)
-    link         = None
-    if best_sb_id and cfg["skullboard_channel_id"]:
-        link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{best_sb_id}"
-
-    embed = discord.Embed(title=f"📊 Stats de {member.display_name}", color=0x8b5cf6)
-    embed.set_thumbnail(url=member.avatar.url if member.avatar else member.default_avatar.url)
-    embed.add_field(name="📌 Mensajes en el board",        value=str(total_msgs),    inline=False)
-    embed.add_field(name="💀 Calaveras totales recibidas",  value=str(total_skulls),  inline=False)
-    embed.add_field(name="🏆 Récord personal",              value=f"{best_count} 💀", inline=False)
-    if link:
-        embed.add_field(name="🔗 Mejor mensaje", value=f"[Saltar al mensaje]({link})", inline=False)
-    embed.set_footer(text=f"Estadísticas de {member.display_name} en este servidor")
-    await ctx.send(embed=embed)
 
 @bot.command(name="ignored")
 @commands.guild_only()
@@ -829,8 +950,8 @@ async def notify_cmd(ctx, estado: str = None):
 @bot.command(name="setuppin", aliases=["setup_pin"])
 @commands.guild_only()
 @commands.has_permissions(administrator=True)
-async def setuppin_cmd(ctx, threshold: int = None):
-    if threshold is None:
+async def setuppin_cmd(ctx, umbral: int = None):
+    if umbral is None:
         cfg = await get_guild_config(ctx.guild.id)
         actual = cfg.get("pin_threshold", 0) or 0
         if actual == 0:
@@ -845,23 +966,23 @@ async def setuppin_cmd(ctx, threshold: int = None):
         )
         return await ctx.send(embed=embed)
 
-    if threshold < 0:
-        embed = discord.Embed(title="❌ Número inválido", description="El threshold no puede ser negativo.", color=0xed4245)
+    if umbral < 0:
+        embed = discord.Embed(title="❌ Número inválido", description="El umbral no puede ser negativo.", color=0xed4245)
         return await ctx.send(embed=embed)
 
     cfg = await get_guild_config(ctx.guild.id)
     min_skulls = cfg.get("min_skulls", 1)
 
-    if threshold > 0 and threshold < min_skulls:
+    if umbral > 0 and umbral < min_skulls:
         embed = discord.Embed(
-            title="❌ Threshold demasiado bajo",
-            description=f"El threshold de auto-pin debe ser **mayor o igual al mínimo** del skullboard ({min_skulls} 💀).\n\nUsa un número ≥ {min_skulls} o `0` para desactivar.",
+            title="❌ Umbral demasiado bajo",
+            description=f"El umbral de auto-pin debe ser **mayor o igual al mínimo** del skullboard ({min_skulls} 💀).\n\nUsa un número ≥ {min_skulls} o `0` para desactivar.",
             color=0xed4245
         )
         return await ctx.send(embed=embed)
 
-    await update_guild_config(ctx.guild.id, {"pin_threshold": threshold})
-    if threshold == 0:
+    await update_guild_config(ctx.guild.id, {"pin_threshold": umbral})
+    if umbral == 0:
         embed = discord.Embed(
             title="📌 Auto-pin desactivado",
             description="Ya no se pinearán mensajes automáticamente en el skullboard.",
@@ -870,7 +991,7 @@ async def setuppin_cmd(ctx, threshold: int = None):
     else:
         embed = discord.Embed(
             title="✅ Auto-pin configurado",
-            description=f"Los mensajes con **{threshold}** o más 💀 se pinearán automáticamente.",
+            description=f"Los mensajes con **{umbral}** o más 💀 se pinearán automáticamente.",
             color=0x57f287
         )
     await ctx.send(embed=embed)
@@ -879,11 +1000,15 @@ async def setuppin_cmd(ctx, threshold: int = None):
 @commands.guild_only()
 async def leaderboard_cmd(ctx):
     gid = str(ctx.guild.id)
-    def _op():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("skull_count,author_id") \
             .eq("guild_id", gid).execute()
-    resp = await asyncio.to_thread(_op)
+    except Exception as e:
+        logger.error(f"Error en leaderboard_cmd para guild {gid}: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudo obtener la clasificación.", color=0xed4245)
+        return await ctx.send(embed=embed)
+
     if not resp.data:
         embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos en el skullboard.", color=0x4e5058)
         return await ctx.send(embed=embed)
@@ -903,26 +1028,33 @@ async def leaderboard_cmd(ctx):
     lines   = []
     for i, (uid, total) in enumerate(ranking):
         pos  = medals[i] if i < 3 else f"{i+1}."
+        name = "Usuario desconocido"
         try:
-            m    = ctx.guild.get_member(int(uid))
-            name = m.display_name if m else "Usuario desconocido"
+            m = ctx.guild.get_member(int(uid))
+            if m is None:
+                m = await ctx.guild.fetch_member(int(uid))
+            if m:
+                name = m.display_name
         except Exception:
-            name = "Usuario desconocido"
-        lines.append(f"{pos} **{name}** — {total} 💀")
+            pass
+        lines.append(f"{pos} **{name}** — **{total} 💀**")
 
     embed = discord.Embed(title="🏆 Top Usuarios — Skullboard", description="\n".join(lines), color=0xfaa61a)
     embed.set_footer(text=f"Top {len(ranking)} usuarios por calaveras totales")
     await ctx.send(embed=embed)
 
-@bot.command(name="serverstats", aliases=["sstats"])
+@bot.command(name="serverstats", aliases=["sstats", "server_stats"])
 @commands.guild_only()
 async def serverstats_cmd(ctx):
     gid = str(ctx.guild.id)
-    def _op():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("skull_count,author_id") \
             .eq("guild_id", gid).execute()
-    resp = await asyncio.to_thread(_op)
+    except Exception as e:
+        logger.error(f"Error en serverstats_cmd para guild {gid}: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas del servidor.", color=0xed4245)
+        return await ctx.send(embed=embed)
 
     if not resp.data:
         embed = discord.Embed(title="📊 Stats del Servidor", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
@@ -941,7 +1073,10 @@ async def serverstats_cmd(ctx):
         top_uid, top_user_count = max(totals.items(), key=lambda x: x[1])
         try:
             m = ctx.guild.get_member(int(top_uid))
-            top_user_name = m.display_name if m else "Usuario desconocido"
+            if m is None:
+                m = await ctx.guild.fetch_member(int(top_uid))
+            if m:
+                top_user_name = m.display_name
         except Exception:
             top_user_name = "Usuario desconocido"
 
@@ -953,8 +1088,8 @@ async def serverstats_cmd(ctx):
         embed.set_thumbnail(url=ctx.guild.icon.url)
     embed.add_field(name="📌 Mensajes en el board", value=str(total_msgs),    inline=True)
     embed.add_field(name="💀 Calaveras totales",     value=str(total_skulls), inline=True)
-    embed.add_field(name="🏆 Récord",                value=f"{record_count} 💀", inline=True)
-    embed.add_field(name="👑 Usuario más reaccionado", value=f"{top_user_name} · {top_user_count} 💀", inline=False)
+    embed.add_field(name="🏆 Récord",                value=f"**{record_count} 💀**", inline=True)
+    embed.add_field(name="👑 Usuario con más reacciones", value=f"{top_user_name} · **{top_user_count} 💀**", inline=False)
     embed.set_footer(text="Estadísticas globales del servidor")
     await ctx.send(embed=embed)
 
@@ -965,13 +1100,15 @@ def snowflake_to_datetime(snowflake_id: int) -> datetime:
     return datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
 
 async def get_top_periodo(guild: discord.Guild, desde: datetime, titulo: str) -> discord.Embed:
-    """Devuelve un embed con el top de mensajes en el periodo dado."""
+    """Devuelve un embed con el top de mensajes en el período dado."""
     gid = str(guild.id)
-    def _op():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("message_id,skull_count,author_id,skullboard_message_id") \
             .eq("guild_id", gid).order("skull_count", desc=True).execute()
-    resp = await asyncio.to_thread(_op)
+    except Exception as e:
+        logger.error(f"Error en get_top_periodo para guild {gid}: {e}")
+        return discord.Embed(title=titulo, description="No se pudo obtener el top para este período.", color=0xed4245)
 
     if not resp.data:
         return discord.Embed(title=titulo, description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
@@ -987,7 +1124,7 @@ async def get_top_periodo(guild: discord.Guild, desde: datetime, titulo: str) ->
             continue
 
     if not filtrados:
-        return discord.Embed(title=titulo, description="No hay mensajes en este periodo.", color=0x4e5058)
+        return discord.Embed(title=titulo, description="No hay mensajes en este período.", color=0x4e5058)
 
     medals = ["🥇", "🥈", "🥉"]
     cfg    = await get_guild_config(guild.id)
@@ -995,31 +1132,38 @@ async def get_top_periodo(guild: discord.Guild, desde: datetime, titulo: str) ->
     for i, row in enumerate(filtrados[:10]):
         pos   = medals[i] if i < 3 else f"{i+1}."
         count = row.get("skull_count") or 0
-        try:
-            m    = guild.get_member(int(row["author_id"])) if row.get("author_id") else None
-            name = m.display_name if m else "Usuario desconocido"
-        except Exception:
-            name = "Usuario desconocido"
+        name  = "Usuario desconocido"
+        author_id = row.get("author_id")
+        if author_id:
+            try:
+                m = guild.get_member(int(author_id))
+                if m is None:
+                    m = await guild.fetch_member(int(author_id))
+                if m:
+                    name = m.display_name
+            except Exception:
+                pass
         sb_id = row.get("skullboard_message_id")
         if cfg["skullboard_channel_id"] and sb_id:
             link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{sb_id}"
-            lines.append(f"{pos} [{name}]({link}) — **{count} 💀**")
+            lines.append(f"{pos} **[{name}]({link})** — **{count} 💀**")
         else:
-            lines.append(f"{pos} {name} — **{count} 💀**")
+            lines.append(f"{pos} **{name}** — **{count} 💀**")
 
     embed = discord.Embed(title=titulo, description="\n".join(lines), color=0xfaa61a)
-    embed.set_footer(text=f"Top {len(filtrados[:10])} mensajes del periodo · {filtrados[0].get('skull_count', 0)} 💀 el más reaccionado")
+    embed.set_footer(text=f"Top {len(filtrados[:10])} mensajes del período · {filtrados[0].get('skull_count', 0)} 💀 el mensaje con más reacciones")
     return embed
 
-@bot.command(name="topmonth", aliases=["monthly"])
+@bot.command(name="topmonth", aliases=["monthly", "top_month"])
 @commands.guild_only()
 async def topmonth_cmd(ctx):
     ahora = datetime.now(timezone.utc)
     desde = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    embed = await get_top_periodo(ctx.guild, desde, f"🏆 Top del mes — {ahora.strftime('%B %Y')}")
+    mes_nombre = SPANISH_MONTHS[ahora.month].capitalize()
+    embed = await get_top_periodo(ctx.guild, desde, f"🏆 Top del mes — {mes_nombre} {ahora.year}")
     await ctx.send(embed=embed)
 
-@bot.command(name="topyear", aliases=["yearly"])
+@bot.command(name="topyear", aliases=["yearly", "top_year"])
 @commands.guild_only()
 async def topyear_cmd(ctx):
     ahora = datetime.now(timezone.utc)
@@ -1030,30 +1174,25 @@ async def topyear_cmd(ctx):
 # ─── Resync: deduplica el canal y reconcilia la BD con la realidad ────────────
 async def _delete_rows_by_sb_id(gid: str, sb_id):
     """Borra de la BD cualquier fila que apunte a un repost concreto."""
-    def _op():
-        return supabase.table("tracked_messages").delete() \
-            .eq("guild_id", gid).eq("skullboard_message_id", sb_id).execute()
     try:
-        await asyncio.to_thread(_op)
-    except Exception:
-        pass
+        await supabase.table("tracked_messages").delete() \
+            .eq("guild_id", gid).eq("skullboard_message_id", sb_id).execute()
+    except Exception as e:
+        logger.error(f"Error borrando fila por sb_id {sb_id} en guild {gid}: {e}")
 
 async def _resync_guild(guild: discord.Guild) -> dict:
-    """Reconstruye el skullboard a partir del propio canal:
-
-    1. Agrupa todos los reposts por su mensaje original.
-    2. Elimina los reposts DUPLICADOS (deja solo uno por mensaje original).
-    3. Recuenta las 💀 reales del original y actualiza el repost superviviente.
-    4. Deja en la BD una única fila por mensaje, con el conteo real.
-
-    No toca el esquema: solo borra reposts duplicados/huérfanos y reescribe
-    la columna skull_count y el skullboard_message_id de cada fila.
-    """
     gid           = str(guild.id)
     cfg           = await get_guild_config(guild.id)
     min_skulls    = cfg.get("min_skulls", 1)
     sb_channel_id = cfg.get("skullboard_channel_id")
-    sb_chan       = bot.get_channel(sb_channel_id) if sb_channel_id else None
+    
+    # Safe channel fetch fallback
+    sb_chan = bot.get_channel(sb_channel_id) if sb_channel_id else None
+    if sb_chan is None and sb_channel_id:
+        try:
+            sb_chan = await bot.fetch_channel(sb_channel_id)
+        except Exception:
+            pass
 
     res = {"originales": 0, "duplicados_borrados": 0, "huerfanos_borrados": 0,
            "sincronizados": 0, "no_localizables": 0}
@@ -1076,21 +1215,21 @@ async def _resync_guild(guild: discord.Guild) -> dict:
     record = await get_guild_record(gid)
 
     for orig_msg_id, reposts in grupos.items():
-        # El superviviente es el repost más reciente; el resto son duplicados.
         reposts.sort(key=lambda t: t[0].created_at, reverse=True)
         survivor, orig_chan_id = reposts[0]
         extras = reposts[1:]
 
-        # Recontar las 💀 reales del mensaje original.
-        # IMPORTANTE: solo borramos si Discord CONFIRMA que el original ya no
-        # existe (NotFound). Ante cualquier otro fallo (rate limit, canal no
-        # cacheado, permisos) saltamos SIN borrar nada para no perder reposts buenos.
         original   = None
         real_count = None
         author_id  = None
         confirmado_borrado = False
 
         orig_chan = bot.get_channel(orig_chan_id)
+        if orig_chan is None:
+            try:
+                orig_chan = await bot.fetch_channel(orig_chan_id)
+            except Exception:
+                pass
         if orig_chan is None:
             res["no_localizables"] += 1
             await asyncio.sleep(0.05)
@@ -1108,22 +1247,20 @@ async def _resync_guild(guild: discord.Guild) -> dict:
             await asyncio.sleep(0.1)
             continue
 
-        # El original fue borrado (confirmado) → eliminar TODOS sus reposts y filas
         if confirmado_borrado:
             for rp, _ in reposts:
                 try: await rp.delete()
                 except Exception: pass
                 await _delete_rows_by_sb_id(gid, rp.id)
                 await asyncio.sleep(0.3)
-            def _del_orig(mm=orig_msg_id):
-                return supabase.table("tracked_messages").delete() \
-                    .eq("message_id", mm).eq("guild_id", gid).execute()
-            try: await asyncio.to_thread(_del_orig)
-            except Exception: pass
+            try:
+                await supabase.table("tracked_messages").delete() \
+                    .eq("message_id", orig_msg_id).eq("guild_id", gid).execute()
+            except Exception:
+                pass
             res["huerfanos_borrados"] += 1
             continue
 
-        # Borrar los reposts duplicados (queda solo el superviviente)
         for rp, _ in extras:
             try:
                 await rp.delete()
@@ -1133,24 +1270,26 @@ async def _resync_guild(guild: discord.Guild) -> dict:
             await _delete_rows_by_sb_id(gid, rp.id)
             await asyncio.sleep(0.3)
 
-        # Reescribir el superviviente con el conteo real
         try:
             texto, embed = _build_repost(original, real_count, record, min_skulls)
             await survivor.edit(content=texto, embed=embed)
         except Exception:
             pass
 
-        # Dejar una única fila en la BD para este mensaje
-        await db_upsert("tracked_messages", {
-            "message_id":            str(orig_msg_id),
-            "skullboard_message_id": survivor.id,
-            "skull_count":           real_count,
-            "author_id":             author_id or "0",
-            "guild_id":              gid,
-        })
+        try:
+            await db_upsert("tracked_messages", {
+                "message_id":            str(orig_msg_id),
+                "skullboard_message_id": survivor.id,
+                "skull_count":           real_count,
+                "author_id":             author_id or "0",
+                "guild_id":              gid,
+            })
+        except Exception:
+            pass
         res["sincronizados"] += 1
         await asyncio.sleep(0.3)
 
+    _guild_record_cache.pop(gid, None)  # Invalidate record cache
     return res
 
 def _resync_result_embed(res: dict) -> discord.Embed:
@@ -1202,6 +1341,11 @@ async def backfill_cmd(ctx):
         ))
 
     channel = bot.get_channel(sb_channel_id)
+    if not channel:
+        try:
+            channel = await bot.fetch_channel(sb_channel_id)
+        except Exception:
+            channel = None
     if not channel:
         return await ctx.send(embed=discord.Embed(
             title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245
@@ -1263,6 +1407,8 @@ async def backfill_cmd(ctx):
         
         try:
             orig_chan = bot.get_channel(data["orig_chan_id"])
+            if orig_chan is None:
+                orig_chan = await bot.fetch_channel(data["orig_chan_id"])
             if orig_chan:
                 orig_msg = await orig_chan.fetch_message(int(orig_msg_id))
                 author_id = str(orig_msg.author.id)
@@ -1277,13 +1423,13 @@ async def backfill_cmd(ctx):
         if author_id:
             if orig_msg_id in registros_dict:
                 if count > registros_dict[orig_msg_id]["skull_count"]:
-                    registros_dict[orig_msg_id]["skull_count"] = count
+                    registros_dict[orig_msg_id]["skull_count"] = min(count, 32767)
                     registros_dict[orig_msg_id]["skullboard_message_id"] = data["sb_msg_id"]
             else:
                 registros_dict[orig_msg_id] = {
                     "message_id": str(orig_msg_id),
                     "skullboard_message_id": data["sb_msg_id"],
-                    "skull_count": count,
+                    "skull_count": min(count, 32767),
                     "author_id": str(author_id),
                     "guild_id": gid
                 }
@@ -1311,10 +1457,7 @@ async def backfill_cmd(ctx):
     errores_db = 0
     for registro in registros_a_subir:
         try:
-            # Función auxiliar necesaria para que no se pise la variable en el loop async
-            def _upsert(r=registro):
-                return supabase.table("tracked_messages").upsert(r).execute()
-            await asyncio.to_thread(_upsert)
+            await supabase.table("tracked_messages").upsert(registro).execute()
             exitosos += 1
         except Exception as e:
             logger.error(f"Error guardando msg {registro['message_id']}: {e}")
@@ -1322,6 +1465,7 @@ async def backfill_cmd(ctx):
             
         await asyncio.sleep(0.05) # Pequeñísima pausa para cuidar la BD
 
+    _guild_record_cache.pop(gid, None)  # Invalidate record cache
     await msg_status.edit(embed=discord.Embed(
         title="✅ Backfill de IDs Completado",
         description=(
@@ -1348,7 +1492,7 @@ def _build_announce_embed() -> discord.Embed:
             "• `/resync` (o `sk!resync`) — recuenta las 💀 reales de todos los mensajes, "
             "borra duplicados y corrige cualquier descuadre de golpe.\n\n"
             "**🔒 Permisos**\n"
-            "• `sk!reset` ahora **solo puede usarlo el dueño del servidor**.\n\n"
+            "• `sk!reset` ahora **solo puede usarlo el propietario del servidor**.\n\n"
             "Usa `/help` o `sk!help` para ver todos los comandos. ¡Gracias por usar SkullBoard! 💀"
         ),
         color=0x8b5cf6
@@ -1373,6 +1517,8 @@ async def announce_cmd(ctx):
             cid = cfg.get("skullboard_channel_id", 0)
             if cid:
                 canal = bot.get_channel(cid)
+                if canal is None:
+                    canal = await bot.fetch_channel(cid)
         except Exception:
             pass
         if not canal:
@@ -1413,6 +1559,8 @@ async def editannounce_cmd(ctx):
             cid = cfg.get("skullboard_channel_id", 0)
             if cid:
                 canal = bot.get_channel(cid)
+                if canal is None:
+                    canal = await bot.fetch_channel(cid)
         except Exception:
             pass
         if not canal:
@@ -1422,8 +1570,6 @@ async def editannounce_cmd(ctx):
             continue
 
         try:
-            # history() va del más reciente al más antiguo
-            # El primero que encontremos del bot con embed de novedades es el más reciente
             encontrado = False
             async for msg in canal.history(limit=50):
                 if msg.author.id == bot.user.id and msg.embeds:
@@ -1446,37 +1592,6 @@ async def editannounce_cmd(ctx):
     )
     await ctx.send(embed=resultado)
 
-    enviados = 0
-    fallidos = 0
-
-    for guild in bot.guilds:
-        canal = None
-        try:
-            cfg = await get_guild_config(guild.id)
-            cid = cfg.get("skullboard_channel_id", 0)
-            if cid:
-                canal = bot.get_channel(cid)
-        except Exception:
-            pass
-        if not canal:
-            canal = guild.system_channel
-        if canal:
-            try:
-                await canal.send(embed=embed)
-                enviados += 1
-                await asyncio.sleep(1)
-            except Exception:
-                fallidos += 1
-        else:
-            fallidos += 1
-
-    resultado = discord.Embed(
-        title="📊 Anuncio enviado",
-        description=f"✅ Enviado: **{enviados}** servidores\n❌ Sin canal: **{fallidos}** servidores",
-        color=0x57f287
-    )
-    await ctx.send(embed=resultado)
-
 @bot.command(name="servers", hidden=True)
 async def servers_cmd(ctx):
     if ctx.author.id != OWNER_ID:
@@ -1487,7 +1602,7 @@ async def servers_cmd(ctx):
     texto = "\n".join(f"• {g.name} (`{g.id}`)" for g in bot.guilds)
     if len(texto) > 1900:
         texto = texto[:1900] + "\n... (truncado)"
-    embed = discord.Embed(title=f"🌍 El bot está en {total} servidores:", description=texto, color=discord.Color.gold())
+    embed = discord.Embed(title=f"🌍 El bot está en {total} servidores:", description=texto, color=0xfaa61a)
     await ctx.send(embed=embed)
 
 @bot.command(name="serverinfo", hidden=True)
@@ -1507,10 +1622,12 @@ async def serverinfo_cmd(ctx, guild_id: int = None):
     cfg = await get_guild_config(guild.id)
     gid = str(guild.id)
 
-    def _count():
-        return supabase.table("tracked_messages").select("message_id", count="exact").eq("guild_id", gid).execute()
-    count_resp = await asyncio.to_thread(_count)
-    msg_count  = count_resp.count if count_resp.count else 0
+    try:
+        resp = await supabase.table("tracked_messages").select("message_id", count="exact").eq("guild_id", gid).execute()
+        msg_count = resp.count if resp.count else 0
+    except Exception as e:
+        logger.error(f"Error en serverinfo_cmd para guild {gid}: {e}")
+        msg_count = 0
 
     owner   = guild.owner
     created = guild.created_at.strftime("%d/%m/%Y")
@@ -1569,14 +1686,14 @@ async def set_min_slash(interaction: discord.Interaction, cantidad: int):
 @tree.command(name="ping", description="Ver latencia")
 async def ping_slash(interaction: discord.Interaction):
     ms    = round(bot.latency * 1000)
-    embed = discord.Embed(title="🏓 Pong!", color=0x5865F2)
-    embed.add_field(name="Latencia", value=f"**{ms}ms**", inline=True)
-    embed.add_field(name="Estado",   value=ping_estado(ms),  inline=True)
+    embed = discord.Embed(title="🏓 Pong!", color=0x8b5cf6)
+    embed.add_field(name="⚡ Latencia", value=f"**{ms}ms**", inline=True)
+    embed.add_field(name="📡 Estado",   value=ping_estado(ms),  inline=True)
     await interaction.response.send_message(embed=embed)
 
 @tree.command(name="invite", description="Invita al bot")
 async def invite_slash(interaction: discord.Interaction):
-    embed = discord.Embed(title="💀 SkullBoard", description="Añade este Bot a tu servidor y disfruta!", color=0x8b5cf6)
+    embed = discord.Embed(title="💀 SkullBoard", description="Añade este bot a tu servidor y ¡disfruta!", color=0x8b5cf6)
     embed.add_field(name="🔗 Invitar al servidor", value=f"[Haz click aquí para invitarme]({get_invite_url()})", inline=False)
     embed.set_footer(text=f"Más de {len(bot.guilds)} servidores confían en SkullBoard")
     await interaction.response.send_message(embed=embed)
@@ -1591,12 +1708,10 @@ async def help_slash(interaction: discord.Interaction):
 async def top_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     gid = str(interaction.guild.id)
-    def _op():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("skull_count,author_id,skullboard_message_id") \
             .eq("guild_id", gid).order("skull_count", desc=True).limit(10).execute()
-    try:
-        resp = await asyncio.to_thread(_op)
     except Exception as e:
         logger.error(f"Error en /top: {e}")
         embed = discord.Embed(title="❌ Error", description="No se pudo obtener el top.", color=0xed4245)
@@ -1612,17 +1727,23 @@ async def top_slash(interaction: discord.Interaction):
     for i, row in enumerate(resp.data):
         pos   = medals[i] if i < 3 else f"{i+1}."
         count = row.get("skull_count") or 0
-        try:
-            m    = interaction.guild.get_member(int(row["author_id"])) if row.get("author_id") else None
-            name = m.display_name if m else "Usuario desconocido"
-        except Exception:
-            name = "Usuario desconocido"
+        name = "Usuario desconocido"
+        author_id = row.get("author_id")
+        if author_id:
+            try:
+                m = interaction.guild.get_member(int(author_id))
+                if m is None:
+                    m = await interaction.guild.fetch_member(int(author_id))
+                if m:
+                    name = m.display_name
+            except Exception:
+                pass
         sb_id = row.get("skullboard_message_id")
         if cfg["skullboard_channel_id"] and sb_id:
             link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{sb_id}"
-            lines.append(f"{pos} [{name}]({link}) — **{count} 💀**")
+            lines.append(f"{pos} **[{name}]({link})** — **{count} 💀**")
         else:
-            lines.append(f"{pos} {name} — **{count} 💀**")
+            lines.append(f"{pos} **{name}** — **{count} 💀**")
 
     embed = discord.Embed(title="🏆 Top Skullboard", description="\n".join(lines), color=0xfaa61a)
     embed.set_footer(text=f"Top {len(resp.data)} mensajes del servidor")
@@ -1632,16 +1753,25 @@ async def top_slash(interaction: discord.Interaction):
 async def random_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     gid = str(interaction.guild.id)
-    def _op():
-        return supabase.table("tracked_messages").select("*").eq("guild_id", gid).execute()
-    resp = await asyncio.to_thread(_op)
+    try:
+        resp = await supabase.table("tracked_messages").select("*").eq("guild_id", gid).execute()
+    except Exception as e:
+        logger.error(f"Error en /random: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudo obtener un mensaje aleatorio.", color=0xed4245)
+        return await interaction.followup.send(embed=embed)
     if not resp.data:
         embed = discord.Embed(title="🎲 Mensaje aleatorio", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
         return await interaction.followup.send(embed=embed)
 
     row     = random.choice(resp.data)
     cfg     = await get_guild_config(interaction.guild.id)
-    sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
+    sb_channel_id = cfg.get("skullboard_channel_id")
+    sb_chan  = bot.get_channel(sb_channel_id) if sb_channel_id else None
+    if sb_chan is None and sb_channel_id:
+        try:
+            sb_chan = await bot.fetch_channel(sb_channel_id)
+        except Exception:
+            pass
     sb_id   = row.get("skullboard_message_id")
 
     try:
@@ -1664,12 +1794,10 @@ async def stats_slash(interaction: discord.Interaction, usuario: discord.Member 
     gid    = str(interaction.guild.id)
     uid    = str(member.id)
 
-    def _op():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("skull_count,skullboard_message_id") \
             .eq("guild_id", gid).eq("author_id", uid).execute()
-    try:
-        resp = await asyncio.to_thread(_op)
     except Exception as e:
         logger.error(f"Error en /stats: {e}")
         embed = discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas.", color=0xed4245)
@@ -1710,7 +1838,7 @@ async def ignore_slash(interaction: discord.Interaction, canal: discord.TextChan
         embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     await add_ignored_channel(str(interaction.guild.id), str(canal.id))
-    embed = discord.Embed(title="🚫 Canal ignorado", description=f"Los mensajes de {canal.mention} ya no podrán llegar al skullboard.", color=0xed4245)
+    embed = discord.Embed(title="🚫 Canal ignorado", description=f"Los mensajes de {canal.mention} ya no podrán llegar al skullboard.", color=0x57f287)
     await interaction.response.send_message(embed=embed)
 
 @tree.command(name="unignore", description="Deja de ignorar un canal (admin)")
@@ -1772,29 +1900,29 @@ async def notify_slash(interaction: discord.Interaction, estado: app_commands.Ch
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @tree.command(name="setup_pin", description="Configura el auto-pin de mensajes (admin)")
-@app_commands.describe(threshold="Mínimo de 💀 para pinear automáticamente. 0 = desactivado")
-async def setup_pin_slash(interaction: discord.Interaction, threshold: int):
+@app_commands.describe(umbral="Mínimo de 💀 para pinear automáticamente. 0 = desactivado")
+async def setup_pin_slash(interaction: discord.Interaction, umbral: int):
     if not interaction.user.guild_permissions.administrator:
         embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    if threshold < 0:
-        embed = discord.Embed(title="❌ Número inválido", description="El threshold no puede ser negativo.", color=0xed4245)
+    if umbral < 0:
+        embed = discord.Embed(title="❌ Número inválido", description="El umbral no puede ser negativo.", color=0xed4245)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
     cfg = await get_guild_config(interaction.guild.id)
     min_skulls = cfg.get("min_skulls", 1)
 
-    if threshold > 0 and threshold < min_skulls:
+    if umbral > 0 and umbral < min_skulls:
         embed = discord.Embed(
-            title="❌ Threshold demasiado bajo",
-            description=f"El threshold de auto-pin debe ser **mayor o igual al mínimo** del skullboard ({min_skulls} 💀).\n\nUsa un número ≥ {min_skulls} o `0` para desactivar.",
+            title="❌ Umbral demasiado bajo",
+            description=f"El umbral de auto-pin debe ser **mayor o igual al mínimo** del skullboard ({min_skulls} 💀).\n\nUsa un número ≥ {min_skulls} o `0` para desactivar.",
             color=0xed4245
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    await update_guild_config(interaction.guild.id, {"pin_threshold": threshold})
-    if threshold == 0:
+    await update_guild_config(interaction.guild.id, {"pin_threshold": umbral})
+    if umbral == 0:
         embed = discord.Embed(
             title="📌 Auto-pin desactivado",
             description="Ya no se pinearán mensajes automáticamente en el skullboard.",
@@ -1803,7 +1931,7 @@ async def setup_pin_slash(interaction: discord.Interaction, threshold: int):
     else:
         embed = discord.Embed(
             title="✅ Auto-pin configurado",
-            description=f"Los mensajes con **{threshold}** o más 💀 se pinearán automáticamente.",
+            description=f"Los mensajes con **{umbral}** o más 💀 se pinearán automáticamente.",
             color=0x57f287
         )
     await interaction.response.send_message(embed=embed)
@@ -1812,11 +1940,14 @@ async def setup_pin_slash(interaction: discord.Interaction, threshold: int):
 async def leaderboard_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     gid = str(interaction.guild.id)
-    def _op():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("skull_count,author_id") \
             .eq("guild_id", gid).execute()
-    resp = await asyncio.to_thread(_op)
+    except Exception as e:
+        logger.error(f"Error en /leaderboard: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudo obtener la clasificación.", color=0xed4245)
+        return await interaction.followup.send(embed=embed)
     if not resp.data:
         embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos en el skullboard.", color=0x4e5058)
         return await interaction.followup.send(embed=embed)
@@ -1836,12 +1967,16 @@ async def leaderboard_slash(interaction: discord.Interaction):
     lines   = []
     for i, (uid, total) in enumerate(ranking):
         pos  = medals[i] if i < 3 else f"{i+1}."
+        name = "Usuario desconocido"
         try:
-            m    = interaction.guild.get_member(int(uid))
-            name = m.display_name if m else "Usuario desconocido"
+            m = interaction.guild.get_member(int(uid))
+            if m is None:
+                m = await interaction.guild.fetch_member(int(uid))
+            if m:
+                name = m.display_name
         except Exception:
-            name = "Usuario desconocido"
-        lines.append(f"{pos} **{name}** — {total} 💀")
+            pass
+        lines.append(f"{pos} **{name}** — **{total} 💀**")
 
     embed = discord.Embed(title="🏆 Top Usuarios — Skullboard", description="\n".join(lines), color=0xfaa61a)
     embed.set_footer(text=f"Top {len(ranking)} usuarios por calaveras totales")
@@ -1851,11 +1986,14 @@ async def leaderboard_slash(interaction: discord.Interaction):
 async def server_stats_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     gid = str(interaction.guild.id)
-    def _op():
-        return supabase.table("tracked_messages") \
+    try:
+        resp = await supabase.table("tracked_messages") \
             .select("skull_count,author_id") \
             .eq("guild_id", gid).execute()
-    resp = await asyncio.to_thread(_op)
+    except Exception as e:
+        logger.error(f"Error en /server_stats: {e}")
+        embed = discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas del servidor.", color=0xed4245)
+        return await interaction.followup.send(embed=embed)
 
     if not resp.data:
         embed = discord.Embed(title="📊 Stats del Servidor", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
@@ -1874,6 +2012,8 @@ async def server_stats_slash(interaction: discord.Interaction):
         top_uid, top_user_count = max(totals.items(), key=lambda x: x[1])
         try:
             m = interaction.guild.get_member(int(top_uid))
+            if m is None:
+                m = await interaction.guild.fetch_member(int(top_uid))
             top_user_name = m.display_name if m else "Usuario desconocido"
         except Exception:
             top_user_name = "Usuario desconocido"
@@ -1896,7 +2036,8 @@ async def top_month_slash(interaction: discord.Interaction):
     await interaction.response.defer()
     ahora = datetime.now(timezone.utc)
     desde = ahora.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    embed = await get_top_periodo(interaction.guild, desde, f"🏆 Top del mes — {ahora.strftime('%B %Y')}")
+    mes_nombre = SPANISH_MONTHS[ahora.month].capitalize()
+    embed = await get_top_periodo(interaction.guild, desde, f"🏆 Top del mes — {mes_nombre} {ahora.year}")
     await interaction.followup.send(embed=embed)
 
 @tree.command(name="top_year", description="Top mensajes más reaccionados del año actual")
@@ -1927,6 +2068,65 @@ async def resync_slash(interaction: discord.Interaction):
     ))
     res = await _resync_guild(interaction.guild)
     await interaction.followup.send(embed=_resync_result_embed(res))
+
+
+@tree.command(name="reset", description="Resetea el skullboard del servidor (solo el propietario)")
+async def reset_slash(interaction: discord.Interaction):
+    if interaction.user.id != interaction.guild.owner_id:
+        embed = discord.Embed(
+            title="❌ Solo el propietario del servidor",
+            description="Únicamente el **propietario del servidor** puede usar este comando.",
+            color=0xed4245
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+
+    class ConfirmResetView(discord.ui.View):
+        def __init__(self):
+            super().__init__(timeout=30)
+            self.confirmed = False
+
+        @discord.ui.button(label="CONFIRMAR RESET", style=discord.ButtonStyle.danger)
+        async def confirm_btn(self, btn_interaction: discord.Interaction, button: discord.ui.Button):
+            if btn_interaction.user.id != interaction.user.id:
+                return await btn_interaction.response.send_message("Solo el propietario puede confirmar.", ephemeral=True)
+            self.confirmed = True
+            self.stop()
+            gid = str(interaction.guild.id)
+            try:
+                resp = await supabase.table("tracked_messages").delete().eq("guild_id", gid).execute()
+                deleted = len(resp.data) if resp.data else 0
+                _guild_record_cache.pop(gid, None)
+                embed = discord.Embed(
+                    title="✅ Skullboard reseteado",
+                    description=f"Se han eliminado **{deleted} mensajes** del registro. El skullboard empieza de cero.",
+                    color=0x57f287
+                )
+                await btn_interaction.response.edit_message(embed=embed, view=None)
+            except Exception as e:
+                logger.error(f"Error reseteando tracked_messages en /reset para guild {gid}: {e}")
+                embed = discord.Embed(title="❌ Error", description="No se pudo resetear la base de datos.", color=0xed4245)
+                await btn_interaction.response.edit_message(embed=embed, view=None)
+
+        @discord.ui.button(label="Cancelar", style=discord.ButtonStyle.secondary)
+        async def cancel_btn(self, btn_interaction: discord.Interaction, button: discord.ui.Button):
+            self.stop()
+            embed = discord.Embed(title="❌ Reset cancelado", description="No se ha realizado ningún cambio.", color=0x4e5058)
+            await btn_interaction.response.edit_message(embed=embed, view=None)
+
+        async def on_timeout(self):
+            pass
+
+    embed_warn = discord.Embed(
+        title="⚠️ ¿Estás seguro?",
+        description=(
+            "Esto borrará **todos los mensajes** del skullboard de este servidor.\n"
+            "Esta acción **no se puede deshacer**.\n\n"
+            "Pulsa **CONFIRMAR RESET** para continuar. Tienes **30 segundos**."
+        ),
+        color=0xed4245
+    )
+    view = ConfirmResetView()
+    await interaction.response.send_message(embed=embed_warn, view=view, ephemeral=True)
 
 # ─── Manejo de errores global ─────────────────────────────────────────────────
 @bot.event
