@@ -1172,6 +1172,54 @@ async def topyear_cmd(ctx):
     await ctx.send(embed=embed)
 
 # ─── Resync: deduplica el canal y reconcilia la BD con la realidad ────────────
+# ─── Infraestructura de resync: rate limiter GLOBAL + locks por servidor ──────
+_resync_guild_locks: dict[str, asyncio.Lock] = {}
+
+class _GlobalRateLimiter:
+    """Token-bucket compartido por TODOS los resync del proceso.
+
+    Como el bot es un único proceso, aunque N servidores lancen /resync a la vez
+    todas las llamadas pasan por este mismo limitador, de modo que el total
+    agregado NUNCA supera `rate` llamadas/seg a la API de Discord. Así, con 1 o
+    con 100 servidores simultáneos, jamás se dispara el rate limit global.
+    """
+    def __init__(self, rate_per_sec: float):
+        self._interval = 1.0 / rate_per_sec
+        self._lock = asyncio.Lock()
+        self._next = 0.0
+
+    async def acquire(self):
+        async with self._lock:
+            now   = asyncio.get_running_loop().time()
+            start = self._next if self._next > now else now
+            self._next = start + self._interval
+            wait_for   = start - now
+        if wait_for > 0:
+            await asyncio.sleep(wait_for)
+
+# 8 llamadas/seg TOTALES entre todos los resync (Discord permite ~50/seg global,
+# así que dejamos amplio margen para la actividad normal del bot).
+_resync_limiter = _GlobalRateLimiter(8)
+
+def _progress_bar(done: int, total: int, width: int = 18) -> str:
+    if total <= 0:
+        return "▱" * width + "  0%"
+    frac   = min(max(done / total, 0.0), 1.0)
+    filled = int(frac * width)
+    return "▰" * filled + "▱" * (width - filled) + f"  {done}/{total} ({int(frac * 100)}%)"
+
+def _parse_repost_count(msg: discord.Message):
+    """Extrae el número de 💀 que muestra actualmente un repost del skullboard."""
+    m = re.search(r'\*\*(\d+)\*\*', msg.content or "")
+    return int(m.group(1)) if m else None
+
+def _resync_busy_embed() -> discord.Embed:
+    return discord.Embed(
+        title="⏳ Ya hay un resync en curso",
+        description="Este servidor ya se está resincronizando. Espera a que termine antes de lanzar otro.",
+        color=0xed4245
+    )
+
 async def _delete_rows_by_sb_id(gid: str, sb_id):
     """Borra de la BD cualquier fila que apunte a un repost concreto."""
     try:
@@ -1180,13 +1228,12 @@ async def _delete_rows_by_sb_id(gid: str, sb_id):
     except Exception as e:
         logger.error(f"Error borrando fila por sb_id {sb_id} en guild {gid}: {e}")
 
-async def _resync_guild(guild: discord.Guild) -> dict:
+async def _resync_guild(guild: discord.Guild, status_msg: Optional[discord.Message] = None) -> dict:
     gid           = str(guild.id)
     cfg           = await get_guild_config(guild.id)
     min_skulls    = cfg.get("min_skulls", 1)
     sb_channel_id = cfg.get("skullboard_channel_id")
-    
-    # Safe channel fetch fallback
+
     sb_chan = bot.get_channel(sb_channel_id) if sb_channel_id else None
     if sb_chan is None and sb_channel_id:
         try:
@@ -1194,12 +1241,34 @@ async def _resync_guild(guild: discord.Guild) -> dict:
         except Exception:
             pass
 
-    res = {"originales": 0, "duplicados_borrados": 0, "huerfanos_borrados": 0,
-           "sincronizados": 0, "no_localizables": 0}
+    res = {"originales": 0, "ya_correctos": 0, "sincronizados": 0,
+           "duplicados_borrados": 0, "huerfanos_borrados": 0, "no_localizables": 0}
     if sb_chan is None:
         return res
 
+    # ── Barra de progreso (edición muy espaciada para no añadir presión) ──
+    _last_pb = 0.0
+    async def _tick(done: int, total: int, fase: str = ""):
+        nonlocal _last_pb
+        if status_msg is None:
+            return
+        now = asyncio.get_running_loop().time()
+        if done < total and (now - _last_pb) < 3.0:
+            return  # throttle: como mucho un refresco cada 3s
+        _last_pb = now
+        embed = discord.Embed(
+            title="🔄 Resincronizando el skullboard",
+            description=f"`{_progress_bar(done, total)}`" + (f"\n{fase}" if fase else ""),
+            color=0x8b5cf6
+        )
+        await _resync_limiter.acquire()
+        try:
+            await status_msg.edit(embed=embed)
+        except Exception:
+            pass
+
     # 1) Escanear el canal y agrupar reposts por mensaje original
+    await _tick(0, 1, "📖 Leyendo el canal del skullboard...")
     grupos: dict[str, list] = {}
     async for sb_msg in sb_chan.history(limit=None):
         if sb_msg.author.id != bot.user.id: continue
@@ -1207,35 +1276,39 @@ async def _resync_guild(guild: discord.Guild) -> dict:
         emb_str = str(sb_msg.embeds[0].to_dict())
         m = re.search(r'discord\.com/channels/(\d+)/(\d+)/(\d+)', emb_str)
         if not m: continue
-        orig_chan_id = int(m.group(2))
-        orig_msg_id  = m.group(3)
-        grupos.setdefault(orig_msg_id, []).append((sb_msg, orig_chan_id))
+        grupos.setdefault(m.group(3), []).append((sb_msg, int(m.group(2))))
 
-    res["originales"] = len(grupos)
+    total = len(grupos)
+    res["originales"] = total
     record = await get_guild_record(gid)
 
+    done = 0
     for orig_msg_id, reposts in grupos.items():
         reposts.sort(key=lambda t: t[0].created_at, reverse=True)
         survivor, orig_chan_id = reposts[0]
         extras = reposts[1:]
 
-        original   = None
-        real_count = None
-        author_id  = None
-        confirmado_borrado = False
-
+        # Localizar el canal del mensaje original
         orig_chan = bot.get_channel(orig_chan_id)
         if orig_chan is None:
             try:
+                await _resync_limiter.acquire()
                 orig_chan = await bot.fetch_channel(orig_chan_id)
             except Exception:
-                pass
+                orig_chan = None
         if orig_chan is None:
             res["no_localizables"] += 1
-            await asyncio.sleep(0.05)
+            done += 1
+            await _tick(done, total)
             continue
 
+        # Recontar las 💀 reales del mensaje original
+        confirmado_borrado = False
+        real_count = None
+        author_id  = None
+        original   = None
         try:
+            await _resync_limiter.acquire()
             original   = await orig_chan.fetch_message(int(orig_msg_id))
             skull_reac = next((r for r in original.reactions if str(r.emoji) == skull_emoji), None)
             real_count = skull_reac.count if skull_reac else 0
@@ -1244,38 +1317,54 @@ async def _resync_guild(guild: discord.Guild) -> dict:
             confirmado_borrado = True
         except Exception:
             res["no_localizables"] += 1
-            await asyncio.sleep(0.1)
+            done += 1
+            await _tick(done, total)
             continue
 
+        # Original borrado (confirmado) → eliminar todos sus reposts y filas
         if confirmado_borrado:
             for rp, _ in reposts:
-                try: await rp.delete()
-                except Exception: pass
+                try:
+                    await _resync_limiter.acquire()
+                    await rp.delete()
+                except Exception:
+                    pass
                 await _delete_rows_by_sb_id(gid, rp.id)
-                await asyncio.sleep(0.3)
             try:
                 await supabase.table("tracked_messages").delete() \
                     .eq("message_id", orig_msg_id).eq("guild_id", gid).execute()
             except Exception:
                 pass
             res["huerfanos_borrados"] += 1
+            done += 1
+            await _tick(done, total)
             continue
 
+        # Borrar los reposts duplicados (queda solo el superviviente)
         for rp, _ in extras:
             try:
+                await _resync_limiter.acquire()
                 await rp.delete()
                 res["duplicados_borrados"] += 1
             except Exception:
                 pass
             await _delete_rows_by_sb_id(gid, rp.id)
-            await asyncio.sleep(0.3)
 
+        # Si ya está correcto (sin duplicados y con el conteo real) NO tocamos
+        # nada: evita ediciones innecesarias, que son lo que dispara el rate limit.
+        if not extras and _parse_repost_count(survivor) == real_count:
+            res["ya_correctos"] += 1
+            done += 1
+            await _tick(done, total)
+            continue
+
+        # Reescribir el superviviente con el conteo real
         try:
             texto, embed = _build_repost(original, real_count, record, min_skulls)
+            await _resync_limiter.acquire()
             await survivor.edit(content=texto, embed=embed)
         except Exception:
             pass
-
         try:
             await db_upsert("tracked_messages", {
                 "message_id":            str(orig_msg_id),
@@ -1287,9 +1376,10 @@ async def _resync_guild(guild: discord.Guild) -> dict:
         except Exception:
             pass
         res["sincronizados"] += 1
-        await asyncio.sleep(0.3)
+        done += 1
+        await _tick(done, total)
 
-    _guild_record_cache.pop(gid, None)  # Invalidate record cache
+    _guild_record_cache.pop(gid, None)  # Invalida la caché del récord
     return res
 
 def _resync_result_embed(res: dict) -> discord.Embed:
@@ -1297,7 +1387,8 @@ def _resync_result_embed(res: dict) -> discord.Embed:
         title="✅ Resincronización completada",
         description=(
             f"📊 Mensajes únicos: **{res['originales']}**\n"
-            f"🔄 Sincronizados con su conteo real: **{res['sincronizados']}**\n"
+            f"✅ Ya estaban correctos: **{res['ya_correctos']}**\n"
+            f"🔄 Sincronizados (conteo corregido): **{res['sincronizados']}**\n"
             f"🧹 Reposts duplicados eliminados: **{res['duplicados_borrados']}**\n"
             f"🗑️ Entradas obsoletas eliminadas (originales borrados): **{res['huerfanos_borrados']}**"
         ),
@@ -1315,13 +1406,18 @@ async def resync_cmd(ctx):
             description="Configura primero el canal del skullboard con `set_channel`.",
             color=0xed4245
         ))
-    status = await ctx.send(embed=discord.Embed(
-        title="⏳ Resincronizando...",
-        description="Recontando las 💀 reales de cada mensaje. Esto puede tardar un poco. ☕",
-        color=0x8b5cf6
-    ))
-    res = await _resync_guild(ctx.guild)
-    await status.edit(embed=_resync_result_embed(res))
+    gid  = str(ctx.guild.id)
+    lock = _resync_guild_locks.setdefault(gid, asyncio.Lock())
+    if lock.locked():
+        return await ctx.send(embed=_resync_busy_embed())
+    async with lock:
+        status = await ctx.send(embed=discord.Embed(
+            title="🔄 Resincronizando el skullboard",
+            description=f"`{_progress_bar(0, 1)}`\n📖 Preparando...",
+            color=0x8b5cf6
+        ))
+        res = await _resync_guild(ctx.guild, status)
+        await status.edit(embed=_resync_result_embed(res))
 
 # ─── Comandos privados del owner (BACKFILL IDs PURAS - 1 a 1) ─────────────────────────
 @bot.command(name="backfill", hidden=True)
@@ -2060,14 +2156,19 @@ async def resync_slash(interaction: discord.Interaction):
             description="Configura primero el canal del skullboard con `/set_channel`.",
             color=0xed4245
         ), ephemeral=True)
-    await interaction.response.defer()
-    await interaction.followup.send(embed=discord.Embed(
-        title="⏳ Resincronizando...",
-        description="Recontando las 💀 reales de cada mensaje. Esto puede tardar un poco. ☕",
-        color=0x8b5cf6
-    ))
-    res = await _resync_guild(interaction.guild)
-    await interaction.followup.send(embed=_resync_result_embed(res))
+    gid  = str(interaction.guild.id)
+    lock = _resync_guild_locks.setdefault(gid, asyncio.Lock())
+    if lock.locked():
+        return await interaction.response.send_message(embed=_resync_busy_embed(), ephemeral=True)
+    async with lock:
+        await interaction.response.defer()
+        status = await interaction.followup.send(embed=discord.Embed(
+            title="🔄 Resincronizando el skullboard",
+            description=f"`{_progress_bar(0, 1)}`\n📖 Preparando...",
+            color=0x8b5cf6
+        ))
+        res = await _resync_guild(interaction.guild, status)
+        await status.edit(embed=_resync_result_embed(res))
 
 
 @tree.command(name="reset", description="Resetea el skullboard del servidor (solo el propietario)")
