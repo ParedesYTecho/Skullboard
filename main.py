@@ -569,83 +569,84 @@ async def _check(msg: discord.Message):
                 _check_counts.pop(mid, None)
 
 # ─── Borrado de mensajes ──────────────────────────────────────────────────────
-@bot.event
-async def on_raw_message_delete(payload):
-    mid = str(payload.message_id)
+# Semáforo global: limita cuántos handlers de borrado tocan la BD a la vez.
+# Sin esto, una purga masiva dispara cientos de eventos concurrentes, revienta
+# el límite de 100 streams HTTP/2 del cliente Supabase y acumula tareas en RAM
+# hasta el OOM (visto en producción el 2026-07-04).
+_delete_sem = asyncio.Semaphore(8)
+
+async def _handle_deleted_messages(mids: list[str]):
+    """Procesa un lote de mensajes borrados con pocas queries (batched).
+
+    - 1 SELECT in_() para saber cuáles estaban trackeados como originales.
+    - Borra sus reposts en Discord (secuencial, con cuidado del rate limit).
+    - 1 DELETE in_() para limpiar las filas de la BD.
+    - 1 DELETE in_() para filas cuyo repost fue el mensaje borrado.
+    """
+    if not mids:
+        return
     try:
         resp = await supabase.table("tracked_messages") \
-            .select("skullboard_message_id,guild_id") \
-            .eq("message_id", mid).execute()
+            .select("message_id,skullboard_message_id,guild_id") \
+            .in_("message_id", mids).execute()
 
-        if resp.data:
-            row    = resp.data[0]
-            sb_id  = row.get("skullboard_message_id")
-            gid    = row.get("guild_id")
-            if sb_id and gid:
-                try:
-                    cfg      = await get_guild_config(int(gid))
-                    sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
-                    if sb_chan is None:
-                        sb_chan = await bot.fetch_channel(cfg["skullboard_channel_id"])
-                    if sb_chan:
-                        try:
-                            sb_msg = await sb_chan.fetch_message(sb_id)
-                            await sb_msg.delete()
-                        except discord.NotFound:
-                            pass
-                except Exception:
-                    pass
-            await supabase.table("tracked_messages").delete().eq("message_id", mid).execute()
+        rows = resp.data or []
+        touched_guilds: set[str] = set()
+
+        for row in rows:
+            sb_id = row.get("skullboard_message_id")
+            gid   = row.get("guild_id")
             if gid:
-                _guild_record_cache.pop(str(gid), None)
-            return
+                touched_guilds.add(str(gid))
+            if not (sb_id and gid):
+                continue
+            try:
+                cfg     = await get_guild_config(int(gid))
+                sb_chan = bot.get_channel(cfg["skullboard_channel_id"])
+                if sb_chan is None:
+                    sb_chan = await bot.fetch_channel(cfg["skullboard_channel_id"])
+                if sb_chan:
+                    try:
+                        sb_msg = await sb_chan.fetch_message(sb_id)
+                        await sb_msg.delete()
+                    except discord.NotFound:
+                        pass
+                    await asyncio.sleep(0.35)  # ritmo suave en purgas grandes
+            except Exception:
+                pass
 
-        sb_mid = str(payload.message_id)
+        if rows:
+            await supabase.table("tracked_messages").delete() \
+                .in_("message_id", [r["message_id"] for r in rows]).execute()
+
+        # Mensajes borrados que eran REPOSTS del skullboard (no originales)
         resp2 = await supabase.table("tracked_messages") \
-            .select("message_id,guild_id") \
-            .eq("skullboard_message_id", sb_mid).execute()
-
+            .select("guild_id") \
+            .in_("skullboard_message_id", mids).execute()
         if resp2.data:
-            gid = resp2.data[0].get("guild_id")
-            await supabase.table("tracked_messages") \
-                .delete().eq("skullboard_message_id", sb_mid).execute()
-            if gid:
-                _guild_record_cache.pop(str(gid), None)
+            for r in resp2.data:
+                if r.get("guild_id"):
+                    touched_guilds.add(str(r["guild_id"]))
+            await supabase.table("tracked_messages").delete() \
+                .in_("skullboard_message_id", mids).execute()
+
+        for gid in touched_guilds:
+            _guild_record_cache.pop(gid, None)
     except Exception as e:
-        logger.error(f"Error en on_raw_message_delete para message {mid}: {e}")
+        logger.error(f"Error procesando lote de {len(mids)} borrados: {e}")
+
+@bot.event
+async def on_raw_message_delete(payload):
+    async with _delete_sem:
+        await _handle_deleted_messages([str(payload.message_id)])
 
 @bot.event
 async def on_raw_bulk_message_delete(payload):
-    for mid_int in payload.message_ids:
-        mid = str(mid_int)
-        try:
-            resp = await supabase.table("tracked_messages") \
-                .select("skullboard_message_id,guild_id") \
-                .eq("message_id", mid).execute()
-
-            if resp.data:
-                row    = resp.data[0]
-                sb_id  = row.get("skullboard_message_id")
-                gid    = row.get("guild_id")
-                if sb_id and gid:
-                    try:
-                        cfg      = await get_guild_config(int(gid))
-                        sb_chan  = bot.get_channel(cfg["skullboard_channel_id"])
-                        if sb_chan is None:
-                            sb_chan = await bot.fetch_channel(cfg["skullboard_channel_id"])
-                        if sb_chan:
-                            try:
-                                sb_msg = await sb_chan.fetch_message(sb_id)
-                                await sb_msg.delete()
-                            except discord.NotFound:
-                                pass
-                    except Exception:
-                        pass
-                await supabase.table("tracked_messages").delete().eq("message_id", mid).execute()
-                if gid:
-                    _guild_record_cache.pop(str(gid), None)
-        except Exception as e:
-            logger.error(f"Error en on_raw_bulk_message_delete para message {mid}: {e}")
+    mids = [str(m) for m in payload.message_ids]
+    # Procesar en trozos de 100 para no generar queries in_() gigantes
+    async with _delete_sem:
+        for i in range(0, len(mids), 100):
+            await _handle_deleted_messages(mids[i:i + 100])
 
 # ─── COMANDOS DE TEXTO ────────────────────────────────────────────────────────
 
