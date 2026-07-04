@@ -106,7 +106,8 @@ def run():
     except Exception as e:
         print(f"⚠️ Error al registrar metadata: {e}")
     try:
-        app.run(host='0.0.0.0', port=8080)
+        # threaded=True: una petición lenta no bloquea el keep-alive de Render
+        app.run(host='0.0.0.0', port=8080, threaded=True)
     except Exception as e:
         print(f"❌ Error al iniciar el servidor: {e}")
 
