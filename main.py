@@ -975,6 +975,13 @@ async def top_cmd(ctx):
     embed.set_footer(text=f"Top {len(resp.data)} mensajes del servidor")
     await ctx.send(embed=embed)
 
+@bot.command(name="stats", aliases=["estadisticas"])
+@commands.guild_only()
+async def stats_cmd(ctx, member: discord.Member = None):
+    member = member or ctx.author
+    embed  = await _stats_embed(ctx.guild, member)
+    await ctx.send(embed=embed)
+
 @bot.command(name="random")
 @commands.guild_only()
 async def random_cmd(ctx):
@@ -1954,37 +1961,31 @@ async def random_slash(interaction: discord.Interaction):
     else:
         await interaction.followup.send(embed=discord.Embed(title="🎲 Mensaje aleatorio", description="No se pudo recuperar el mensaje.", color=0x4e5058))
 
-@tree.command(name="stats", description="Estadísticas de un usuario en el skullboard")
-@app_commands.describe(usuario="Usuario del que ver las estadísticas")
-async def stats_slash(interaction: discord.Interaction, usuario: discord.Member = None):
-    await interaction.response.defer()
-    member = usuario or interaction.user
-    gid    = str(interaction.guild.id)
-    uid    = str(member.id)
-
+async def _stats_embed(guild: discord.Guild, member: discord.Member) -> discord.Embed:
+    """Embed de estadísticas de un usuario. Compartido por sk!stats y /stats."""
+    gid = str(guild.id)
+    uid = str(member.id)
     try:
         resp = await supabase.table("tracked_messages") \
             .select("skull_count,skullboard_message_id") \
             .eq("guild_id", gid).eq("author_id", uid).execute()
     except Exception as e:
-        logger.error(f"Error en /stats: {e}")
-        embed = discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas.", color=0xed4245)
-        return await interaction.followup.send(embed=embed)
+        logger.error(f"Error en stats para {uid} en guild {gid}: {e}")
+        return discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas.", color=0xed4245)
 
     if not resp.data:
-        embed = discord.Embed(
+        return discord.Embed(
             title=f"📊 Stats de {member.display_name}",
             description="Este usuario no tiene ningún mensaje en el skullboard.",
             color=0x4e5058
         )
-        return await interaction.followup.send(embed=embed)
 
     total_msgs   = len(resp.data)
     total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
     best_row     = max(resp.data, key=lambda r: r.get("skull_count") or 0)
     best_count   = best_row.get("skull_count") or 0
     best_sb_id   = best_row.get("skullboard_message_id")
-    cfg          = await get_guild_config(interaction.guild.id)
+    cfg          = await get_guild_config(guild.id)
     link         = None
     if best_sb_id and cfg["skullboard_channel_id"]:
         link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{best_sb_id}"
@@ -1997,6 +1998,14 @@ async def stats_slash(interaction: discord.Interaction, usuario: discord.Member 
     if link:
         embed.add_field(name="🔗 Mejor mensaje", value=f"[Saltar al mensaje]({link})", inline=False)
     embed.set_footer(text=f"Estadísticas de {member.display_name} en este servidor")
+    return embed
+
+@tree.command(name="stats", description="Estadísticas de un usuario en el skullboard")
+@app_commands.describe(usuario="Usuario del que ver las estadísticas")
+async def stats_slash(interaction: discord.Interaction, usuario: discord.Member = None):
+    await interaction.response.defer()
+    member = usuario or interaction.user
+    embed  = await _stats_embed(interaction.guild, member)
     await interaction.followup.send(embed=embed)
 
 @tree.command(name="ignore", description="Ignora un canal (admin)")
