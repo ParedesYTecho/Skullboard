@@ -328,24 +328,38 @@ def ping_estado(ms: int) -> str:
     if ms < 200: return "🟡 Aceptable"
     return "🔴 Alto"
 
+def _sanitize_name(name: str) -> str:
+    """Neutraliza inyección en embeds. Un apodo malicioso como
+    'x](https://phishing.com)' rompería el enlace markdown `[texto](url)` de los
+    rankings y crearía un enlace a un sitio externo. Escapamos el markdown y
+    convertimos los corchetes/paréntesis en variantes inofensivas."""
+    name = discord.utils.escape_markdown(name or "")
+    name = name.replace("[", "(").replace("]", ")")
+    return name[:40] if name else "Usuario desconocido"
+
 async def resolve_display_name(guild: discord.Guild, user_id) -> str:
     """Resuelve el mejor nombre visible de un usuario: apodo del servidor →
-    nombre global (si dejó el servidor) → 'Usuario desconocido'."""
+    nombre global (si dejó el servidor) → 'Usuario desconocido'.
+    El resultado va SANITIZADO para insertarse con seguridad en embeds."""
     try:
         uid = int(user_id)
     except (TypeError, ValueError):
         return "Usuario desconocido"
+    raw = None
     m = guild.get_member(uid)
     if m:
-        return m.display_name
-    try:
-        m = await guild.fetch_member(uid)
-        if m:
-            return m.display_name
-    except Exception:
-        pass
-    u = bot.get_user(uid)
-    return u.display_name if u else "Usuario desconocido"
+        raw = m.display_name
+    else:
+        try:
+            m = await guild.fetch_member(uid)
+            if m:
+                raw = m.display_name
+        except Exception:
+            pass
+        if raw is None:
+            u = bot.get_user(uid)
+            raw = u.display_name if u else None
+    return _sanitize_name(raw) if raw else "Usuario desconocido"
 
 # ─── Embed de ajustes ─────────────────────────────────────────────────────────
 async def build_ajustes_embed(guild_id) -> discord.Embed:
@@ -726,6 +740,9 @@ async def on_raw_bulk_message_delete(payload):
 async def prefix_cmd(ctx, nuevo_prefijo: str = None):
     if not nuevo_prefijo:
         embed = discord.Embed(title="❌ Falta el prefijo", description="Indica el nuevo prefijo.", color=0xed4245)
+        return await ctx.send(embed=embed)
+    if len(nuevo_prefijo) > 10:
+        embed = discord.Embed(title="❌ Prefijo demasiado largo", description="El prefijo no puede superar los **10 caracteres**.", color=0xed4245)
         return await ctx.send(embed=embed)
     await update_guild_config(ctx.guild.id, {"prefix": nuevo_prefijo})
     _prefix_cache.pop(str(ctx.guild.id), None)
@@ -1792,6 +1809,9 @@ async def prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
     if not interaction.user.guild_permissions.administrator:
         embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
+    if len(nuevo_prefijo) > 10:
+        embed = discord.Embed(title="❌ Prefijo demasiado largo", description="El prefijo no puede superar los **10 caracteres**.", color=0xed4245)
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
     await update_guild_config(interaction.guild.id, {"prefix": nuevo_prefijo})
     _prefix_cache.pop(str(interaction.guild.id), None)
     embed = discord.Embed(title="✅ Prefijo actualizado", description=f"Ahora puedes usar comandos con `{nuevo_prefijo}`", color=0x57f287)
@@ -2278,7 +2298,13 @@ async def on_command_error(ctx, error):
 
 @tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
-    embed = discord.Embed(title="❌ Ha ocurrido un error", description=str(error), color=0xed4245)
+    # Mensaje genérico al usuario (no filtramos str(error): puede exponer
+    # rutas o estado interno). El detalle completo va al log.
+    embed = discord.Embed(
+        title="❌ Ha ocurrido un error",
+        description="Algo ha fallado al ejecutar el comando. Inténtalo de nuevo más tarde.",
+        color=0xed4245
+    )
     try:
         if not interaction.response.is_done():
             await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -2286,7 +2312,7 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
             await interaction.followup.send(embed=embed, ephemeral=True)
     except Exception:
         pass
-    logger.error(f"Error en slash command: {error}")
+    logger.error(f"Error en slash command: {error}", exc_info=error)
 
 # ─── Ejecución ────────────────────────────────────────────────────────────────
 if __name__ == "__main__":

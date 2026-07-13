@@ -1,7 +1,10 @@
-from flask import Flask, request, send_from_directory
+from flask import Flask, request, send_from_directory, redirect
 from threading import Thread
+from urllib.parse import urlencode
 import requests
 import os
+import secrets
+import time
 
 app = Flask(__name__)
 
@@ -26,6 +29,37 @@ def serve_legal_files(filename):
 
 OWNER_ID = os.getenv("BOT_OWNER_ID", "561225979389804544")
 
+# ── OAuth2: protección anti-CSRF ──────────────────────────────────────────────
+# state -> epoch de caducidad. Solo se aceptan callbacks cuyo `state` emitimos
+# nosotros desde /verify. Se limpian solos al validarse o expirar.
+_oauth_states: dict = {}
+_OAUTH_STATE_TTL = 600  # 10 minutos
+
+def _new_state() -> str:
+    now = time.time()
+    for s, exp in list(_oauth_states.items()):
+        if exp < now:
+            _oauth_states.pop(s, None)
+    state = secrets.token_urlsafe(24)
+    _oauth_states[state] = now + _OAUTH_STATE_TTL
+    return state
+
+@app.route('/verify')
+def verify():
+    """Punto de entrada recomendado para vincular el rol de owner.
+    Genera un `state` anti-CSRF y redirige a la autorización de Discord.
+    (Configura esta URL como 'Linked Roles Verification URL' en el portal.)"""
+    state  = _new_state()
+    params = urlencode({
+        "client_id":     APPLICATION_ID,
+        "redirect_uri":  REDIRECT_URI,
+        "response_type": "code",
+        "scope":         "identify role_connections.write",
+        "state":         state,
+        "prompt":        "consent",
+    })
+    return redirect(f"https://discord.com/api/oauth2/authorize?{params}")
+
 # Linked Role Connection
 @app.route('/callback')
 def callback():
@@ -33,7 +67,13 @@ def callback():
     if not code:
         return "❌ No se proporcionó el código de autorización.", 400
 
-    # Intercambiar código por access_token
+    # Validación anti-CSRF: si llega con state, debe ser uno emitido por /verify.
+    state = request.args.get("state")
+    if state is not None:
+        expiry = _oauth_states.pop(state, None)
+        if expiry is None or expiry < time.time():
+            return "❌ Sesión de verificación inválida o caducada. Empieza de nuevo desde /verify.", 400
+
     data = {
         "client_id": APPLICATION_ID,
         "client_secret": DISCORD_CLIENT_SECRET,
@@ -43,43 +83,53 @@ def callback():
         "scope": "identify role_connections.write"
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    token_res = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers)
+    try:
+        token_res = requests.post("https://discord.com/api/oauth2/token", data=data, headers=headers, timeout=10)
+    except requests.RequestException as e:
+        print(f"⚠️ Error de red en intercambio de token: {e}")
+        return "❌ Error al contactar con Discord. Inténtalo más tarde.", 502
 
     if token_res.status_code != 200:
-        return f"❌ Error obteniendo el token: {token_res.text}", 400
+        print(f"⚠️ Intercambio de token falló ({token_res.status_code}): {token_res.text}")
+        return "❌ No se pudo completar la autorización.", 400
 
-    access_token = token_res.json()["access_token"]
+    access_token = token_res.json().get("access_token")
+    if not access_token:
+        return "❌ No se pudo completar la autorización.", 400
 
-    # Obtener datos del usuario
-    user_info = requests.get(
-        "https://discord.com/api/users/@me",
-        headers={"Authorization": f"Bearer {access_token}"}
-    ).json()
+    try:
+        user_info = requests.get(
+            "https://discord.com/api/users/@me",
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=10
+        ).json()
+    except requests.RequestException as e:
+        print(f"⚠️ Error obteniendo usuario: {e}")
+        return "❌ Error al contactar con Discord. Inténtalo más tarde.", 502
 
-    if user_info.get("id") != OWNER_ID: # ID del propietario del bot
+    if user_info.get("id") != OWNER_ID:  # ID del propietario del bot
         return "❌ No estás autorizado para vincular este rol.", 403
 
-    # Asignar datos de rol
     connection_url = f"https://discord.com/api/v10/users/@me/applications/{APPLICATION_ID}/role-connection"
     headers = {
         "Authorization": f"Bearer {access_token}",
         "Content-Type": "application/json"
     }
-
     payload = {
         "platform_name": "Skullboard",
         "platform_username": "Owner",
-        "metadata": {
-            "is_owner": True
-        }
+        "metadata": {"is_owner": True}
     }
+    try:
+        assign_res = requests.put(connection_url, headers=headers, json=payload, timeout=10)
+    except requests.RequestException as e:
+        print(f"⚠️ Error asignando rol: {e}")
+        return "❌ Error al contactar con Discord. Inténtalo más tarde.", 502
 
-    assign_res = requests.put(connection_url, headers=headers, json=payload)
-
-    if assign_res.status_code in [200, 204]:
+    if assign_res.status_code in (200, 204):
         return "✅ Rol vinculado correctamente. Ya puedes cerrar esta ventana."
-    else:
-        return f"❌ Error al vincular el rol: {assign_res.status_code} {assign_res.text}"
+    print(f"⚠️ Fallo al vincular rol ({assign_res.status_code}): {assign_res.text}")
+    return "❌ No se pudo vincular el rol.", 400
 
 def register_metadata():
     url = f"https://discord.com/api/v10/applications/{APPLICATION_ID}/role-connections/metadata"
@@ -97,7 +147,7 @@ def register_metadata():
         }
     ]
 
-    response = requests.put(url, headers=headers, json=body)
+    response = requests.put(url, headers=headers, json=body, timeout=10)
     print("📌 Metadata registrada:", response.status_code, response.text)
 
 def run():
