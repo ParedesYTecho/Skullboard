@@ -358,6 +358,13 @@ async def resolve_display_name(guild: discord.Guild, user_id) -> str:
             pass
         if raw is None:
             u = bot.get_user(uid)
+            if u is None:
+                # Último recurso: la API. Resuelve el nombre global de CUALQUIER
+                # usuario válido, aunque haya dejado el servidor y no esté cacheado.
+                try:
+                    u = await bot.fetch_user(uid)
+                except Exception:
+                    u = None
             raw = u.display_name if u else None
     return _sanitize_name(raw) if raw else "Usuario desconocido"
 
