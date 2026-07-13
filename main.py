@@ -361,6 +361,29 @@ async def resolve_display_name(guild: discord.Guild, user_id) -> str:
             raw = u.display_name if u else None
     return _sanitize_name(raw) if raw else "Usuario desconocido"
 
+async def _is_admin_or_deny(interaction: discord.Interaction) -> bool:
+    """True si el usuario es administrador. Si no, responde con el aviso de
+    permisos (efímero) y devuelve False. Uso: `if not await _is_admin_or_deny(i): return`."""
+    if interaction.user.guild_permissions.administrator:
+        return True
+    embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
+    try:
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    except Exception:
+        pass
+    return False
+
+async def _deny_if_not_owner(ctx) -> bool:
+    """Para comandos de owner del bot. Si NO es el owner, reacciona con ❓ y
+    devuelve True (denegado). Si lo es, devuelve False. Uso: `if await _deny_if_not_owner(ctx): return`."""
+    if ctx.author.id == OWNER_ID:
+        return False
+    try:
+        await ctx.message.add_reaction("❓")
+    except Exception:
+        pass
+    return True
+
 # ─── Embed de ajustes ─────────────────────────────────────────────────────────
 async def build_ajustes_embed(guild_id) -> discord.Embed:
     cfg           = await get_guild_config(guild_id)
@@ -1480,9 +1503,7 @@ async def resync_cmd(ctx):
 # ─── Comandos privados del owner (BACKFILL IDs PURAS - 1 a 1) ─────────────────────────
 @bot.command(name="backfill", hidden=True)
 async def backfill_cmd(ctx):
-    if ctx.author.id != OWNER_ID:
-        try: await ctx.message.add_reaction("❓")
-        except: pass
+    if await _deny_if_not_owner(ctx):
         return
 
     gid = str(ctx.guild.id)
@@ -1654,9 +1675,7 @@ def _build_announce_embed() -> discord.Embed:
 
 @bot.command(name="announce", hidden=True)
 async def announce_cmd(ctx):
-    if ctx.author.id != OWNER_ID:
-        try: await ctx.message.add_reaction("❓")
-        except: pass
+    if await _deny_if_not_owner(ctx):
         return
 
     embed = _build_announce_embed()
@@ -1696,9 +1715,7 @@ async def announce_cmd(ctx):
 
 @bot.command(name="editannounce", hidden=True)
 async def editannounce_cmd(ctx):
-    if ctx.author.id != OWNER_ID:
-        try: await ctx.message.add_reaction("❓")
-        except: pass
+    if await _deny_if_not_owner(ctx):
         return
 
     nuevo_embed = _build_announce_embed()
@@ -1748,9 +1765,7 @@ async def editannounce_cmd(ctx):
 
 @bot.command(name="servers", hidden=True)
 async def servers_cmd(ctx):
-    if ctx.author.id != OWNER_ID:
-        try: await ctx.message.add_reaction("❓")
-        except: pass
+    if await _deny_if_not_owner(ctx):
         return
     total = len(bot.guilds)
     texto = "\n".join(f"• {g.name} (`{g.id}`)" for g in bot.guilds)
@@ -1761,9 +1776,7 @@ async def servers_cmd(ctx):
 
 @bot.command(name="serverinfo", hidden=True)
 async def serverinfo_cmd(ctx, guild_id: int = None):
-    if ctx.author.id != OWNER_ID:
-        try: await ctx.message.add_reaction("❓")
-        except: pass
+    if await _deny_if_not_owner(ctx):
         return
     if not guild_id:
         embed = discord.Embed(title="❌ Falta el ID", description=f"Usa `{await get_formatted_prefix(ctx)}serverinfo <ID>`", color=0xed4245)
@@ -1806,9 +1819,8 @@ async def ajustes_slash(interaction: discord.Interaction):
 @tree.command(name="prefix", description="Cambiar prefijo (admin)")
 @app_commands.describe(nuevo_prefijo="Prefijo nuevo")
 async def prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
-    if not interaction.user.guild_permissions.administrator:
-        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    if not await _is_admin_or_deny(interaction):
+        return
     if len(nuevo_prefijo) > 10:
         embed = discord.Embed(title="❌ Prefijo demasiado largo", description="El prefijo no puede superar los **10 caracteres**.", color=0xed4245)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -1820,9 +1832,8 @@ async def prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
 @tree.command(name="set_channel", description="Configura el canal del SkullBoard")
 @app_commands.describe(channel="Canal donde se enviarán los mensajes del SkullBoard")
 async def set_channel_slash(interaction: discord.Interaction, channel: discord.TextChannel):
-    if not interaction.user.guild_permissions.administrator:
-        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    if not await _is_admin_or_deny(interaction):
+        return
     await update_guild_config(interaction.guild.id, {"skullboard_channel_id": channel.id})
     embed = discord.Embed(title="✅ Canal configurado", description=f"Los mensajes se enviarán a {channel.mention}", color=0x57f287)
     await interaction.response.send_message(embed=embed)
@@ -1830,9 +1841,8 @@ async def set_channel_slash(interaction: discord.Interaction, channel: discord.T
 @tree.command(name="set_min", description="Fija el mínimo de reacciones 💀")
 @app_commands.describe(cantidad="Número mínimo de reacciones para destacar un mensaje (≥ 1)")
 async def set_min_slash(interaction: discord.Interaction, cantidad: int):
-    if not interaction.user.guild_permissions.administrator:
-        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    if not await _is_admin_or_deny(interaction):
+        return
     if cantidad < 1:
         embed = discord.Embed(title="❌ Número inválido", description="El mínimo debe ser ≥ 1.", color=0xed4245)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -1985,9 +1995,8 @@ async def stats_slash(interaction: discord.Interaction, usuario: discord.Member 
 @tree.command(name="ignore", description="Ignora un canal (admin)")
 @app_commands.describe(canal="Canal a ignorar")
 async def ignore_slash(interaction: discord.Interaction, canal: discord.TextChannel):
-    if not interaction.user.guild_permissions.administrator:
-        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    if not await _is_admin_or_deny(interaction):
+        return
     await add_ignored_channel(str(interaction.guild.id), str(canal.id))
     embed = discord.Embed(title="🚫 Canal ignorado", description=f"Los mensajes de {canal.mention} ya no podrán llegar al skullboard.", color=0x57f287)
     await interaction.response.send_message(embed=embed)
@@ -1995,9 +2004,8 @@ async def ignore_slash(interaction: discord.Interaction, canal: discord.TextChan
 @tree.command(name="unignore", description="Deja de ignorar un canal (admin)")
 @app_commands.describe(canal="Canal a desbloquear")
 async def unignore_slash(interaction: discord.Interaction, canal: discord.TextChannel):
-    if not interaction.user.guild_permissions.administrator:
-        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    if not await _is_admin_or_deny(interaction):
+        return
     await remove_ignored_channel(str(interaction.guild.id), str(canal.id))
     embed = discord.Embed(title="✅ Canal desbloqueado", description=f"Los mensajes de {canal.mention} ya pueden llegar al skullboard.", color=0x57f287)
     await interaction.response.send_message(embed=embed)
@@ -2053,9 +2061,8 @@ async def notify_slash(interaction: discord.Interaction, estado: app_commands.Ch
 @tree.command(name="setup_pin", description="Configura el auto-pin de mensajes (admin)")
 @app_commands.describe(umbral="Mínimo de 💀 para pinear automáticamente. 0 = desactivado")
 async def setup_pin_slash(interaction: discord.Interaction, umbral: int):
-    if not interaction.user.guild_permissions.administrator:
-        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    if not await _is_admin_or_deny(interaction):
+        return
 
     if umbral < 0:
         embed = discord.Embed(title="❌ Número inválido", description="El umbral no puede ser negativo.", color=0xed4245)
@@ -2187,9 +2194,8 @@ async def top_year_slash(interaction: discord.Interaction):
 
 @tree.command(name="resync", description="Resincroniza los conteos de 💀 con la realidad (admin)")
 async def resync_slash(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-        embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    if not await _is_admin_or_deny(interaction):
+        return
     cfg = await get_guild_config(interaction.guild.id)
     if not cfg.get("skullboard_channel_id"):
         return await interaction.response.send_message(embed=discord.Embed(
