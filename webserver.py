@@ -1,4 +1,4 @@
-from flask import Flask, request, send_from_directory, redirect
+from flask import Flask, request, send_from_directory, redirect, jsonify
 from threading import Thread
 from urllib.parse import urlencode
 import requests
@@ -61,6 +61,66 @@ def api_stats():
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Cache-Control"] = "public, max-age=60"
     return resp
+
+# ── Formulario de contacto (Resend) ───────────────────────────────────────────
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+CONTACT_TO   = "globalsupportpyt@gmail.com"
+CONTACT_FROM = "SkullBoard <onboarding@resend.dev>"  # sin dominio: entrega solo a la cuenta Resend
+_contact_last = {}  # ponytail: rate-limit por IP en memoria (proceso único). Crece con IPs; trivial.
+
+def _cors(resp):
+    resp.headers["Access-Control-Allow-Origin"]  = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return resp
+
+@app.route('/api/contact', methods=["POST", "OPTIONS"])
+def api_contact():
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+
+    data = request.get_json(silent=True) or {}
+    if (data.get("website") or "").strip():  # honeypot: bots rellenan campo oculto
+        return _cors(jsonify(ok=True))       # fingimos éxito, no enviamos
+
+    name = (data.get("name") or "").strip()[:80]
+    email = (data.get("email") or "").strip()[:120]
+    msg = (data.get("message") or "").strip()[:4000]
+    if len(msg) < 5:
+        return _cors(jsonify(ok=False, error="El mensaje es demasiado corto.")), 400
+
+    ip = (request.headers.get("X-Forwarded-For", request.remote_addr or "")).split(",")[0].strip()
+    now = time.time()
+    if now - _contact_last.get(ip, 0) < 30:
+        return _cors(jsonify(ok=False, error="Espera un momento antes de enviar otro mensaje.")), 429
+    if not RESEND_API_KEY:
+        return _cors(jsonify(ok=False, error="El envío de correo no está configurado.")), 500
+
+    esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    html = (
+        "<h2>Nuevo mensaje de contacto (SkullBoard)</h2>"
+        f"<p><strong>De:</strong> {esc(name or 'Anónimo')}</p>"
+        f"<p><strong>Email:</strong> {esc(email or '—')}</p><hr/>"
+        f"<p style='white-space:pre-wrap'>{esc(msg)}</p>"
+    )
+    payload = {"from": CONTACT_FROM, "to": [CONTACT_TO],
+               "subject": f"Contacto SkullBoard — {name or 'Anónimo'}", "html": html}
+    if "@" in email:
+        payload["reply_to"] = email
+
+    try:
+        r = requests.post("https://api.resend.com/emails",
+                          headers={"Authorization": f"Bearer {RESEND_API_KEY}", "Content-Type": "application/json"},
+                          json=payload, timeout=10)
+    except requests.RequestException as e:
+        print(f"⚠️ /api/contact red: {e}")
+        return _cors(jsonify(ok=False, error="No se pudo contactar con el servidor de correo.")), 502
+    if r.status_code >= 300:
+        print(f"⚠️ resend {r.status_code}: {r.text}")
+        return _cors(jsonify(ok=False, error="No se pudo enviar el mensaje.")), 502
+
+    _contact_last[ip] = now
+    return _cors(jsonify(ok=True))
 
 @app.route('/<path:filename>')
 def serve_legal_files(filename):
