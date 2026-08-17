@@ -344,8 +344,6 @@ class SkullBot(commands.Bot):
 bot  = SkullBot(command_prefix=get_prefix, intents=intents, help_command=None, tree_cls=GuildOnlyTree)
 tree = bot.tree
 
-processing_messages: dict = {}
-
 async def get_formatted_prefix(ctx_or_interaction) -> str:
     cfg = await get_guild_config(ctx_or_interaction.guild.id)
     return cfg.get("prefix", "sk!")
@@ -1312,8 +1310,6 @@ async def topyear_cmd(ctx):
 
 # ─── Resync: deduplica el canal y reconcilia la BD con la realidad ────────────
 # ─── Infraestructura de resync: rate limiter GLOBAL + locks por servidor ──────
-_resync_guild_locks: dict[str, asyncio.Lock] = {}
-
 class _GlobalRateLimiter:
     """Token-bucket compartido por TODOS los resync del proceso.
 
@@ -1546,10 +1542,7 @@ async def resync_cmd(ctx):
             color=0xed4245
         ))
     gid  = str(ctx.guild.id)
-    lock = _resync_guild_locks.setdefault(gid, asyncio.Lock())
-    if lock.locked():
-        return await ctx.send(embed=_resync_busy_embed())
-    async with lock:
+    async with await _resync_locks.acquire(gid):
         status = await ctx.send(embed=discord.Embed(
             title="🔄 Resincronizando el skullboard",
             description=f"`{_progress_bar(0, 1)}`\n📖 Preparando...",
