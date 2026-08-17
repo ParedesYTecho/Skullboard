@@ -27,10 +27,77 @@ SUPABASE_URL  = os.getenv("SUPABASE_URL")
 SUPABASE_KEY  = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
 supabase: Optional[AsyncClient] = None
 
-OWNER_ID    = 561225979389804544
+OWNER_ID    = int(os.getenv("BOT_OWNER_ID", "561225979389804544"))
 skull_emoji = '💀'
 
-# ─── Cachés y Locks en memoria ────────────────────────────────────────────────
+# ─── Gestores de Concurrencia y Cachés en memoria ─────────────────────────────
+class KeyedAsyncLock:
+    """Gestor de locks por clave seguro contra cancelaciones y con desalojo automático."""
+    def __init__(self):
+        self._locks: dict[str, asyncio.Lock] = {}
+        self._counts: dict[str, int] = {}
+        self._guard = asyncio.Lock()
+
+    async def acquire(self, key: str):
+        key_str = str(key)
+        async with self._guard:
+            if key_str not in self._locks:
+                self._locks[key_str] = asyncio.Lock()
+                self._counts[key_str] = 0
+            self._counts[key_str] += 1
+            lock = self._locks[key_str]
+        return _KeyedLockContext(self, key_str, lock)
+
+class _KeyedLockContext:
+    def __init__(self, manager: KeyedAsyncLock, key: str, lock: asyncio.Lock):
+        self._manager = manager
+        self._key = key
+        self._lock = lock
+
+    async def __aenter__(self):
+        await self._lock.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        try:
+            self._lock.release()
+        finally:
+            async with self._manager._guard:
+                self._manager._counts[self._key] -= 1
+                if self._manager._counts[self._key] <= 0:
+                    self._manager._locks.pop(self._key, None)
+                    self._manager._counts.pop(self._key, None)
+
+class MessageDebouncer:
+    """Debouncer que rastrea la versión de la tarea para evitar descarte prematuro de timers."""
+    def __init__(self, delay: float = 2.0):
+        self.delay = delay
+        self._handles: dict[str, tuple[asyncio.TimerHandle, int]] = {}
+        self._generation: dict[str, int] = {}
+
+    def schedule(self, mid: int, callback, *args):
+        mid_str = str(mid)
+        loop = asyncio.get_running_loop()
+        gen = self._generation.get(mid_str, 0) + 1
+        self._generation[mid_str] = gen
+
+        if mid_str in self._handles:
+            old_handle, _ = self._handles[mid_str]
+            old_handle.cancel()
+
+        def _fire(target_gen: int):
+            if self._generation.get(mid_str) == target_gen:
+                self._handles.pop(mid_str, None)
+                self._generation.pop(mid_str, None)
+                asyncio.create_task(callback(*args))
+
+        handle = loop.call_later(self.delay, _fire, gen)
+        self._handles[mid_str] = (handle, gen)
+
+_msg_locks = KeyedAsyncLock()
+_resync_locks = KeyedAsyncLock()
+_debouncer = MessageDebouncer(delay=2.0)
+
 _prefix_cache: dict[str, tuple[str, float]] = {}
 PREFIX_CACHE_TTL = 120
 
@@ -38,9 +105,6 @@ _guild_config_cache: dict[str, tuple[dict, float]] = {}
 _ignored_channels_cache: dict[str, tuple[set[str], float]] = {}
 _guild_record_cache: dict[str, tuple[int, float]] = {}
 CACHE_TTL = 300  # 5 minutos
-
-_check_locks: dict[str, asyncio.Lock] = {}
-_check_counts: dict[str, int] = {}
 
 SPANISH_MONTHS = {
     1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
@@ -57,31 +121,21 @@ async def db_select(table: str, match_col: str, match_val: str, select_cols: str
 
 async def db_insert(table: str, data: dict):
     try:
-        data_copy = data.copy()
-        if "skull_count" in data_copy:
-            data_copy["skull_count"] = min(data_copy["skull_count"], 32767)
-        return await supabase.table(table).insert(data_copy).execute()
+        return await supabase.table(table).insert(data).execute()
     except Exception as e:
         logger.error(f"Error en db_insert en tabla {table}: {e}")
         raise
 
 async def db_update(table: str, updates: dict, match_col: str, match_val: str):
     try:
-        updates_copy = updates.copy()
-        updates_copy.pop("guild_id", None)  # Prevent updating guild_id primary key
-        if "skull_count" in updates_copy:
-            updates_copy["skull_count"] = min(updates_copy["skull_count"], 32767)
-        return await supabase.table(table).update(updates_copy).eq(match_col, match_val).execute()
+        return await supabase.table(table).update(updates).eq(match_col, match_val).execute()
     except Exception as e:
         logger.error(f"Error en db_update ({table}.{match_col}={match_val}): {e}")
         raise
 
 async def db_upsert(table: str, data: dict):
     try:
-        data_copy = data.copy()
-        if "skull_count" in data_copy:
-            data_copy["skull_count"] = min(data_copy["skull_count"], 32767)
-        return await supabase.table(table).upsert(data_copy).execute()
+        return await supabase.table(table).upsert(data).execute()
     except Exception as e:
         logger.error(f"Error en db_upsert en tabla {table}: {e}")
         raise
@@ -516,7 +570,7 @@ async def on_ready():
 # ─── React Handlers con cooldown inteligente ──────────────────────────────────
 @bot.event
 async def on_raw_reaction_add(payload):
-    if payload.guild_id is None: return  # DMs: nunca califican, ahorra 2 llamadas API
+    if payload.guild_id is None: return
     if payload.user_id == bot.user.id: return
     if str(payload.emoji) != skull_emoji: return
     await _schedule_check(payload.guild_id, payload.channel_id, payload.message_id)
@@ -529,29 +583,16 @@ async def on_raw_reaction_remove(payload):
     await _schedule_check(payload.guild_id, payload.channel_id, payload.message_id)
 
 async def _schedule_check(guild_id: int, channel_id: int, message_id: int):
-    mid = str(message_id)
-    if mid in processing_messages:
-        processing_messages[mid].cancel()
-    loop   = asyncio.get_running_loop()
-    handle = loop.call_later(
-        2.0,
-        lambda: asyncio.ensure_future(_run_check(guild_id, channel_id, message_id))
-    )
-    processing_messages[mid] = handle
+    _debouncer.schedule(message_id, _run_check, guild_id, channel_id, message_id)
 
 async def _run_check(guild_id: int, channel_id: int, message_id: int):
-    mid = str(message_id)
-    processing_messages.pop(mid, None)
-
-    # Filtros tempranos (solo cachés): si el canal nunca puede calificar,
-    # evitamos el fetch_message — p. ej. reacciones a los propios reposts
-    # del skullboard o en canales ignorados.
+    # Filtros tempranos (solo cachés)
     try:
         cfg = await get_guild_config(guild_id)
         if channel_id == cfg.get("skullboard_channel_id"): return
         if await is_channel_ignored(str(guild_id), str(channel_id)): return
     except Exception:
-        pass  # ante la duda, seguimos: _check re-valida todo
+        pass
 
     chan = bot.get_channel(channel_id)
     if chan is None:
@@ -561,7 +602,8 @@ async def _run_check(guild_id: int, channel_id: int, message_id: int):
             return
     try:
         msg = await chan.fetch_message(message_id)
-    except Exception: return
+    except Exception:
+        return
     await _check(msg)
 
 # ─── Core logic ───────────────────────────────────────────────────────────────
@@ -593,13 +635,7 @@ async def _check(msg: discord.Message):
 
     mid = str(msg.id)
 
-    if mid not in _check_locks:
-        _check_locks[mid] = asyncio.Lock()
-        _check_counts[mid] = 0
-    _check_counts[mid] += 1
-    lock = _check_locks[mid]
-
-    async with lock:
+    async with await _msg_locks.acquire(mid):
         try:
             cfg = await get_guild_config(msg.guild.id)
             gid = str(msg.guild.id)
@@ -628,20 +664,16 @@ async def _check(msg: discord.Message):
 
             if existing_id:
                 try:
-                    # PartialMessage: edita sin fetch previo → 1 llamada API menos
-                    # en el camino más caliente del bot (reacción a msg trackeado).
                     if hasattr(dest_chan, "get_partial_message"):
                         old = dest_chan.get_partial_message(existing_id)
                     else:
                         old = await dest_chan.fetch_message(existing_id)
                     await old.edit(content=texto, embed=embed)
                     await update_tracked_count(mid, count)
-                    _guild_record_cache.pop(gid, None)  # Invalidate record cache
+                    _guild_record_cache.pop(gid, None)
                     return
                 except discord.NotFound:
                     if count < cfg["min_skulls"]:
-                        # El repost fue borrado y ya no califica: eliminar la fila
-                        # para no dejar un registro zombie apuntando a la nada.
                         try:
                             await supabase.table("tracked_messages").delete() \
                                 .eq("message_id", mid).execute()
@@ -698,34 +730,19 @@ async def _check(msg: discord.Message):
                                 "Libera pins y vuelve a configurarlo con `/setup_pin`."
                             ),
                             color=0xed4245
-                           )
+                        )
                         await dest_chan.send(embed=err_embed)
                     except Exception:
                         pass
 
         except Exception as e:
             logger.error(f"Error en _check: {e}")
-        finally:
-            _check_counts[mid] -= 1
-            if _check_counts[mid] <= 0:
-                _check_locks.pop(mid, None)
-                _check_counts.pop(mid, None)
 
 # ─── Borrado de mensajes ──────────────────────────────────────────────────────
-# Semáforo global: limita cuántos handlers de borrado tocan la BD a la vez.
-# Sin esto, una purga masiva dispara cientos de eventos concurrentes, revienta
-# el límite de 100 streams HTTP/2 del cliente Supabase y acumula tareas en RAM
-# hasta el OOM (visto en producción el 2026-07-04).
 _delete_sem = asyncio.Semaphore(8)
 
 async def _handle_deleted_messages(mids: list[str]):
-    """Procesa un lote de mensajes borrados con pocas queries (batched).
-
-    - 1 SELECT in_() para saber cuáles estaban trackeados como originales.
-    - Borra sus reposts en Discord (secuencial, con cuidado del rate limit).
-    - 1 DELETE in_() para limpiar las filas de la BD.
-    - 1 DELETE in_() para filas cuyo repost fue el mensaje borrado.
-    """
+    """Procesa un lote de mensajes borrados con pocas queries (batched)."""
     if not mids:
         return
     try:
@@ -750,11 +767,14 @@ async def _handle_deleted_messages(mids: list[str]):
                     sb_chan = await bot.fetch_channel(cfg["skullboard_channel_id"])
                 if sb_chan:
                     try:
-                        sb_msg = await sb_chan.fetch_message(sb_id)
-                        await sb_msg.delete()
-                    except discord.NotFound:
+                        if hasattr(sb_chan, "get_partial_message"):
+                            await sb_chan.get_partial_message(sb_id).delete()
+                        else:
+                            sb_msg = await sb_chan.fetch_message(sb_id)
+                            await sb_msg.delete()
+                    except (discord.NotFound, discord.HTTPException):
                         pass
-                    await asyncio.sleep(0.35)  # ritmo suave en purgas grandes
+                    await asyncio.sleep(0.1)
             except Exception:
                 pass
 
@@ -762,7 +782,6 @@ async def _handle_deleted_messages(mids: list[str]):
             await supabase.table("tracked_messages").delete() \
                 .in_("message_id", [r["message_id"] for r in rows]).execute()
 
-        # Mensajes borrados que eran REPOSTS del skullboard (no originales)
         resp2 = await supabase.table("tracked_messages") \
             .select("guild_id") \
             .in_("skullboard_message_id", mids).execute()
@@ -786,26 +805,35 @@ async def on_raw_message_delete(payload):
 @bot.event
 async def on_raw_bulk_message_delete(payload):
     mids = [str(m) for m in payload.message_ids]
-    # Procesar en trozos de 100 para no generar queries in_() gigantes
     async with _delete_sem:
         for i in range(0, len(mids), 100):
             await _handle_deleted_messages(mids[i:i + 100])
 
 # ─── COMANDOS DE TEXTO ────────────────────────────────────────────────────────
 
+def _validate_prefix(p: Optional[str]) -> tuple[bool, str]:
+    if not p:
+        return False, "Indica el nuevo prefijo."
+    p_clean = p.strip()
+    if not p_clean:
+        return False, "El prefijo no puede estar compuesto únicamente por espacios."
+    if any(c in p_clean for c in ("\n", "\r", "\t")):
+        return False, "El prefijo no puede contener saltos de línea ni tabuladores."
+    if len(p_clean) > 10:
+        return False, "El prefijo no puede superar los **10 caracteres**."
+    return True, p_clean
+
 @bot.command(name="prefix", aliases=["set_prefix"])
 @commands.guild_only()
 @commands.has_permissions(administrator=True)
 async def prefix_cmd(ctx, nuevo_prefijo: str = None):
-    if not nuevo_prefijo:
-        embed = discord.Embed(title="❌ Falta el prefijo", description="Indica el nuevo prefijo.", color=0xed4245)
+    valido, res = _validate_prefix(nuevo_prefijo)
+    if not valido:
+        embed = discord.Embed(title="❌ Prefijo inválido", description=res, color=0xed4245)
         return await ctx.send(embed=embed)
-    if len(nuevo_prefijo) > 10:
-        embed = discord.Embed(title="❌ Prefijo demasiado largo", description="El prefijo no puede superar los **10 caracteres**.", color=0xed4245)
-        return await ctx.send(embed=embed)
-    await update_guild_config(ctx.guild.id, {"prefix": nuevo_prefijo})
+    await update_guild_config(ctx.guild.id, {"prefix": res})
     _prefix_cache.pop(str(ctx.guild.id), None)
-    embed = discord.Embed(title="✅ Prefijo actualizado", description=f"Ahora puedes usar comandos con `{nuevo_prefijo}`", color=0x57f287)
+    embed = discord.Embed(title="✅ Prefijo actualizado", description=f"Ahora puedes usar comandos con `{res}`", color=0x57f287)
     await ctx.send(embed=embed)
 
 @bot.command(name="set_channel", aliases=["channel"])
@@ -1019,25 +1047,21 @@ async def stats_cmd(ctx, member: discord.Member = None):
     embed  = await _stats_embed(ctx.guild, member)
     await ctx.send(embed=embed)
 
-@bot.command(name="random")
-@commands.guild_only()
-async def random_cmd(ctx):
-    gid = str(ctx.guild.id)
+async def _handle_random_message(guild: discord.Guild) -> tuple[Optional[str], Optional[discord.Embed]]:
+    gid = str(guild.id)
     try:
-        resp = await supabase.table("tracked_messages").select("*").eq("guild_id", gid).execute()
+        resp = await supabase.rpc("get_random_tracked_message", {"p_guild_id": gid}).execute()
     except Exception as e:
-        logger.error(f"Error en random_cmd para guild {gid}: {e}")
-        embed = discord.Embed(title="❌ Error", description="No se pudo obtener un mensaje aleatorio.", color=0xed4245)
-        return await ctx.send(embed=embed)
+        logger.error(f"Error en RPC get_random_tracked_message para guild {gid}: {e}")
+        return None, discord.Embed(title="❌ Error", description="No se pudo obtener un mensaje aleatorio.", color=0xed4245)
 
     if not resp.data:
-        embed = discord.Embed(title="🎲 Mensaje aleatorio", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
-        return await ctx.send(embed=embed)
+        return None, discord.Embed(title="🎲 Mensaje aleatorio", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
 
-    row     = random.choice(resp.data)
-    cfg     = await get_guild_config(ctx.guild.id)
+    row = resp.data[0]
+    cfg = await get_guild_config(guild.id)
     sb_channel_id = cfg.get("skullboard_channel_id")
-    sb_chan  = bot.get_channel(sb_channel_id) if sb_channel_id else None
+    sb_chan = bot.get_channel(sb_channel_id) if sb_channel_id else None
     if sb_chan is None and sb_channel_id:
         try:
             sb_chan = await bot.fetch_channel(sb_channel_id)
@@ -1045,17 +1069,27 @@ async def random_cmd(ctx):
             pass
 
     sb_id = row.get("skullboard_message_id")
-    try:
-        sb_msg = await sb_chan.fetch_message(sb_id) if sb_chan and sb_id else None
-    except Exception:
-        sb_msg = None
+    sb_msg = None
+    if sb_chan and sb_id:
+        try:
+            sb_msg = await sb_chan.fetch_message(sb_id)
+        except Exception:
+            sb_msg = None
 
     if sb_msg and sb_msg.embeds:
         embed = sb_msg.embeds[0].copy()
         embed.title = "🎲 Mensaje aleatorio del skullboard"
-        await ctx.send(content=sb_msg.content, embed=embed)
+        return sb_msg.content, embed
+    return None, discord.Embed(title="🎲 Mensaje aleatorio", description="No se pudo recuperar el mensaje.", color=0x4e5058)
+
+@bot.command(name="random")
+@commands.guild_only()
+async def random_cmd(ctx):
+    content, embed = await _handle_random_message(ctx.guild)
+    if content:
+        await ctx.send(content=content, embed=embed)
     else:
-        await ctx.send(embed=discord.Embed(title="🎲 Mensaje aleatorio", description="No se pudo recuperar el mensaje.", color=0x4e5058))
+        await ctx.send(embed=embed)
 
 @bot.command(name="ignored")
 @commands.guild_only()
@@ -1153,137 +1187,110 @@ async def setuppin_cmd(ctx, umbral: int = None):
         )
     await ctx.send(embed=embed)
 
-@bot.command(name="leaderboard", aliases=["lb", "topusers"])
-@commands.guild_only()
-async def leaderboard_cmd(ctx):
-    gid = str(ctx.guild.id)
+async def _build_leaderboard_embed(guild: discord.Guild) -> discord.Embed:
+    gid = str(guild.id)
     try:
-        resp = await supabase.table("tracked_messages") \
-            .select("skull_count,author_id") \
-            .eq("guild_id", gid).execute()
+        resp = await supabase.rpc("get_guild_leaderboard", {"p_guild_id": gid, "p_limit": 10}).execute()
     except Exception as e:
-        logger.error(f"Error en leaderboard_cmd para guild {gid}: {e}")
-        embed = discord.Embed(title="❌ Error", description="No se pudo obtener la clasificación.", color=0xed4245)
-        return await ctx.send(embed=embed)
+        logger.error(f"Error en RPC get_guild_leaderboard para guild {gid}: {e}")
+        return discord.Embed(title="❌ Error", description="No se pudo obtener la clasificación.", color=0xed4245)
 
     if not resp.data:
-        embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos en el skullboard.", color=0x4e5058)
-        return await ctx.send(embed=embed)
+        return discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos en el skullboard.", color=0x4e5058)
 
-    totals = {}
-    for r in resp.data:
-        uid = r.get("author_id")
-        if not uid: continue
-        totals[uid] = totals.get(uid, 0) + (r.get("skull_count") or 0)
-
-    if not totals:
-        embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos suficientes.", color=0x4e5058)
-        return await ctx.send(embed=embed)
-
-    ranking = sorted(totals.items(), key=lambda x: x[1], reverse=True)[:10]
-    medals  = ["🥇", "🥈", "🥉"]
-    lines   = []
-    for i, (uid, total) in enumerate(ranking):
-        pos  = medals[i] if i < 3 else f"{i+1}."
-        name = await resolve_display_name(ctx.guild, uid)
+    medals = ["🥇", "🥈", "🥉"]
+    lines  = []
+    for i, row in enumerate(resp.data):
+        pos   = medals[i] if i < 3 else f"{i+1}."
+        name  = await resolve_display_name(guild, row.get("author_id"))
+        total = row.get("total_skulls") or 0
         lines.append(f"{pos} **{name}** — **{total} 💀**")
 
     embed = discord.Embed(title="🏆 Top Usuarios — Skullboard", description="\n".join(lines), color=0xfaa61a)
-    embed.set_footer(text=f"Top {len(ranking)} usuarios por calaveras totales")
+    embed.set_footer(text=f"Top {len(resp.data)} usuarios por calaveras totales")
+    return embed
+
+@bot.command(name="leaderboard", aliases=["lb", "topusers"])
+@commands.guild_only()
+async def leaderboard_cmd(ctx):
+    embed = await _build_leaderboard_embed(ctx.guild)
     await ctx.send(embed=embed)
+
+async def _build_serverstats_embed(guild: discord.Guild) -> discord.Embed:
+    gid = str(guild.id)
+    try:
+        resp = await supabase.rpc("get_guild_server_stats", {"p_guild_id": gid}).execute()
+    except Exception as e:
+        logger.error(f"Error en RPC get_guild_server_stats para guild {gid}: {e}")
+        return discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas del servidor.", color=0xed4245)
+
+    if not resp.data or resp.data[0]["total_messages"] == 0:
+        return discord.Embed(title="📊 Stats del Servidor", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
+
+    stats = resp.data[0]
+    total_msgs    = stats["total_messages"]
+    total_skulls  = stats["total_skulls"]
+    record_count  = stats["record_count"]
+    top_author_id = stats["top_author_id"]
+    top_skulls    = stats["top_author_skulls"]
+
+    top_user_name = await resolve_display_name(guild, top_author_id) if top_author_id else "—"
+
+    embed = discord.Embed(title=f"📊 Stats de {guild.name}", color=0x8b5cf6)
+    if guild.icon:
+        embed.set_thumbnail(url=guild.icon.url)
+    embed.add_field(name="📌 Mensajes en el board", value=f"{total_msgs:,}",    inline=True)
+    embed.add_field(name="💀 Calaveras totales",     value=f"{total_skulls:,}",  inline=True)
+    embed.add_field(name="🏆 Récord",                value=f"**{record_count} 💀**", inline=True)
+    embed.add_field(name="👑 Usuario más reaccionado", value=f"{top_user_name} · **{top_skulls} 💀**", inline=False)
+    embed.set_footer(text="Estadísticas globales del servidor")
+    return embed
 
 @bot.command(name="serverstats", aliases=["sstats", "server_stats"])
 @commands.guild_only()
 async def serverstats_cmd(ctx):
-    gid = str(ctx.guild.id)
-    try:
-        resp = await supabase.table("tracked_messages") \
-            .select("skull_count,author_id") \
-            .eq("guild_id", gid).execute()
-    except Exception as e:
-        logger.error(f"Error en serverstats_cmd para guild {gid}: {e}")
-        embed = discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas del servidor.", color=0xed4245)
-        return await ctx.send(embed=embed)
-
-    if not resp.data:
-        embed = discord.Embed(title="📊 Stats del Servidor", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
-        return await ctx.send(embed=embed)
-
-    total_msgs   = len(resp.data)
-    total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
-    totals = {}
-    for r in resp.data:
-        uid = r.get("author_id")
-        if not uid: continue
-        totals[uid] = totals.get(uid, 0) + (r.get("skull_count") or 0)
-    top_user_name = "—"
-    top_user_count = 0
-    if totals:
-        top_uid, top_user_count = max(totals.items(), key=lambda x: x[1])
-        top_user_name = await resolve_display_name(ctx.guild, top_uid)
-
-    record = max(resp.data, key=lambda r: r.get("skull_count") or 0)
-    record_count = record.get("skull_count") or 0
-
-    embed = discord.Embed(title=f"📊 Stats de {ctx.guild.name}", color=0x8b5cf6)
-    if ctx.guild.icon:
-        embed.set_thumbnail(url=ctx.guild.icon.url)
-    embed.add_field(name="📌 Mensajes en el board", value=str(total_msgs),    inline=True)
-    embed.add_field(name="💀 Calaveras totales",     value=str(total_skulls), inline=True)
-    embed.add_field(name="🏆 Récord",                value=f"**{record_count} 💀**", inline=True)
-    embed.add_field(name="👑 Usuario con más reacciones", value=f"{top_user_name} · **{top_user_count} 💀**", inline=False)
-    embed.set_footer(text="Estadísticas globales del servidor")
+    embed = await _build_serverstats_embed(ctx.guild)
     await ctx.send(embed=embed)
 
-# ─── Helper para top por periodo (snowflake timestamp) ────────────────────────
-def snowflake_to_datetime(snowflake_id: int) -> datetime:
-    """Convierte un Discord snowflake ID a datetime UTC."""
-    timestamp_ms = (snowflake_id >> 22) + 1420070400000
-    return datetime.fromtimestamp(timestamp_ms / 1000, tz=timezone.utc)
+# ─── Helper para top por periodo (snowflake timestamp & RPC) ──────────────────
+def datetime_to_min_snowflake(dt: datetime) -> int:
+    """Calcula el snowflake mínimo de Discord para mensajes creados a partir de dt."""
+    timestamp_ms = int(dt.timestamp() * 1000)
+    return max(0, (timestamp_ms - 1420070400000) << 22)
 
 async def get_top_periodo(guild: discord.Guild, desde: datetime, titulo: str) -> discord.Embed:
-    """Devuelve un embed con el top de mensajes en el período dado."""
+    """Devuelve un embed con el top de mensajes en el período dado usando RPC y Snowflake."""
     gid = str(guild.id)
+    min_snowflake = datetime_to_min_snowflake(desde)
     try:
-        resp = await supabase.table("tracked_messages") \
-            .select("message_id,skull_count,author_id,skullboard_message_id") \
-            .eq("guild_id", gid).order("skull_count", desc=True).execute()
+        resp = await supabase.rpc("get_top_periodo", {
+            "p_guild_id": gid,
+            "p_min_snowflake": min_snowflake,
+            "p_limit": 10
+        }).execute()
     except Exception as e:
-        logger.error(f"Error en get_top_periodo para guild {gid}: {e}")
+        logger.error(f"Error en get_top_periodo RPC para guild {gid}: {e}")
         return discord.Embed(title=titulo, description="No se pudo obtener el top para este período.", color=0xed4245)
 
     if not resp.data:
-        return discord.Embed(title=titulo, description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
-
-    # Filtrar por periodo usando el snowflake del message_id
-    filtrados = []
-    for r in resp.data:
-        try:
-            msg_dt = snowflake_to_datetime(int(r["message_id"]))
-            if msg_dt >= desde:
-                filtrados.append(r)
-        except Exception:
-            continue
-
-    if not filtrados:
         return discord.Embed(title=titulo, description="No hay mensajes en este período.", color=0x4e5058)
 
     medals = ["🥇", "🥈", "🥉"]
     cfg    = await get_guild_config(guild.id)
     lines  = []
-    for i, row in enumerate(filtrados[:10]):
+    for i, row in enumerate(resp.data):
         pos   = medals[i] if i < 3 else f"{i+1}."
         count = row.get("skull_count") or 0
         name  = await resolve_display_name(guild, row.get("author_id"))
         sb_id = row.get("skullboard_message_id")
-        if cfg["skullboard_channel_id"] and sb_id:
+        if cfg.get("skullboard_channel_id") and sb_id:
             link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{sb_id}"
             lines.append(f"{pos} **[{name}]({link})** — **{count} 💀**")
         else:
             lines.append(f"{pos} **{name}** — **{count} 💀**")
 
     embed = discord.Embed(title=titulo, description="\n".join(lines), color=0xfaa61a)
-    embed.set_footer(text=f"Top {len(filtrados[:10])} mensajes del período · {filtrados[0].get('skull_count', 0)} 💀 el mensaje con más reacciones")
+    embed.set_footer(text=f"Top {len(resp.data)} mensajes del período · {resp.data[0].get('skull_count', 0)} 💀 el récord del período")
     return embed
 
 @bot.command(name="topmonth", aliases=["monthly", "top_month"])
@@ -1649,13 +1656,13 @@ async def backfill_cmd(ctx):
         if author_id:
             if orig_msg_id in registros_dict:
                 if count > registros_dict[orig_msg_id]["skull_count"]:
-                    registros_dict[orig_msg_id]["skull_count"] = min(count, 32767)
+                    registros_dict[orig_msg_id]["skull_count"] = count
                     registros_dict[orig_msg_id]["skullboard_message_id"] = data["sb_msg_id"]
             else:
                 registros_dict[orig_msg_id] = {
                     "message_id": str(orig_msg_id),
                     "skullboard_message_id": data["sb_msg_id"],
-                    "skull_count": min(count, 32767),
+                    "skull_count": count,
                     "author_id": str(author_id),
                     "guild_id": gid
                 }
@@ -1674,22 +1681,23 @@ async def backfill_cmd(ctx):
 
     await msg_status.edit(embed=discord.Embed(
         title="⏳ Paso 3/3 — Subiendo a BD...",
-        description=f"Guardando **{len(registros_a_subir)}** IDs en Supabase 1 a 1 para evitar bloqueos...",
+        description=f"Guardando **{len(registros_a_subir)}** IDs en Supabase por lotes optimizados...",
         color=0x8b5cf6
     ))
 
-    # PASO 3: Subir a Supabase DE 1 EN 1 (Anti-Errores de Bloque)
+    # PASO 3: Subir a Supabase en Lotes de 100 (Atómico y 100x más rápido)
     exitosos = 0
     errores_db = 0
-    for registro in registros_a_subir:
+    BATCH_SIZE = 100
+    for i in range(0, len(registros_a_subir), BATCH_SIZE):
+        lote = registros_a_subir[i:i + BATCH_SIZE]
         try:
-            await supabase.table("tracked_messages").upsert(registro).execute()
-            exitosos += 1
+            await supabase.table("tracked_messages").upsert(lote).execute()
+            exitosos += len(lote)
         except Exception as e:
-            logger.error(f"Error guardando msg {registro['message_id']}: {e}")
-            errores_db += 1
-            
-        await asyncio.sleep(0.05) # Pequeñísima pausa para cuidar la BD
+            logger.error(f"Error subiendo lote de backfill ({i}-{i+len(lote)}): {e}")
+            errores_db += len(lote)
+        await asyncio.sleep(0.1)
 
     _guild_record_cache.pop(gid, None)  # Invalidate record cache
     await msg_status.edit(embed=discord.Embed(
@@ -1868,19 +1876,22 @@ async def ajustes_slash(interaction: discord.Interaction):
     await interaction.response.send_message(embed=embed)
 
 @tree.command(name="prefix", description="Cambiar prefijo (admin)")
+@app_commands.default_permissions(administrator=True)
 @app_commands.describe(nuevo_prefijo="Prefijo nuevo")
 async def prefix_slash(interaction: discord.Interaction, nuevo_prefijo: str):
     if not await _is_admin_or_deny(interaction):
         return
-    if len(nuevo_prefijo) > 10:
-        embed = discord.Embed(title="❌ Prefijo demasiado largo", description="El prefijo no puede superar los **10 caracteres**.", color=0xed4245)
+    valido, res = _validate_prefix(nuevo_prefijo)
+    if not valido:
+        embed = discord.Embed(title="❌ Prefijo inválido", description=res, color=0xed4245)
         return await interaction.response.send_message(embed=embed, ephemeral=True)
-    await update_guild_config(interaction.guild.id, {"prefix": nuevo_prefijo})
+    await update_guild_config(interaction.guild.id, {"prefix": res})
     _prefix_cache.pop(str(interaction.guild.id), None)
-    embed = discord.Embed(title="✅ Prefijo actualizado", description=f"Ahora puedes usar comandos con `{nuevo_prefijo}`", color=0x57f287)
+    embed = discord.Embed(title="✅ Prefijo actualizado", description=f"Ahora puedes usar comandos con `{res}`", color=0x57f287)
     await interaction.response.send_message(embed=embed)
 
-@tree.command(name="set_channel", description="Configura el canal del SkullBoard")
+@tree.command(name="set_channel", description="Configura el canal del SkullBoard (admin)")
+@app_commands.default_permissions(administrator=True)
 @app_commands.describe(channel="Canal donde se enviarán los mensajes del SkullBoard")
 async def set_channel_slash(interaction: discord.Interaction, channel: discord.TextChannel):
     if not await _is_admin_or_deny(interaction):
@@ -1889,7 +1900,8 @@ async def set_channel_slash(interaction: discord.Interaction, channel: discord.T
     embed = discord.Embed(title="✅ Canal configurado", description=f"Los mensajes se enviarán a {channel.mention}", color=0x57f287)
     await interaction.response.send_message(embed=embed)
 
-@tree.command(name="set_min", description="Fija el mínimo de reacciones 💀")
+@tree.command(name="set_min", description="Fija el mínimo de reacciones 💀 (admin)")
+@app_commands.default_permissions(administrator=True)
 @app_commands.describe(cantidad="Número mínimo de reacciones para destacar un mensaje (≥ 1)")
 async def set_min_slash(interaction: discord.Interaction, cantidad: int):
     if not await _is_admin_or_deny(interaction):
@@ -1957,7 +1969,7 @@ async def top_slash(interaction: discord.Interaction):
         count = row.get("skull_count") or 0
         name  = await resolve_display_name(interaction.guild, row.get("author_id"))
         sb_id = row.get("skullboard_message_id")
-        if cfg["skullboard_channel_id"] and sb_id:
+        if cfg.get("skullboard_channel_id") and sb_id:
             link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{sb_id}"
             lines.append(f"{pos} **[{name}]({link})** — **{count} 💀**")
         else:
@@ -1970,39 +1982,11 @@ async def top_slash(interaction: discord.Interaction):
 @tree.command(name="random", description="Muestra un mensaje aleatorio del skullboard")
 async def random_slash(interaction: discord.Interaction):
     await interaction.response.defer()
-    gid = str(interaction.guild.id)
-    try:
-        resp = await supabase.table("tracked_messages").select("*").eq("guild_id", gid).execute()
-    except Exception as e:
-        logger.error(f"Error en /random: {e}")
-        embed = discord.Embed(title="❌ Error", description="No se pudo obtener un mensaje aleatorio.", color=0xed4245)
-        return await interaction.followup.send(embed=embed)
-    if not resp.data:
-        embed = discord.Embed(title="🎲 Mensaje aleatorio", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
-        return await interaction.followup.send(embed=embed)
-
-    row     = random.choice(resp.data)
-    cfg     = await get_guild_config(interaction.guild.id)
-    sb_channel_id = cfg.get("skullboard_channel_id")
-    sb_chan  = bot.get_channel(sb_channel_id) if sb_channel_id else None
-    if sb_chan is None and sb_channel_id:
-        try:
-            sb_chan = await bot.fetch_channel(sb_channel_id)
-        except Exception:
-            pass
-    sb_id   = row.get("skullboard_message_id")
-
-    try:
-        sb_msg = await sb_chan.fetch_message(sb_id) if sb_chan and sb_id else None
-    except Exception:
-        sb_msg = None
-
-    if sb_msg and sb_msg.embeds:
-        embed = sb_msg.embeds[0].copy()
-        embed.title = "🎲 Mensaje aleatorio del skullboard"
-        await interaction.followup.send(content=sb_msg.content, embed=embed)
+    content, embed = await _handle_random_message(interaction.guild)
+    if content:
+        await interaction.followup.send(content=content, embed=embed)
     else:
-        await interaction.followup.send(embed=discord.Embed(title="🎲 Mensaje aleatorio", description="No se pudo recuperar el mensaje.", color=0x4e5058))
+        await interaction.followup.send(embed=embed)
 
 async def _stats_embed(guild: discord.Guild, member: discord.Member) -> discord.Embed:
     """Embed de estadísticas de un usuario. Compartido por sk!stats y /stats."""
@@ -2030,7 +2014,7 @@ async def _stats_embed(guild: discord.Guild, member: discord.Member) -> discord.
     best_sb_id   = best_row.get("skullboard_message_id")
     cfg          = await get_guild_config(guild.id)
     link         = None
-    if best_sb_id and cfg["skullboard_channel_id"]:
+    if best_sb_id and cfg.get("skullboard_channel_id"):
         link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{best_sb_id}"
 
     embed = discord.Embed(title=f"📊 Stats de {member.display_name}", color=0x8b5cf6)
@@ -2052,6 +2036,7 @@ async def stats_slash(interaction: discord.Interaction, usuario: discord.Member 
     await interaction.followup.send(embed=embed)
 
 @tree.command(name="ignore", description="Ignora un canal (admin)")
+@app_commands.default_permissions(administrator=True)
 @app_commands.describe(canal="Canal a ignorar")
 async def ignore_slash(interaction: discord.Interaction, canal: discord.TextChannel):
     if not await _is_admin_or_deny(interaction):
@@ -2061,6 +2046,7 @@ async def ignore_slash(interaction: discord.Interaction, canal: discord.TextChan
     await interaction.response.send_message(embed=embed)
 
 @tree.command(name="unignore", description="Deja de ignorar un canal (admin)")
+@app_commands.default_permissions(administrator=True)
 @app_commands.describe(canal="Canal a desbloquear")
 async def unignore_slash(interaction: discord.Interaction, canal: discord.TextChannel):
     if not await _is_admin_or_deny(interaction):
@@ -2118,6 +2104,7 @@ async def notify_slash(interaction: discord.Interaction, estado: app_commands.Ch
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @tree.command(name="setup_pin", description="Configura el auto-pin de mensajes (admin)")
+@app_commands.default_permissions(administrator=True)
 @app_commands.describe(umbral="Mínimo de 💀 para pinear automáticamente. 0 = desactivado")
 async def setup_pin_slash(interaction: discord.Interaction, umbral: int):
     if not await _is_admin_or_deny(interaction):
@@ -2156,82 +2143,13 @@ async def setup_pin_slash(interaction: discord.Interaction, umbral: int):
 @tree.command(name="leaderboard", description="Top usuarios con más calaveras totales del servidor")
 async def leaderboard_slash(interaction: discord.Interaction):
     await interaction.response.defer()
-    gid = str(interaction.guild.id)
-    try:
-        resp = await supabase.table("tracked_messages") \
-            .select("skull_count,author_id") \
-            .eq("guild_id", gid).execute()
-    except Exception as e:
-        logger.error(f"Error en /leaderboard: {e}")
-        embed = discord.Embed(title="❌ Error", description="No se pudo obtener la clasificación.", color=0xed4245)
-        return await interaction.followup.send(embed=embed)
-    if not resp.data:
-        embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos en el skullboard.", color=0x4e5058)
-        return await interaction.followup.send(embed=embed)
-
-    totals = {}
-    for r in resp.data:
-        uid = r.get("author_id")
-        if not uid: continue
-        totals[uid] = totals.get(uid, 0) + (r.get("skull_count") or 0)
-
-    if not totals:
-        embed = discord.Embed(title="🏆 Top Usuarios", description="Aún no hay datos suficientes.", color=0x4e5058)
-        return await interaction.followup.send(embed=embed)
-
-    ranking = sorted(totals.items(), key=lambda x: x[1], reverse=True)[:10]
-    medals  = ["🥇", "🥈", "🥉"]
-    lines   = []
-    for i, (uid, total) in enumerate(ranking):
-        pos  = medals[i] if i < 3 else f"{i+1}."
-        name = await resolve_display_name(interaction.guild, uid)
-        lines.append(f"{pos} **{name}** — **{total} 💀**")
-
-    embed = discord.Embed(title="🏆 Top Usuarios — Skullboard", description="\n".join(lines), color=0xfaa61a)
-    embed.set_footer(text=f"Top {len(ranking)} usuarios por calaveras totales")
+    embed = await _build_leaderboard_embed(interaction.guild)
     await interaction.followup.send(embed=embed)
 
 @tree.command(name="server_stats", description="Estadísticas globales del skullboard del servidor")
 async def server_stats_slash(interaction: discord.Interaction):
     await interaction.response.defer()
-    gid = str(interaction.guild.id)
-    try:
-        resp = await supabase.table("tracked_messages") \
-            .select("skull_count,author_id") \
-            .eq("guild_id", gid).execute()
-    except Exception as e:
-        logger.error(f"Error en /server_stats: {e}")
-        embed = discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas del servidor.", color=0xed4245)
-        return await interaction.followup.send(embed=embed)
-
-    if not resp.data:
-        embed = discord.Embed(title="📊 Stats del Servidor", description="Aún no hay mensajes en el skullboard.", color=0x4e5058)
-        return await interaction.followup.send(embed=embed)
-
-    total_msgs   = len(resp.data)
-    total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
-    totals = {}
-    for r in resp.data:
-        uid = r.get("author_id")
-        if not uid: continue
-        totals[uid] = totals.get(uid, 0) + (r.get("skull_count") or 0)
-    top_user_name = "—"
-    top_user_count = 0
-    if totals:
-        top_uid, top_user_count = max(totals.items(), key=lambda x: x[1])
-        top_user_name = await resolve_display_name(interaction.guild, top_uid)
-
-    record = max(resp.data, key=lambda r: r.get("skull_count") or 0)
-    record_count = record.get("skull_count") or 0
-
-    embed = discord.Embed(title=f"📊 Stats de {interaction.guild.name}", color=0x8b5cf6)
-    if interaction.guild.icon:
-        embed.set_thumbnail(url=interaction.guild.icon.url)
-    embed.add_field(name="📌 Mensajes en el board", value=str(total_msgs),    inline=True)
-    embed.add_field(name="💀 Calaveras totales",     value=str(total_skulls), inline=True)
-    embed.add_field(name="🏆 Récord",                value=f"{record_count} 💀", inline=True)
-    embed.add_field(name="👑 Usuario más reaccionado", value=f"{top_user_name} · {top_user_count} 💀", inline=False)
-    embed.set_footer(text="Estadísticas globales del servidor")
+    embed = await _build_serverstats_embed(interaction.guild)
     await interaction.followup.send(embed=embed)
 
 @tree.command(name="top_month", description="Top mensajes más reaccionados del mes actual")
@@ -2252,6 +2170,7 @@ async def top_year_slash(interaction: discord.Interaction):
     await interaction.followup.send(embed=embed)
 
 @tree.command(name="resync", description="Resincroniza los conteos de 💀 con la realidad (admin)")
+@app_commands.default_permissions(administrator=True)
 async def resync_slash(interaction: discord.Interaction):
     if not await _is_admin_or_deny(interaction):
         return
@@ -2262,11 +2181,8 @@ async def resync_slash(interaction: discord.Interaction):
             description="Configura primero el canal del skullboard con `/set_channel`.",
             color=0xed4245
         ), ephemeral=True)
-    gid  = str(interaction.guild.id)
-    lock = _resync_guild_locks.setdefault(gid, asyncio.Lock())
-    if lock.locked():
-        return await interaction.response.send_message(embed=_resync_busy_embed(), ephemeral=True)
-    async with lock:
+    gid = str(interaction.guild.id)
+    async with await _resync_locks.acquire(gid):
         await interaction.response.defer()
         status = await interaction.followup.send(embed=discord.Embed(
             title="🔄 Resincronizando el skullboard",
@@ -2276,8 +2192,8 @@ async def resync_slash(interaction: discord.Interaction):
         res = await _resync_guild(interaction.guild, status)
         await status.edit(embed=_resync_result_embed(res))
 
-
 @tree.command(name="reset", description="Resetea el skullboard del servidor (solo el propietario)")
+@app_commands.default_permissions(administrator=True)
 async def reset_slash(interaction: discord.Interaction):
     if interaction.user.id != interaction.guild.owner_id:
         embed = discord.Embed(
