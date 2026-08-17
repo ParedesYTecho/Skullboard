@@ -3,12 +3,32 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SkullBoard · Bot de Discord</title>
-    <meta name="description" content="SkullBoard resalta los mensajes más reaccionados de tu servidor de Discord: un tablón de honor con las 💀 de tu comunidad, rankings y estadísticas.">
-    <meta property="og:title" content="SkullBoard · Bot de Discord">
-    <meta property="og:description" content="El starboard 💀 para tu servidor: resalta lo mejor, con rankings y estadísticas.">
+    <title>SkullBoard · El Starboard 💀 Definitivo para Discord</title>
+    <meta name="description" content="SkullBoard transforma las reacciones 💀 de tu comunidad en un tablón de honor automático con rankings mensuales, auto-pin de récords y estadísticas.">
+    <link rel="canonical" href="https://skullboard.vercel.app/">
+
+    <!-- Open Graph / Discord Embeds -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://skullboard.vercel.app/">
+    <meta property="og:site_name" content="SkullBoard">
+    <meta property="og:title" content="SkullBoard · El Starboard 💀 Definitivo para Discord">
+    <meta property="og:description" content="Destaca los mejores momentos de tu servidor con el Starboard de calaveras, leaderboards históricos y privacidad estricta.">
+    <meta property="og:image" content="https://skullboard.vercel.app/skullboard_icon.png">
+    <meta property="og:locale" content="es_ES">
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="SkullBoard · Bot de Discord">
+    <meta name="twitter:description" content="El Starboard 💀 para tu servidor: resalta lo mejor, con rankings y estadísticas.">
+    <meta name="twitter:image" content="https://skullboard.vercel.app/skullboard_icon.png">
+
     <meta name="theme-color" content="#0b0a10">
     <link rel="icon" type="image/png" href="skullboard_icon.png">
+
+    <!-- Google Fonts con Preconnect -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
     <script>document.documentElement.dataset.theme = localStorage.getItem('skb-theme') || 'dark';</script>
 </head>
@@ -234,6 +254,10 @@
     </div>
 
     <script>
+        const API_BASE = window.location.hostname.includes('localhost') 
+            ? 'http://localhost:8080' 
+            : 'https://skullboard-fqf1.onrender.com';
+
         const chips = document.querySelectorAll('.filter-chip');
         const cmds  = document.querySelectorAll('#cmd-grid .cmd');
         chips.forEach(chip => chip.addEventListener('click', () => {
@@ -243,9 +267,23 @@
             cmds.forEach(cmd => { cmd.hidden = cat !== 'all' && cmd.dataset.cat !== cat; });
         }));
 
-        // Expandir parámetros al pulsar una tarjeta de comando
-        document.querySelectorAll('#cmd-grid .cmd.has-params').forEach(c =>
-            c.addEventListener('click', () => c.classList.toggle('open')));
+        // Expandir parámetros al pulsar una tarjeta de comando (Accesible por Click y Teclado)
+        document.querySelectorAll('#cmd-grid .cmd.has-params').forEach(c => {
+            c.setAttribute('tabindex', '0');
+            c.setAttribute('role', 'button');
+            c.setAttribute('aria-expanded', 'false');
+            const toggle = () => {
+                const isOpen = c.classList.toggle('open');
+                c.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+            };
+            c.addEventListener('click', toggle);
+            c.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    toggle();
+                }
+            });
+        });
 
         // Toggle claro/oscuro
         document.getElementById('theme-toggle').addEventListener('click', () => {
@@ -254,43 +292,81 @@
             localStorage.setItem('skb-theme', next);
         });
 
-        // Stats en vivo (endpoint del bot, con cache 60s en el servidor)
-        fetch('https://skullboard-fqf1.onrender.com/api/stats')
-            .then(r => r.json())
-            .then(d => {
-                const fmt = n => (n == null ? '—' : n.toLocaleString('es-ES'));
-                document.getElementById('pill-servers').textContent = fmt(d.servers);
-                document.getElementById('stat-servers').textContent = fmt(d.servers);
-                document.getElementById('stat-highlighted').textContent = fmt(d.highlighted);
-            })
-            .catch(() => {});
+        // Stats en vivo con Timeout de 8 segundos (anti-bloqueo ante cold starts)
+        async function fetchStats() {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 8000);
+            try {
+                const res = await fetch(`${API_BASE}/api/stats`, { signal: controller.signal });
+                if (!res.ok) throw new Error('Respuesta no válida');
+                const d = await res.json();
+                const fmt = n => (n == null ? '—' : Number(n).toLocaleString('es-ES'));
+                if (d.servers != null) {
+                    document.getElementById('pill-servers').textContent = fmt(d.servers);
+                    document.getElementById('stat-servers').textContent = fmt(d.servers);
+                }
+                if (d.highlighted != null) {
+                    document.getElementById('stat-highlighted').textContent = fmt(d.highlighted);
+                }
+            } catch (err) {
+                // Mantiene silenciosamente el fallback '—' si el backend está iniciando
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+        fetchStats();
 
-        // Formulario de contacto
+        // Formulario de contacto resiliente
         const form = document.getElementById('contact-form');
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('c-submit');
             const status = document.getElementById('c-status');
+            const inputs = form.querySelectorAll('input, textarea, button');
             const body = {
-                name: form.name.value, email: form.email.value,
-                message: form.message.value, website: form.website.value
+                name: form.name.value.trim(),
+                email: form.email.value.trim(),
+                message: form.message.value.trim(),
+                website: form.website.value
             };
-            btn.disabled = true; status.className = 'form-msg'; status.textContent = 'Enviando…';
+
+            if (body.message.length < 5) {
+                status.className = 'form-msg err';
+                status.textContent = '❌ El mensaje debe tener al menos 5 caracteres.';
+                return;
+            }
+
+            inputs.forEach(el => el.disabled = true);
+            status.className = 'form-msg';
+            status.textContent = 'Enviando… (esto puede tomar unos segundos)';
+
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), 12000);
+
             try {
-                const r = await fetch('https://skullboard-fqf1.onrender.com/api/contact', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                const r = await fetch(`${API_BASE}/api/contact`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                    signal: controller.signal
                 });
                 const d = await r.json().catch(() => ({}));
                 if (r.ok && d.ok) {
-                    status.className = 'form-msg ok'; status.textContent = '✅ ¡Mensaje enviado! Te responderemos pronto.';
+                    status.className = 'form-msg ok';
+                    status.textContent = '✅ ¡Mensaje enviado! Te responderemos pronto.';
                     form.reset();
                 } else {
-                    status.className = 'form-msg err'; status.textContent = '❌ ' + (d.error || 'No se pudo enviar. Inténtalo más tarde.');
+                    status.className = 'form-msg err';
+                    status.textContent = '❌ ' + (d.error || 'No se pudo enviar. Inténtalo más tarde.');
                 }
-            } catch {
-                status.className = 'form-msg err'; status.textContent = '❌ Error de conexión. Inténtalo más tarde.';
+            } catch (err) {
+                status.className = 'form-msg err';
+                status.textContent = err.name === 'AbortError'
+                    ? '❌ El servidor tardó en responder. Inténtalo de nuevo en un momento.'
+                    : '❌ Error de conexión. Inténtalo más tarde.';
             } finally {
-                btn.disabled = false;
+                clearTimeout(timer);
+                inputs.forEach(el => el.disabled = false);
             }
         });
     </script>

@@ -31,6 +31,7 @@ OWNER_ID    = int(os.getenv("BOT_OWNER_ID", "561225979389804544"))
 skull_emoji = '💀'
 
 # ─── Gestores de Concurrencia y Cachés en memoria ─────────────────────────────
+# ─── Gestores de Concurrencia y Cachés en memoria ─────────────────────────────
 class KeyedAsyncLock:
     """Gestor de locks por clave seguro contra cancelaciones y con desalojo automático."""
     def __init__(self):
@@ -39,34 +40,44 @@ class KeyedAsyncLock:
         self._guard = asyncio.Lock()
 
     async def acquire(self, key: str):
-        key_str = str(key)
-        async with self._guard:
-            if key_str not in self._locks:
-                self._locks[key_str] = asyncio.Lock()
-                self._counts[key_str] = 0
-            self._counts[key_str] += 1
-            lock = self._locks[key_str]
-        return _KeyedLockContext(self, key_str, lock)
+        return _KeyedLockContext(self, str(key))
 
 class _KeyedLockContext:
-    def __init__(self, manager: KeyedAsyncLock, key: str, lock: asyncio.Lock):
+    def __init__(self, manager: KeyedAsyncLock, key: str):
         self._manager = manager
         self._key = key
-        self._lock = lock
+        self._lock: Optional[asyncio.Lock] = None
+        self._acquired = False
 
     async def __aenter__(self):
-        await self._lock.acquire()
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        async with self._manager._guard:
+            if self._key not in self._manager._locks:
+                self._manager._locks[self._key] = asyncio.Lock()
+                self._manager._counts[self._key] = 0
+            self._manager._counts[self._key] += 1
+            self._lock = self._manager._locks[self._key]
+        
         try:
-            self._lock.release()
-        finally:
+            await self._lock.acquire()
+            self._acquired = True
+            return self
+        except BaseException:
+            # Si se cancela mientras esperaba el lock, decrementar y desalojar
             async with self._manager._guard:
                 self._manager._counts[self._key] -= 1
                 if self._manager._counts[self._key] <= 0:
                     self._manager._locks.pop(self._key, None)
                     self._manager._counts.pop(self._key, None)
+            raise
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self._acquired and self._lock:
+            self._lock.release()
+        async with self._manager._guard:
+            self._manager._counts[self._key] -= 1
+            if self._manager._counts[self._key] <= 0:
+                self._manager._locks.pop(self._key, None)
+                self._manager._counts.pop(self._key, None)
 
 class MessageDebouncer:
     """Debouncer que rastrea la versión de la tarea para evitar descarte prematuro de timers."""
@@ -111,7 +122,32 @@ SPANISH_MONTHS = {
     7: "julio", 8: "agosto", 9: "septiembre", 10: "octubre", 11: "noviembre", 12: "diciembre"
 }
 
+# ─── Decorador de Reintento con Exponential Backoff y Jitter ─────────────────
+def db_retry(max_retries: int = 3, base_delay: float = 0.3, max_delay: float = 2.0):
+    """Reintenta automáticamente llamadas asíncronas ante microcortes o fallos transitorios."""
+    def decorator(func):
+        async def wrapper(*args, **kwargs):
+            delay = base_delay
+            last_exc = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return await func(*args, **kwargs)
+                except Exception as e:
+                    last_exc = e
+                    if attempt == max_retries:
+                        logger.error(f"❌ [DB Retry] Falló tras {max_retries} intentos ({func.__name__}): {e}")
+                        raise
+                    jitter = random.uniform(0.8, 1.2)
+                    sleep_time = min(delay * jitter, max_delay)
+                    logger.warning(f"⚠️ [DB Retry] Intento {attempt}/{max_retries} en {func.__name__} falló: {e}. Reintentando en {sleep_time:.2f}s...")
+                    await asyncio.sleep(sleep_time)
+                    delay *= 2
+            raise last_exc
+        return wrapper
+    return decorator
+
 # ─── Wrappers Async ───────────────────────────────────────────────────────────
+@db_retry(max_retries=3, base_delay=0.3)
 async def db_select(table: str, match_col: str, match_val: str, select_cols: str = "*"):
     try:
         return await supabase.table(table).select(select_cols).eq(match_col, match_val).execute()
@@ -119,6 +155,7 @@ async def db_select(table: str, match_col: str, match_val: str, select_cols: str
         logger.error(f"Error en db_select ({table}.{match_col}={match_val}): {e}")
         raise
 
+@db_retry(max_retries=3, base_delay=0.3)
 async def db_insert(table: str, data: dict):
     try:
         return await supabase.table(table).insert(data).execute()
@@ -126,6 +163,7 @@ async def db_insert(table: str, data: dict):
         logger.error(f"Error en db_insert en tabla {table}: {e}")
         raise
 
+@db_retry(max_retries=3, base_delay=0.3)
 async def db_update(table: str, updates: dict, match_col: str, match_val: str):
     try:
         return await supabase.table(table).update(updates).eq(match_col, match_val).execute()
@@ -133,6 +171,7 @@ async def db_update(table: str, updates: dict, match_col: str, match_val: str):
         logger.error(f"Error en db_update ({table}.{match_col}={match_val}): {e}")
         raise
 
+@db_retry(max_retries=3, base_delay=0.3)
 async def db_upsert(table: str, data: dict):
     try:
         return await supabase.table(table).upsert(data).execute()
@@ -345,21 +384,29 @@ bot  = SkullBot(command_prefix=get_prefix, intents=intents, help_command=None, t
 tree = bot.tree
 
 async def get_formatted_prefix(ctx_or_interaction) -> str:
-    cfg = await get_guild_config(ctx_or_interaction.guild.id)
+    guild = getattr(ctx_or_interaction, "guild", None)
+    if guild is None:
+        return "sk!"
+    cfg = await get_guild_config(guild.id)
     return cfg.get("prefix", "sk!")
 
 # ─── Status Loop ──────────────────────────────────────────────────────────────
 @tasks.loop(minutes=5)
 async def status_loop():
     await bot.wait_until_ready()
-    activities = [
-        discord.Activity(type=discord.ActivityType.watching, name=f"{len(bot.guilds)} servidores"),
-        discord.Game(name="💀 SkullBoard"),
-        discord.Activity(type=discord.ActivityType.listening, name="Board Calaverosa")
-    ]
-    for activity in activities:
-        await bot.change_presence(activity=activity)
-        await asyncio.sleep(60)
+    try:
+        activities = [
+            discord.Activity(type=discord.ActivityType.watching, name=f"{len(bot.guilds)} servidores"),
+            discord.Game(name="💀 SkullBoard"),
+            discord.Activity(type=discord.ActivityType.listening, name="Board Calaverosa")
+        ]
+        for activity in activities:
+            if bot.is_closed():
+                break
+            await bot.change_presence(activity=activity)
+            await asyncio.sleep(60)
+    except Exception as e:
+        logger.warning(f"⚠️ Error en status_loop (se reintentará en la siguiente iteración): {e}")
 
 # ─── Utilidades ───────────────────────────────────────────────────────────────
 def formatear_fecha(fecha: datetime) -> str:
@@ -1553,157 +1600,159 @@ async def resync_cmd(ctx):
 
 # ─── Comandos privados del owner (BACKFILL IDs PURAS - 1 a 1) ─────────────────────────
 @bot.command(name="backfill", hidden=True)
+@commands.guild_only()
 async def backfill_cmd(ctx):
     if await _deny_if_not_owner(ctx):
         return
 
     gid = str(ctx.guild.id)
-    cfg = await get_guild_config(ctx.guild.id)
-    sb_channel_id = cfg.get("skullboard_channel_id")
+    async with await _resync_locks.acquire(gid):
+        cfg = await get_guild_config(ctx.guild.id)
+        sb_channel_id = cfg.get("skullboard_channel_id")
 
-    if not sb_channel_id:
-        return await ctx.send(embed=discord.Embed(
-            title="❌ Error", description="No hay canal skullboard configurado en este servidor.", color=0xed4245
-        ))
-
-    channel = bot.get_channel(sb_channel_id)
-    if not channel:
-        try:
-            channel = await bot.fetch_channel(sb_channel_id)
-        except Exception:
-            channel = None
-    if not channel:
-        return await ctx.send(embed=discord.Embed(
-            title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245
-        ))
-
-    msg_status = await ctx.send(embed=discord.Embed(
-        title="⏳ Paso 1/3 — Recopilando enlaces...",
-        description="Buscando los enlaces de todos los mensajes en el canal...",
-        color=0x8b5cf6
-    ))
-
-    enlaces = {}
-    leidos = 0
-
-    # PASO 1: Extraer solo los enlaces de los mensajes del board
-    async for sb_msg in channel.history(limit=None, oldest_first=False):
-        if not sb_msg.author.bot: continue 
-        if not sb_msg.embeds: continue
-
-        emb = sb_msg.embeds[0]
-        embed_str = str(emb.to_dict())
-        
-        match_msg = re.search(r'discord\.com/channels/\d+/(\d+)/(\d+)', embed_str)
-        if match_msg:
-            orig_chan_id = int(match_msg.group(1))
-            orig_msg_id = match_msg.group(2)
-            
-            count = 0
-            nums = re.findall(r'\d+', sb_msg.content)
-            if nums: count = int(nums[0])
-            
-            fallback_author = None
-            if emb.author and emb.author.icon_url:
-                match_auth = re.search(r'(?:avatars|users)/(\d+)/', str(emb.author.icon_url))
-                if match_auth: fallback_author = match_auth.group(1)
-
-            enlaces[orig_msg_id] = {
-                "sb_msg_id": str(sb_msg.id),
-                "orig_chan_id": orig_chan_id,
-                "count_fallback": count,
-                "author_fallback": fallback_author
-            }
-        leidos += 1
-
-    await msg_status.edit(embed=discord.Embed(
-        title="⏳ Paso 2/3 — Obteniendo IDs Puras...",
-        description=f"Se extrajeron {len(enlaces)} enlaces.\nVisitando los mensajes originales para sacar la ID real... ☕ (Iremos lento para que Discord no nos bloquee)",
-        color=0x8b5cf6
-    ))
-
-    registros_dict = {}
-    procesados = 0
-    errores_borrados = 0
-
-    # PASO 2: Fetch seguro
-    for orig_msg_id, data in enlaces.items():
-        author_id = data["author_fallback"]
-        count = data["count_fallback"]
-        
-        try:
-            orig_chan = bot.get_channel(data["orig_chan_id"])
-            if orig_chan is None:
-                orig_chan = await bot.fetch_channel(data["orig_chan_id"])
-            if orig_chan:
-                orig_msg = await orig_chan.fetch_message(int(orig_msg_id))
-                author_id = str(orig_msg.author.id)
-                
-                skull_reac = next((r for r in orig_msg.reactions if str(r.emoji) == skull_emoji), None)
-                if skull_reac: count = skull_reac.count
-        except discord.NotFound:
-            errores_borrados += 1
-        except Exception:
-            pass
-        
-        if author_id:
-            if orig_msg_id in registros_dict:
-                if count > registros_dict[orig_msg_id]["skull_count"]:
-                    registros_dict[orig_msg_id]["skull_count"] = count
-                    registros_dict[orig_msg_id]["skullboard_message_id"] = data["sb_msg_id"]
-            else:
-                registros_dict[orig_msg_id] = {
-                    "message_id": str(orig_msg_id),
-                    "skullboard_message_id": data["sb_msg_id"],
-                    "skull_count": count,
-                    "author_id": str(author_id),
-                    "guild_id": gid
-                }
-
-        procesados += 1
-        if procesados % 30 == 0:
-            await msg_status.edit(embed=discord.Embed(
-                title="⏳ Paso 2/3 — Obteniendo IDs Puras...",
-                description=f"Progreso: **{procesados}/{len(enlaces)}** mensajes procesados...",
-                color=0x8b5cf6
+        if not sb_channel_id:
+            return await ctx.send(embed=discord.Embed(
+                title="❌ Error", description="No hay canal skullboard configurado en este servidor.", color=0xed4245
             ))
-        
-        await asyncio.sleep(0.5)
 
-    registros_a_subir = list(registros_dict.values())
+        channel = bot.get_channel(sb_channel_id)
+        if not channel:
+            try:
+                channel = await bot.fetch_channel(sb_channel_id)
+            except Exception:
+                channel = None
+        if not channel:
+            return await ctx.send(embed=discord.Embed(
+                title="❌ Error", description="No se encontró el canal skullboard.", color=0xed4245
+            ))
 
-    await msg_status.edit(embed=discord.Embed(
-        title="⏳ Paso 3/3 — Subiendo a BD...",
-        description=f"Guardando **{len(registros_a_subir)}** IDs en Supabase por lotes optimizados...",
-        color=0x8b5cf6
-    ))
+        msg_status = await ctx.send(embed=discord.Embed(
+            title="⏳ Paso 1/3 — Recopilando enlaces...",
+            description="Buscando los enlaces de todos los mensajes en el canal...",
+            color=0x8b5cf6
+        ))
 
-    # PASO 3: Subir a Supabase en Lotes de 100 (Atómico y 100x más rápido)
-    exitosos = 0
-    errores_db = 0
-    BATCH_SIZE = 100
-    for i in range(0, len(registros_a_subir), BATCH_SIZE):
-        lote = registros_a_subir[i:i + BATCH_SIZE]
-        try:
-            await supabase.table("tracked_messages").upsert(lote).execute()
-            exitosos += len(lote)
-        except Exception as e:
-            logger.error(f"Error subiendo lote de backfill ({i}-{i+len(lote)}): {e}")
-            errores_db += len(lote)
-        await asyncio.sleep(0.1)
+        enlaces = {}
+        leidos = 0
 
-    _guild_record_cache.pop(gid, None)  # Invalidate record cache
-    await msg_status.edit(embed=discord.Embed(
-        title="✅ Backfill de IDs Completado",
-        description=(
-            f"📖 Mensajes leídos: **{leidos}**\n"
-            f"🛡️ Guardados con éxito: **{exitosos}**\n"
-            f"⚠️ Originales borrados (usado fallback): **{errores_borrados}**\n"
-            f"❌ Conflictos de BD ignorados: **{errores_db}**\n\n"
-            "**¡Listo! Base de datos limpia y asignada a las IDs inmutables.**"
-        ),
-        color=0x57f287
-    ))
+        # PASO 1: Extraer solo los enlaces de los mensajes del board
+        async for sb_msg in channel.history(limit=None, oldest_first=False):
+            if not sb_msg.author.bot: continue 
+            if not sb_msg.embeds: continue
+
+            emb = sb_msg.embeds[0]
+            embed_str = str(emb.to_dict())
+            
+            match_msg = re.search(r'discord\.com/channels/\d+/(\d+)/(\d+)', embed_str)
+            if match_msg:
+                orig_chan_id = int(match_msg.group(1))
+                orig_msg_id = match_msg.group(2)
+                
+                count = 0
+                nums = re.findall(r'\d+', sb_msg.content)
+                if nums: count = int(nums[0])
+                
+                fallback_author = None
+                if emb.author and emb.author.icon_url:
+                    match_auth = re.search(r'(?:avatars|users)/(\d+)/', str(emb.author.icon_url))
+                    if match_auth: fallback_author = match_auth.group(1)
+
+                enlaces[orig_msg_id] = {
+                    "sb_msg_id": str(sb_msg.id),
+                    "orig_chan_id": orig_chan_id,
+                    "count_fallback": count,
+                    "author_fallback": fallback_author
+                }
+            leidos += 1
+
+        await msg_status.edit(embed=discord.Embed(
+            title="⏳ Paso 2/3 — Obteniendo IDs Puras...",
+            description=f"Se extrajeron {len(enlaces)} enlaces.\nVisitando los mensajes originales para sacar la ID real... ☕ (Iremos lento para que Discord no nos bloquee)",
+            color=0x8b5cf6
+        ))
+
+        registros_dict = {}
+        procesados = 0
+        errores_borrados = 0
+
+        # PASO 2: Fetch seguro
+        for orig_msg_id, data in enlaces.items():
+            author_id = data["author_fallback"]
+            count = data["count_fallback"]
+            
+            try:
+                orig_chan = bot.get_channel(data["orig_chan_id"])
+                if orig_chan is None:
+                    orig_chan = await bot.fetch_channel(data["orig_chan_id"])
+                if orig_chan:
+                    orig_msg = await orig_chan.fetch_message(int(orig_msg_id))
+                    author_id = str(orig_msg.author.id)
+                    
+                    skull_reac = next((r for r in orig_msg.reactions if str(r.emoji) == skull_emoji), None)
+                    if skull_reac: count = skull_reac.count
+            except discord.NotFound:
+                errores_borrados += 1
+            except Exception:
+                pass
+            
+            if author_id:
+                if orig_msg_id in registros_dict:
+                    if count > registros_dict[orig_msg_id]["skull_count"]:
+                        registros_dict[orig_msg_id]["skull_count"] = count
+                        registros_dict[orig_msg_id]["skullboard_message_id"] = data["sb_msg_id"]
+                else:
+                    registros_dict[orig_msg_id] = {
+                        "message_id": str(orig_msg_id),
+                        "skullboard_message_id": data["sb_msg_id"],
+                        "skull_count": count,
+                        "author_id": str(author_id),
+                        "guild_id": gid
+                    }
+
+            procesados += 1
+            if procesados % 30 == 0:
+                await msg_status.edit(embed=discord.Embed(
+                    title="⏳ Paso 2/3 — Obteniendo IDs Puras...",
+                    description=f"Progreso: **{procesados}/{len(enlaces)}** mensajes procesados...",
+                    color=0x8b5cf6
+                ))
+            
+            await asyncio.sleep(0.5)
+
+        registros_a_subir = list(registros_dict.values())
+
+        await msg_status.edit(embed=discord.Embed(
+            title="⏳ Paso 3/3 — Subiendo a BD...",
+            description=f"Guardando **{len(registros_a_subir)}** IDs en Supabase por lotes optimizados...",
+            color=0x8b5cf6
+        ))
+
+        # PASO 3: Subir a Supabase en Lotes de 100 (Atómico y 100x más rápido)
+        exitosos = 0
+        errores_db = 0
+        BATCH_SIZE = 100
+        for i in range(0, len(registros_a_subir), BATCH_SIZE):
+            lote = registros_a_subir[i:i + BATCH_SIZE]
+            try:
+                await supabase.table("tracked_messages").upsert(lote).execute()
+                exitosos += len(lote)
+            except Exception as e:
+                logger.error(f"Error subiendo lote de backfill ({i}-{i+len(lote)}): {e}")
+                errores_db += len(lote)
+            await asyncio.sleep(0.1)
+
+        _guild_record_cache.pop(gid, None)  # Invalidate record cache
+        await msg_status.edit(embed=discord.Embed(
+            title="✅ Backfill de IDs Completado",
+            description=(
+                f"📖 Mensajes leídos: **{leidos}**\n"
+                f"🛡️ Guardados con éxito: **{exitosos}**\n"
+                f"⚠️ Originales borrados (usado fallback): **{errores_borrados}**\n"
+                f"❌ Conflictos de BD ignorados: **{errores_db}**\n\n"
+                "**¡Listo! Base de datos limpia y asignada a las IDs inmutables.**"
+            ),
+            color=0x57f287
+        ))
     
 def _build_announce_embed() -> discord.Embed:
     return discord.Embed(

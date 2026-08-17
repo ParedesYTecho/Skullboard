@@ -1,5 +1,4 @@
 /* ====== SkullBoard · Design System ====== */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Manrope:wght@500;600;700;800&display=swap');
 
 :root {
     --bg: #0a0a0c;
@@ -15,7 +14,7 @@
     --glow: rgba(255,255,255, 0.35);
     --ink: #ededf2;
     --ink-soft: #adadb8;
-    --ink-dim: #76767f;
+    --ink-dim: #8e8e99; /* Optimizado para contraste WCAG AA */
     --good: #34d399;
     --bad: #fb7185;
     --admin: #b7b7c2;
@@ -231,14 +230,6 @@ svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColo
 }
 .cta-band h2 { font-family: var(--display); font-size: clamp(1.6rem, 4vw, 2.2rem); font-weight: 700; letter-spacing: -.5px; }
 .cta-band p { color: var(--ink-soft); margin: 12px auto 26px; max-width: 480px; }
-
-/* ====== Footer ====== */
-footer.site { margin-top: 70px; padding-top: 30px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
-footer.site .f-brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink-soft); font-family: var(--display); font-weight: 600; }
-footer.site .f-brand .mark { width: 24px; height: 24px; color: var(--violet-2); }
-footer.site .f-links { display: flex; gap: 18px; }
-footer.site .f-links a { color: var(--ink-soft); font-size: 0.9rem; }
-footer.site .f-links a:hover { color: var(--ink); }
 
 /* ====== Doc pages (privacy / terms) — sin cambios ====== */
 .doc-head {

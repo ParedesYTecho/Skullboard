@@ -74,11 +74,17 @@ def _cors(resp):
     return resp
 
 def _get_real_ip() -> str:
+    cf_ip = request.headers.get("CF-Connecting-IP")
+    if cf_ip:
+        return cf_ip.strip()
+    real_ip = request.headers.get("X-Real-IP")
+    if real_ip:
+        return real_ip.strip()
     xff = request.headers.get("X-Forwarded-For")
     if xff:
         ips = [i.strip() for i in xff.split(",") if i.strip()]
         if ips:
-            return ips[-1]
+            return ips[0]
     return request.remote_addr or "127.0.0.1"
 
 @app.route('/')
@@ -91,21 +97,28 @@ def index():
 @app.route('/api/stats')
 def api_stats():
     now = time.time()
+    needs_refresh = False
     with _stats_lock:
         cached = _stats_cache["data"]
-        if now - _stats_cache["ts"] < _STATS_TTL and cached["servers"] is not None:
+        if now - _stats_cache["ts"] >= _STATS_TTL or cached["servers"] is None:
+            needs_refresh = True
             data = cached
         else:
-            try:
-                srv = _sb_count("settings")
-                hl  = _sb_count("tracked_messages")
-                data = {"servers": srv, "highlighted": hl}
-                if srv is not None:
-                    _stats_cache["ts"] = now
-                    _stats_cache["data"] = data
-            except Exception as e:
-                print(f"⚠️ /api/stats error: {e}")
-                data = cached
+            data = cached
+
+    if needs_refresh:
+        try:
+            # Las llamadas HTTP se hacen FUERA del lock principal
+            srv = _sb_count("settings")
+            hl  = _sb_count("tracked_messages")
+            if srv is not None:
+                new_data = {"servers": srv, "highlighted": hl}
+                with _stats_lock:
+                    _stats_cache["ts"] = time.time()
+                    _stats_cache["data"] = new_data
+                data = new_data
+        except Exception as e:
+            print(f"⚠️ /api/stats error: {e}")
 
     resp = app.response_class(json.dumps(data), mimetype="application/json")
     resp.headers["Access-Control-Allow-Origin"] = "*"
@@ -147,6 +160,7 @@ def api_contact():
             return _cors(jsonify(ok=False, error="Servidor ocupado. Inténtalo en un momento.")), 429
 
         _contact_last[ip] = now
+        _contact_last.move_to_end(ip)
         _global_contact_history.append(now)
 
         if len(_contact_last) > _MAX_CONTACT_IPS:
@@ -259,12 +273,15 @@ def callback():
         if not access_token:
             return "❌ No se pudo obtener el token de acceso.", 400
 
-        user_info = requests.get(
+        user_res = requests.get(
             "https://discord.com/api/users/@me",
             headers={"Authorization": f"Bearer {access_token}"},
             timeout=8
-        ).json()
-    except requests.RequestException as e:
+        )
+        if user_res.status_code != 200:
+            return "❌ Error al obtener la información de usuario de Discord.", 400
+        user_info = user_res.json()
+    except (requests.RequestException, ValueError, Exception) as e:
         print(f"⚠️ Error de red OAuth2: {e}")
         return "❌ Error al contactar con Discord. Inténtalo más tarde.", 502
 
