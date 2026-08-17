@@ -48,6 +48,26 @@
             <p>Todas las novedades y correcciones del bot, de lo más reciente a lo más antiguo.</p>
         </div>
 
+        <div class="chg-month">Agosto 2026</div>
+
+        <article class="chg">
+            <div class="date">17/08/2026</div>
+            <h3>Súper Auditoría 360°, Motor Supabase RPC y Resiliencia Total</h3>
+            <span class="chg-tag new">Nuevo</span>
+            <ul>
+                <li><strong>Motor de Consultas PostgreSQL (RPCs):</strong> Tablas de clasificación, estadísticas de servidor y rankings mensuales/anuales ahora se calculan directamente en la base de datos a alta velocidad con agregación nativa.</li>
+                <li><strong>Resiliencia Automática (<code>@db_retry</code>):</strong> Sistema de reintentos con <em>exponential backoff</em> y <em>jitter</em> para mantener la conectividad del bot ante microcortes o caídas transitorias de red.</li>
+                <li><strong>Accesibilidad y Navegación por Teclado:</strong> Toda la lista de comandos de la web ahora es interactiva mediante teclado (<code>Tab</code>, <code>Enter</code>, <code>Espacio</code>) con soporte completo para lectores de pantalla.</li>
+            </ul>
+            <span class="chg-tag fix">Correcciones y Seguridad</span>
+            <ul>
+                <li><strong>Concurrencia Blindada:</strong> Nuevo gestor <code>KeyedAsyncLock</code> inmune a cancelaciones de tareas y debouncer generacional de reacciones sin colisiones.</li>
+                <li><strong>Seguridad OAuth2 y Contacto:</strong> Validación anti-CSRF estricta con token <code>state</code> obligatorio, protección contra inyección CRLF/XSS y limitador de tasa inteligente con memoria LRU.</li>
+                <li><strong>Rendimiento Web sin Bloqueos:</strong> Integración de <code>AbortController</code> (timeouts automáticos) en las llamadas a la API y carga optimizada de fuentes con <code>preconnect</code> que acelera la pintura inicial.</li>
+                <li><strong>Cero Límite en Calaveras:</strong> Ampliada la columna de conteo a <code>INTEGER</code> en base de datos, eliminando la antigua restricción de 32,767 calaveras por mensaje.</li>
+            </ul>
+        </article>
+
         <div class="chg-month">Julio 2026</div>
 
         <article class="chg">
