@@ -407,9 +407,9 @@ async def build_ajustes_embed(guild_id) -> discord.Embed:
     return embed
 
 # ─── Dashboard & Web Links ───────────────────────────────────────────────────
-DASHBOARD_URL = "https://paredesytecho.github.io/index.html"
-PRIVACY_URL   = "https://paredesytecho.github.io/privacy.html"
-TERMS_URL     = "https://paredesytecho.github.io/terms.html"
+DASHBOARD_URL = "https://skullboard.vercel.app/index.html"
+PRIVACY_URL   = "https://skullboard.vercel.app/privacy.html"
+TERMS_URL     = "https://skullboard.vercel.app/terms.html"
 
 class DashboardView(discord.ui.View):
     def __init__(self):
@@ -424,7 +424,7 @@ def build_dashboard_embed() -> discord.Embed:
         description=(
             "Accede a la web oficial de **SkullBoard** para ver las características completas, "
             "documentación legal y panel informativo.\n\n"
-            f"• 🏠 **Web oficial:** [paredesytecho.github.io]({DASHBOARD_URL})\n"
+            f"• 🏠 **Web oficial:** [skullboard.vercel.app]({DASHBOARD_URL})\n"
             f"• 🔒 **Política de Privacidad:** [Ver política]({PRIVACY_URL})\n"
             f"• 📋 **Términos de Servicio:** [Ver términos]({TERMS_URL})\n"
             f"• 🔗 **Invitar al bot:** [Enlace directo]({get_invite_url()})"
