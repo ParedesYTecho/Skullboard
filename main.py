@@ -406,6 +406,34 @@ async def build_ajustes_embed(guild_id) -> discord.Embed:
     embed.add_field(name="🔗 Invitar",  value=f"[Invitar SkullBoard]({get_invite_url()})",                       inline=False)
     return embed
 
+# ─── Dashboard & Web Links ───────────────────────────────────────────────────
+DASHBOARD_URL = "https://paredesytecho.github.io/index.html"
+PRIVACY_URL   = "https://paredesytecho.github.io/privacy.html"
+TERMS_URL     = "https://paredesytecho.github.io/terms.html"
+
+class DashboardView(discord.ui.View):
+    def __init__(self):
+        super().__init__()
+        self.add_item(discord.ui.Button(label="🌐 Panel Web", url=DASHBOARD_URL, style=discord.ButtonStyle.link))
+        self.add_item(discord.ui.Button(label="🔒 Privacidad", url=PRIVACY_URL, style=discord.ButtonStyle.link))
+        self.add_item(discord.ui.Button(label="📋 Términos", url=TERMS_URL, style=discord.ButtonStyle.link))
+
+def build_dashboard_embed() -> discord.Embed:
+    embed = discord.Embed(
+        title="🌐 Panel Web & Recursos — SkullBoard",
+        description=(
+            "Accede a la web oficial de **SkullBoard** para ver las características completas, "
+            "documentación legal y panel informativo.\n\n"
+            f"• 🏠 **Web oficial:** [paredesytecho.github.io]({DASHBOARD_URL})\n"
+            f"• 🔒 **Política de Privacidad:** [Ver política]({PRIVACY_URL})\n"
+            f"• 📋 **Términos de Servicio:** [Ver términos]({TERMS_URL})\n"
+            f"• 🔗 **Invitar al bot:** [Enlace directo]({get_invite_url()})"
+        ),
+        color=0x8b5cf6
+    )
+    embed.set_footer(text="SkullBoard · Bot de Discord comunitario · 💀")
+    return embed
+
 # ─── Help paginado (slash) ────────────────────────────────────────────────────
 class HelpView(discord.ui.View):
     def __init__(self, pages: list):
@@ -446,10 +474,11 @@ def build_slash_help_pages() -> list:
     footer_admin = "🔒 Requiere permisos de administrador"
 
     p1 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 1 de 4 · General", color=0x8b5cf6)
-    p1.add_field(name="/ajustes", value="⚙️ Ver configuración actual", inline=True)
-    p1.add_field(name="/ping",    value="🏓 Latencia del bot",          inline=True)
-    p1.add_field(name="/invite",  value="🔗 Enlace de invitación",      inline=True)
-    p1.add_field(name="/notify",  value="📬 Activa/desactiva tus DMs",   inline=True)
+    p1.add_field(name="/ajustes",   value="⚙️ Ver configuración actual", inline=True)
+    p1.add_field(name="/dashboard", value="🌐 Panel web y recursos",      inline=True)
+    p1.add_field(name="/ping",      value="🏓 Latencia del bot",          inline=True)
+    p1.add_field(name="/invite",    value="🔗 Enlace de invitación",      inline=True)
+    p1.add_field(name="/notify",    value="📬 Activa/desactiva tus DMs",   inline=True)
     p1.set_footer(text=footer_nav)
 
     p2 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 2 de 4 · Skullboard", color=0x8b5cf6)
@@ -824,6 +853,13 @@ async def invite(ctx):
     embed.set_footer(text=f"Más de {len(bot.guilds)} servidores confían en SkullBoard")
     await ctx.send(embed=embed)
 
+@bot.command(name="dashboard", aliases=["web", "panel"])
+@commands.guild_only()
+async def dashboard_cmd(ctx):
+    embed = build_dashboard_embed()
+    view  = DashboardView()
+    await ctx.send(embed=embed, view=view)
+
 @bot.command(name="help", aliases=["ayuda", "comandos"])
 @commands.guild_only()
 async def help_cmd(ctx):
@@ -832,10 +868,11 @@ async def help_cmd(ctx):
     footer_admin = "🔒 Requiere permisos de administrador"
 
     p1 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 1 de 4 · General", color=0x8b5cf6)
-    p1.add_field(name=f"{p}ajustes", value="⚙️ Ver configuración actual", inline=True)
-    p1.add_field(name=f"{p}ping",    value="🏓 Latencia del bot",          inline=True)
-    p1.add_field(name=f"{p}invite",  value="🔗 Enlace de invitación",      inline=True)
-    p1.add_field(name=f"{p}notify",  value="📬 Activa/desactiva tus DMs",   inline=True)
+    p1.add_field(name=f"{p}ajustes",   value="⚙️ Ver configuración actual", inline=True)
+    p1.add_field(name=f"{p}dashboard", value="🌐 Panel web y recursos",      inline=True)
+    p1.add_field(name=f"{p}ping",      value="🏓 Latencia del bot",          inline=True)
+    p1.add_field(name=f"{p}invite",    value="🔗 Enlace de invitación",      inline=True)
+    p1.add_field(name=f"{p}notify",    value="📬 Activa/desactiva tus DMs",   inline=True)
     p1.set_footer(text=footer_nav)
 
     p2 = discord.Embed(title="📖 Lista de comandos — SkullBoard", description="Página 2 de 4 · Skullboard", color=0x8b5cf6)
@@ -1878,6 +1915,12 @@ async def invite_slash(interaction: discord.Interaction):
     embed.add_field(name="🔗 Invitar al servidor", value=f"[Haz click aquí para invitarme]({get_invite_url()})", inline=False)
     embed.set_footer(text=f"Más de {len(bot.guilds)} servidores confían en SkullBoard")
     await interaction.response.send_message(embed=embed)
+
+@tree.command(name="dashboard", description="Enlace a la web oficial y recursos de SkullBoard")
+async def dashboard_slash(interaction: discord.Interaction):
+    embed = build_dashboard_embed()
+    view  = DashboardView()
+    await interaction.response.send_message(embed=embed, view=view)
 
 @tree.command(name="help", description="Muestra los comandos disponibles del bot")
 async def help_slash(interaction: discord.Interaction):

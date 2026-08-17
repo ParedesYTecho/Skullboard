@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkullBoard · Cambios</title>
+    <meta name="description" content="Historial de cambios y novedades del bot SkullBoard.">
+    <link rel="icon" type="image/png" href="skullboard_icon.png">
+    <link rel="stylesheet" href="styles.css">
+    <script>document.documentElement.dataset.theme = localStorage.getItem('skb-theme') || 'dark';</script>
+</head>
+<body>
+    <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+            <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></symbol>
+            <symbol id="i-discord" viewBox="0 0 24 24"><path d="M19.3 5.6A17 17 0 0 0 15 4.3l-.2.4a13 13 0 0 1 3.7 1.9 12 12 0 0 0-10.9 0 13 13 0 0 1 3.7-1.9L11 4.3A17 17 0 0 0 6.7 5.6C4 9.6 3.3 13.5 3.6 17.3a17 17 0 0 0 5.2 2.6l.6-1a11 11 0 0 1-1.8-.9l.4-.3a12 12 0 0 0 10 0l.4.3c-.6.4-1.2.7-1.8.9l.6 1a17 17 0 0 0 5.2-2.6c.4-4.4-.6-8.3-3.1-11.7ZM9.5 15c-.9 0-1.6-.8-1.6-1.9 0-1 .7-1.9 1.6-1.9s1.7.9 1.6 1.9c0 1.1-.7 1.9-1.6 1.9Zm5 0c-.9 0-1.6-.8-1.6-1.9 0-1 .7-1.9 1.6-1.9s1.7.9 1.6 1.9c0 1.1-.7 1.9-1.6 1.9Z" fill="currentColor" stroke="none"/></symbol>
+        </defs>
+    </svg>
+
+    <nav class="nav">
+        <a class="brand" href="index.html"><span class="mark">💀</span> SkullBoard</a>
+        <div class="nav-links">
+            <a href="index.html#comandos">Comandos</a>
+            <a href="cambios.html">Cambios</a>
+            <a href="privacy.html">Privacidad</a>
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
+                <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
+            </button>
+            <a class="btn btn-primary btn-sm nav-cta" href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">
+                <svg><use href="#i-discord"/></svg> Añadir a Discord
+            </a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="section-head" style="margin-top:56px">
+            <span class="kicker">Historial</span>
+            <h2>Cambios</h2>
+            <p>Todas las novedades y correcciones del bot, de lo más reciente a lo más antiguo.</p>
+        </div>
+
+        <div class="chg-month">Julio 2026</div>
+
+        <article class="chg">
+            <div class="date">14/07/2026</div>
+            <h3>Nueva web, comandos y estadísticas en vivo</h3>
+            <span class="chg-tag new">Nuevo</span>
+            <ul>
+                <li>Web rediseñada con buscador de comandos por categoría, modo claro/oscuro y páginas de Términos y Privacidad.</li>
+                <li>Contador en vivo de servidores y de mensajes destacados en la portada.</li>
+                <li>Comando <code>sk!stats</code> (antes solo estaba <code>/stats</code>).</li>
+            </ul>
+            <span class="chg-tag fix">Correcciones</span>
+            <ul>
+                <li>Los usuarios que dejaron el servidor vuelven a mostrar su nombre en rankings (antes: "Usuario desconocido").</li>
+                <li>Los comandos de barra ya avisan con claridad si se usan por MD en vez de fallar.</li>
+            </ul>
+        </article>
+
+        <article class="chg">
+            <div class="date">05/07/2026</div>
+            <h3>Estabilidad en purgas y auditoría interna</h3>
+            <span class="chg-tag fix">Correcciones</span>
+            <ul>
+                <li>Borrar muchos mensajes de golpe ya no satura el bot: los borrados se procesan por lotes y con límite.</li>
+                <li>Revisión de seguridad: nombres maliciosos ya no pueden inyectar enlaces en los rankings.</li>
+                <li>Conteos de 💀 más precisos y sincronizados en <code>/top</code>, <code>/stats</code> y <code>/leaderboard</code>.</li>
+            </ul>
+        </article>
+
+        <article class="chg">
+            <div class="date">24/06/2026</div>
+            <h3>Resync, duplicados y rankings por periodo</h3>
+            <span class="chg-tag new">Nuevo</span>
+            <ul>
+                <li><code>/resync</code>: recuenta las 💀 reales, elimina duplicados y corrige descuadres, con barra de progreso.</li>
+                <li><code>/leaderboard</code>, <code>/server_stats</code>, <code>/top_month</code> y <code>/top_year</code>.</li>
+                <li><code>/notify</code> para activar o desactivar tus avisos por MD, y auto-pin de récords.</li>
+            </ul>
+            <span class="chg-tag fix">Correcciones</span>
+            <ul>
+                <li>Eliminados los mensajes que aparecían duplicados en el skullboard.</li>
+                <li>El botón «Saltar al mejor mensaje» ahora lleva siempre al mensaje correcto.</li>
+                <li><code>sk!reset</code> pasa a ser exclusivo del dueño del servidor.</li>
+            </ul>
+        </article>
+
+        <footer class="site">
+            <div class="f-top">
+                <div class="f-brand">
+                    <span class="mark">💀</span>
+                    <div>
+                        <div class="f-name">SkullBoard</div>
+                        <div class="f-made">Desarrollado y mantenido por <b>GlobalFerociouS</b></div>
+                    </div>
+                </div>
+                <div class="f-links">
+                    <a href="mailto:globalsupportpyt@gmail.com">Contáctanos</a>
+                    <a href="terms.html">Términos de Servicio</a>
+                    <a href="privacy.html">Política de Privacidad</a>
+                </div>
+            </div>
+            <div class="f-copy">© 2026 GlobalFerociouS · SkullBoard</div>
+        </footer>
+    </div>
+
+    <script>
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+            document.documentElement.dataset.theme = next;
+            localStorage.setItem('skb-theme', next);
+        });
+    </script>
+</body>
+</html>

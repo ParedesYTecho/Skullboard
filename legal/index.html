@@ -4,73 +4,295 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SkullBoard · Bot de Discord</title>
-    <meta name="description" content="SkullBoard resalta los mensajes más reaccionados de tu servidor de Discord con el emoji 💀.">
+    <meta name="description" content="SkullBoard resalta los mensajes más reaccionados de tu servidor de Discord: un tablón de honor con las 💀 de tu comunidad, rankings y estadísticas.">
     <meta property="og:title" content="SkullBoard · Bot de Discord">
     <meta property="og:description" content="El starboard 💀 para tu servidor: resalta lo mejor, con rankings y estadísticas.">
-    <link rel="icon" type="image/png" href="skullboard_icon.png?v=2">
+    <meta name="theme-color" content="#0b0a10">
+    <link rel="icon" type="image/png" href="skullboard_icon.png">
     <link rel="stylesheet" href="styles.css">
+    <script>document.documentElement.dataset.theme = localStorage.getItem('skb-theme') || 'dark';</script>
 </head>
 <body>
+    <!-- SVG sprite (iconos reutilizables) -->
+    <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" focusable="false">
+        <defs>
+            <symbol id="i-skull" viewBox="0 0 24 24"><path d="M12 2a8 8 0 0 0-8 8c0 2.4 1 4 2.5 5.2.6.5 1 1.2 1 2v.8a2 2 0 0 0 2 2h5a2 2 0 0 0 2-2V17c0-.8.4-1.5 1-2C19 13.9 20 12.4 20 10a8 8 0 0 0-8-8Z"/><circle cx="9" cy="11" r="1.6"/><circle cx="15" cy="11" r="1.6"/><path d="M10.5 20v-2M13.5 20v-2"/></symbol>
+            <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0V4Z"/><path d="M8 5H5v2a3 3 0 0 0 3 3M16 5h3v2a3 3 0 0 1-3 3"/><path d="M10 14.5V17h4v-2.5M9 21h6M12 17v4"/></symbol>
+            <symbol id="i-pin" viewBox="0 0 24 24"><path d="M9 4h6l-1 6 3 3H7l3-3-1-6Z"/><path d="M12 16v4"/></symbol>
+            <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1l2-1.5-2-3.4-2.3 1a7 7 0 0 0-1.7-1l-.3-2.6h-4l-.3 2.6a7 7 0 0 0-1.7 1l-2.3-1-2 3.4 2 1.5a7 7 0 0 0 0 2l-2 1.5 2 3.4 2.3-1a7 7 0 0 0 1.7 1l.3 2.6h4l.3-2.6a7 7 0 0 0 1.7-1l2.3 1 2-3.4-2-1.5A7 7 0 0 0 19 12Z"/></symbol>
+            <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.4-3 8.2-7 9-4-.8-7-4.6-7-9V6l7-3Z"/><path d="M9.5 12l1.8 1.8L15 10"/></symbol>
+            <symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/></symbol>
+            <symbol id="i-crown" viewBox="0 0 24 24"><path d="M4 8l3.5 3L12 5l4.5 6L20 8l-1.5 10h-13L4 8Z"/></symbol>
+            <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V4M4 20h16M8 20v-6M13 20V9M18 20v-9"/></symbol>
+            <symbol id="i-dice" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1"/><circle cx="15" cy="15" r="1"/><circle cx="15" cy="9" r="1"/><circle cx="9" cy="15" r="1"/></symbol>
+            <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+            <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 6.2A9.7 9.7 0 0 1 12 6c5 0 9 4.5 9 6a11 11 0 0 1-2.4 3.2M6.3 8.2C4.3 9.4 3 11.2 3 12c0 1.5 4 6 9 6a9.4 9.4 0 0 0 3-.5"/><path d="M9.9 10.1a3 3 0 0 0 4 4"/></symbol>
+            <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+            <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1M14 11a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1"/></symbol>
+            <symbol id="i-hash" viewBox="0 0 24 24"><path d="M5 9h14M5 15h14M9 4 7 20M17 4l-2 16"/></symbol>
+            <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h10M18 8h2M4 16h4M12 16h8"/><circle cx="15" cy="8" r="2"/><circle cx="9" cy="16" r="2"/></symbol>
+            <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1"/></symbol>
+            <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11A8 8 0 0 0 6.3 6.3L4 8M4 4v4h4M4 13a8 8 0 0 0 13.7 4.7L20 16M20 20v-4h-4"/></symbol>
+            <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></symbol>
+            <symbol id="i-discord" viewBox="0 0 24 24"><path d="M19.3 5.6A17 17 0 0 0 15 4.3l-.2.4a13 13 0 0 1 3.7 1.9 12 12 0 0 0-10.9 0 13 13 0 0 1 3.7-1.9L11 4.3A17 17 0 0 0 6.7 5.6C4 9.6 3.3 13.5 3.6 17.3a17 17 0 0 0 5.2 2.6l.6-1a11 11 0 0 1-1.8-.9l.4-.3a12 12 0 0 0 10 0l.4.3c-.6.4-1.2.7-1.8.9l.6 1a17 17 0 0 0 5.2-2.6c.4-4.4-.6-8.3-3.1-11.7ZM9.5 15c-.9 0-1.6-.8-1.6-1.9 0-1 .7-1.9 1.6-1.9s1.7.9 1.6 1.9c0 1.1-.7 1.9-1.6 1.9Zm5 0c-.9 0-1.6-.8-1.6-1.9 0-1 .7-1.9 1.6-1.9s1.7.9 1.6 1.9c0 1.1-.7 1.9-1.6 1.9Z" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
+            <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></symbol>
+        </defs>
+    </svg>
+
+    <nav class="nav">
+        <a class="brand" href="index.html"><span class="mark">💀</span> SkullBoard</a>
+        <div class="nav-links">
+            <a href="#comandos">Comandos</a>
+            <a href="#como-funciona">Cómo funciona</a>
+            <a href="cambios.html">Cambios</a>
+            <a href="privacy.html">Privacidad</a>
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
+                <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
+            </button>
+            <a class="btn btn-primary btn-sm nav-cta" href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">
+                <svg><use href="#i-discord"/></svg> Añadir a Discord
+            </a>
+        </div>
+    </nav>
+
     <div class="container">
         <header class="hero">
-            <div class="skull-badge">💀</div>
-            <h1>SkullBoard</h1>
-            <p class="subtitle">El bot que convierte las reacciones 💀 de tu servidor en un tablón de honor con lo mejor de tu comunidad.</p>
+            <div class="emblem">💀</div>
+            <div class="pill"><span class="dot"></span> En línea · <span id="pill-servers">—</span> servidores</div>
+            <h1>Lo mejor de tu<br>servidor, destacado.</h1>
+            <p class="subtitle">SkullBoard convierte las reacciones 💀 de tu comunidad en un tablón de honor automático, con rankings y estadísticas.</p>
             <div class="cta-row">
-                <a href="privacy.html" class="btn btn-primary">🔒 Política de Privacidad</a>
-                <a href="terms.html" class="btn btn-ghost">📋 Términos de Servicio</a>
+                <a class="btn btn-primary" href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">
+                    <svg><use href="#i-discord"/></svg> Añadir a Discord
+                </a>
+                <a class="btn btn-ghost" href="#comandos"><svg><use href="#i-hash"/></svg> Ver comandos</a>
             </div>
         </header>
 
-        <section class="features">
-            <div class="feature">
-                <div class="ico">💀</div>
-                <h3>Resalta lo mejor</h3>
-                <p>Al alcanzar las reacciones que definas, el mensaje se reenvía a tu canal de skullboard.</p>
+        <section class="stats" aria-label="Resumen">
+            <div class="stat"><div class="num" id="stat-servers">—</div><div class="lbl">Servidores activos</div></div>
+            <div class="stat"><div class="num" id="stat-highlighted">—</div><div class="lbl">Mensajes destacados</div></div>
+            <div class="stat"><div class="num">21</div><div class="lbl">Comandos slash y de texto</div></div>
+        </section>
+
+        <section class="section">
+            <div class="section-head">
+                <span class="kicker">Qué hace</span>
+                <h2>Diseñado para resaltar tu comunidad</h2>
+                <p>Todo lo que necesita un buen starboard, sin configuraciones complicadas.</p>
             </div>
-            <div class="feature">
-                <div class="ico">🏆</div>
-                <h3>Rankings y stats</h3>
-                <p>Leaderboard de usuarios, top del mes y del año, y estadísticas por persona y servidor.</p>
-            </div>
-            <div class="feature">
-                <div class="ico">📌</div>
-                <h3>Auto-pin y avisos</h3>
-                <p>Fija los récords automáticamente y avisa por DM al autor (con opción de desactivar).</p>
-            </div>
-            <div class="feature">
-                <div class="ico">🔧</div>
-                <h3>Totalmente configurable</h3>
-                <p>Canal, mínimo de 💀, prefijo, canales ignorados y umbral de fijado, todo a tu gusto.</p>
-            </div>
-            <div class="feature">
-                <div class="ico">🛡️</div>
-                <h3>Datos mínimos</h3>
-                <p>Guardamos solo IDs y contadores. Nunca almacenamos el texto de tus mensajes.</p>
-            </div>
-            <div class="feature">
-                <div class="ico">⚡</div>
-                <h3>Rápido y estable</h3>
-                <p>Construido con discord.py y Supabase, con cooldown inteligente para evitar bloqueos.</p>
+            <div class="features">
+                <div class="feature">
+                    <div class="ico"><svg class="icon"><use href="#i-skull"/></svg></div>
+                    <h3>Resalta lo mejor</h3>
+                    <p>Al alcanzar las 💀 que definas, el mensaje se reenvía automáticamente a tu canal de skullboard.</p>
+                </div>
+                <div class="feature">
+                    <div class="ico"><svg class="icon"><use href="#i-trophy"/></svg></div>
+                    <h3>Rankings y stats</h3>
+                    <p>Leaderboard de usuarios, top del mes y del año, y estadísticas por persona y por servidor.</p>
+                </div>
+                <div class="feature">
+                    <div class="ico"><svg class="icon"><use href="#i-pin"/></svg></div>
+                    <h3>Auto-pin y avisos</h3>
+                    <p>Fija los récords automáticamente y avisa por DM al autor, con opción de desactivarlo.</p>
+                </div>
+                <div class="feature">
+                    <div class="ico"><svg class="icon"><use href="#i-gear"/></svg></div>
+                    <h3>Totalmente configurable</h3>
+                    <p>Canal, mínimo de 💀, prefijo, canales ignorados y umbral de fijado. Todo a tu gusto.</p>
+                </div>
+                <div class="feature">
+                    <div class="ico"><svg class="icon"><use href="#i-shield"/></svg></div>
+                    <h3>Datos mínimos</h3>
+                    <p>Guardamos solo identificadores y contadores. Nunca almacenamos el texto de tus mensajes.</p>
+                </div>
+                <div class="feature">
+                    <div class="ico"><svg class="icon"><use href="#i-bolt"/></svg></div>
+                    <h3>Rápido y estable</h3>
+                    <p>Construido con discord.py y Supabase, con control de concurrencia para evitar bloqueos.</p>
+                </div>
             </div>
         </section>
 
-        <section class="commands">
-            <h2>Comandos principales</h2>
-            <div class="chips">
-                <span class="chip">/top</span>
-                <span class="chip">/leaderboard</span>
-                <span class="chip">/stats</span>
-                <span class="chip">/server_stats</span>
-                <span class="chip">/top_month</span>
-                <span class="chip">/top_year</span>
-                <span class="chip">/random</span>
-                <span class="chip">/notify</span>
-                <span class="chip">/ajustes</span>
+        <section class="section" id="como-funciona">
+            <div class="section-head">
+                <span class="kicker">Cómo funciona</span>
+                <h2>En tres pasos</h2>
+            </div>
+            <div class="steps">
+                <div class="step">
+                    <h3>Reacciona con 💀</h3>
+                    <p>Cualquier miembro reacciona con la calavera a un mensaje que merezca la pena.</p>
+                </div>
+                <div class="step">
+                    <h3>Alcanza el mínimo</h3>
+                    <p>Cuando el mensaje junta las 💀 configuradas, SkullBoard lo detecta al instante.</p>
+                </div>
+                <div class="step">
+                    <h3>Al tablón de honor</h3>
+                    <p>Se publica en tu canal de skullboard con un enlace al original, y entra en los rankings.</p>
+                </div>
             </div>
         </section>
 
-        <footer class="site">SkullBoard · Bot de Discord comunitario · 💀</footer>
+        <section class="section" id="comandos">
+            <div class="section-head">
+                <span class="kicker">Comandos</span>
+                <h2>Todo lo que puedes hacer</h2>
+                <p>Disponibles como comandos slash <code>/</code> y de texto con tu prefijo (por defecto <code>sk!</code>).</p>
+            </div>
+
+            <div class="filters" role="tablist" aria-label="Filtrar comandos">
+                <button class="filter-chip active" data-cat="all">Todos <span class="count">20</span></button>
+                <button class="filter-chip" data-cat="general">General <span class="count">5</span></button>
+                <button class="filter-chip" data-cat="skull">Skullboard <span class="count">4</span></button>
+                <button class="filter-chip" data-cat="rank">Rankings <span class="count">4</span></button>
+                <button class="filter-chip" data-cat="admin">Administración <span class="count">7</span></button>
+            </div>
+
+            <div class="cmd-grid" id="cmd-grid">
+                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-gear"/></svg></span><div><code>/ajustes</code><div class="c-desc">Ver la configuración actual del bot.</div></div></div>
+                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-bolt"/></svg></span><div><code>/ping</code><div class="c-desc">Latencia y estado del bot.</div></div></div>
+                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-link"/></svg></span><div><code>/invite</code><div class="c-desc">Enlace para añadir el bot a otro servidor.</div></div></div>
+                <div class="cmd has-params" data-cat="general"><span class="c-ico"><svg><use href="#i-bell"/></svg></span><span class="c-caret">▾</span><div><code>/notify</code><div class="c-desc">Activa o desactiva tus avisos por DM.</div><div class="c-params"><div class="param"><code>estado</code><span class="opt">opcional</span><span class="ptype">on / off</span></div><div class="pdesc">Sin valor, muestra tu estado actual. <code>on</code> activa, <code>off</code> desactiva.</div></div></div></div>
+                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-info"/></svg></span><div><code>/help</code><div class="c-desc">Lista completa de comandos.</div></div></div>
+
+                <div class="cmd" data-cat="skull"><span class="c-ico"><svg><use href="#i-trophy"/></svg></span><div><code>/top</code><div class="c-desc">Mensajes con más 💀 del servidor.</div></div></div>
+                <div class="cmd has-params" data-cat="skull"><span class="c-ico"><svg><use href="#i-chart"/></svg></span><span class="c-caret">▾</span><div><code>/stats</code><div class="c-desc">Estadísticas de un usuario.</div><div class="c-params"><div class="param"><code>usuario</code><span class="opt">opcional</span><span class="ptype">miembro</span></div><div class="pdesc">Usuario del que ver las estadísticas. Si lo omites, muestra las tuyas.</div></div></div></div>
+                <div class="cmd" data-cat="skull"><span class="c-ico"><svg><use href="#i-dice"/></svg></span><div><code>/random</code><div class="c-desc">Un mensaje aleatorio del tablón.</div></div></div>
+                <div class="cmd" data-cat="skull"><span class="c-ico"><svg><use href="#i-eye-off"/></svg></span><div><code>/ignored</code><div class="c-desc">Ver los canales ignorados.</div></div></div>
+
+                <div class="cmd" data-cat="rank"><span class="c-ico"><svg><use href="#i-crown"/></svg></span><div><code>/leaderboard</code><div class="c-desc">Top usuarios por 💀 totales.</div></div></div>
+                <div class="cmd" data-cat="rank"><span class="c-ico"><svg><use href="#i-chart"/></svg></span><div><code>/server_stats</code><div class="c-desc">Estadísticas globales del servidor.</div></div></div>
+                <div class="cmd" data-cat="rank"><span class="c-ico"><svg><use href="#i-trophy"/></svg></span><div><code>/top_month</code><div class="c-desc">Top de mensajes del mes.</div></div></div>
+                <div class="cmd" data-cat="rank"><span class="c-ico"><svg><use href="#i-trophy"/></svg></span><div><code>/top_year</code><div class="c-desc">Top de mensajes del año.</div></div></div>
+
+                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-hash"/></svg></span><span class="c-caret">▾</span><div><code>/set_channel</code> <span class="tag">Admin</span><div class="c-desc">Define el canal del skullboard.</div><div class="c-params"><div class="param"><code>channel</code><span class="req">obligatorio</span><span class="ptype">canal de texto</span></div><div class="pdesc">Canal donde se publicarán los mensajes destacados.</div></div></div></div>
+                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-sliders"/></svg></span><span class="c-caret">▾</span><div><code>/set_min</code> <span class="tag">Admin</span><div class="c-desc">Mínimo de 💀 para destacar.</div><div class="c-params"><div class="param"><code>cantidad</code><span class="req">obligatorio</span><span class="ptype">número ≥ 1</span></div><div class="pdesc">Reacciones 💀 necesarias para que un mensaje llegue al tablón.</div></div></div></div>
+                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-gear"/></svg></span><span class="c-caret">▾</span><div><code>/prefix</code> <span class="tag">Admin</span><div class="c-desc">Cambia el prefijo de texto.</div><div class="c-params"><div class="param"><code>nuevo_prefijo</code><span class="req">obligatorio</span><span class="ptype">texto (máx 10)</span></div><div class="pdesc">Prefijo para los comandos de texto (por defecto <code>sk!</code>).</div></div></div></div>
+                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-eye-off"/></svg></span><span class="c-caret">▾</span><div><code>/ignore</code> · <code>/unignore</code> <span class="tag">Admin</span><div class="c-desc">Excluye o reincorpora un canal.</div><div class="c-params"><div class="param"><code>canal</code><span class="req">obligatorio</span><span class="ptype">canal de texto</span></div><div class="pdesc">Canal a excluir (<code>/ignore</code>) o volver a incluir (<code>/unignore</code>) del skullboard.</div></div></div></div>
+                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-target"/></svg></span><span class="c-caret">▾</span><div><code>/setup_pin</code> <span class="tag">Admin</span><div class="c-desc">Auto-pin a partir de un umbral.</div><div class="c-params"><div class="param"><code>umbral</code><span class="req">obligatorio</span><span class="ptype">número ≥ 0</span></div><div class="pdesc">💀 para fijar el mensaje automáticamente. <code>0</code> desactiva el auto-pin.</div></div></div></div>
+                <div class="cmd" data-cat="admin"><span class="c-ico"><svg><use href="#i-sync"/></svg></span><div><code>/resync</code> <span class="tag">Admin</span><div class="c-desc">Recuenta las 💀 y limpia duplicados.</div></div></div>
+                <div class="cmd" data-cat="admin"><span class="c-ico"><svg><use href="#i-trash"/></svg></span><div><code>/reset</code> <span class="tag">Dueño</span><div class="c-desc">Reinicia el tablón (solo el propietario).</div></div></div>
+            </div>
+        </section>
+
+        <section class="cta-band">
+            <h2>Dale voz a los mejores momentos</h2>
+            <p>Añade SkullBoard a tu servidor en segundos. Gratis y sin permisos innecesarios.</p>
+            <a class="btn btn-primary" href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">
+                <svg><use href="#i-discord"/></svg> Añadir a Discord
+            </a>
+        </section>
+
+        <section class="section" id="contacto">
+            <div class="section-head">
+                <span class="kicker">Contacto</span>
+                <h2>¿Dudas o sugerencias?</h2>
+                <p>Escríbenos y te respondemos. También en <a href="mailto:globalsupportpyt@gmail.com">globalsupportpyt@gmail.com</a>.</p>
+            </div>
+            <form class="contact-form" id="contact-form">
+                <div class="row">
+                    <div>
+                        <label for="c-name">Nombre</label>
+                        <input id="c-name" name="name" type="text" maxlength="80" placeholder="Tu nombre">
+                    </div>
+                    <div>
+                        <label for="c-email">Email (para responderte)</label>
+                        <input id="c-email" name="email" type="email" maxlength="120" placeholder="tu@email.com">
+                    </div>
+                </div>
+                <div>
+                    <label for="c-msg">Mensaje</label>
+                    <textarea id="c-msg" name="message" maxlength="4000" required placeholder="Cuéntanos..."></textarea>
+                </div>
+                <input class="hp" type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+                <button class="btn btn-primary" type="submit" id="c-submit">Enviar mensaje</button>
+                <div class="form-msg" id="c-status" role="status" aria-live="polite"></div>
+            </form>
+        </section>
+
+        <footer class="site">
+            <div class="f-top">
+                <div class="f-brand">
+                    <span class="mark">💀</span>
+                    <div>
+                        <div class="f-name">SkullBoard</div>
+                        <div class="f-made">Desarrollado y mantenido por <b>GlobalFerociouS</b></div>
+                    </div>
+                </div>
+                <div class="f-links">
+                    <a href="#contacto">Contáctanos</a>
+                    <a href="terms.html">Términos de Servicio</a>
+                    <a href="privacy.html">Política de Privacidad</a>
+                </div>
+            </div>
+            <div class="f-copy">© 2026 GlobalFerociouS · SkullBoard</div>
+        </footer>
     </div>
+
+    <script>
+        const chips = document.querySelectorAll('.filter-chip');
+        const cmds  = document.querySelectorAll('#cmd-grid .cmd');
+        chips.forEach(chip => chip.addEventListener('click', () => {
+            chips.forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            const cat = chip.dataset.cat;
+            cmds.forEach(cmd => { cmd.hidden = cat !== 'all' && cmd.dataset.cat !== cat; });
+        }));
+
+        // Expandir parámetros al pulsar una tarjeta de comando
+        document.querySelectorAll('#cmd-grid .cmd.has-params').forEach(c =>
+            c.addEventListener('click', () => c.classList.toggle('open')));
+
+        // Toggle claro/oscuro
+        document.getElementById('theme-toggle').addEventListener('click', () => {
+            const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+            document.documentElement.dataset.theme = next;
+            localStorage.setItem('skb-theme', next);
+        });
+
+        // Stats en vivo (endpoint del bot, con cache 60s en el servidor)
+        fetch('https://skullboard-fqf1.onrender.com/api/stats')
+            .then(r => r.json())
+            .then(d => {
+                const fmt = n => (n == null ? '—' : n.toLocaleString('es-ES'));
+                document.getElementById('pill-servers').textContent = fmt(d.servers);
+                document.getElementById('stat-servers').textContent = fmt(d.servers);
+                document.getElementById('stat-highlighted').textContent = fmt(d.highlighted);
+            })
+            .catch(() => {});
+
+        // Formulario de contacto
+        const form = document.getElementById('contact-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('c-submit');
+            const status = document.getElementById('c-status');
+            const body = {
+                name: form.name.value, email: form.email.value,
+                message: form.message.value, website: form.website.value
+            };
+            btn.disabled = true; status.className = 'form-msg'; status.textContent = 'Enviando…';
+            try {
+                const r = await fetch('https://skullboard-fqf1.onrender.com/api/contact', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+                });
+                const d = await r.json().catch(() => ({}));
+                if (r.ok && d.ok) {
+                    status.className = 'form-msg ok'; status.textContent = '✅ ¡Mensaje enviado! Te responderemos pronto.';
+                    form.reset();
+                } else {
+                    status.className = 'form-msg err'; status.textContent = '❌ ' + (d.error || 'No se pudo enviar. Inténtalo más tarde.');
+                }
+            } catch {
+                status.className = 'form-msg err'; status.textContent = '❌ Error de conexión. Inténtalo más tarde.';
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    </script>
 </body>
 </html>

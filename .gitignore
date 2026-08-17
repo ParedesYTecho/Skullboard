@@ -12,3 +12,4 @@ env/
 
 # Tooling
 .claude/
+graphify-out/

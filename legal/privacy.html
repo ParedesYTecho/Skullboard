@@ -4,8 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SkullBoard · Política de Privacidad</title>
-    <link rel="icon" type="image/png" href="skullboard_icon.png?v=2">
+    <link rel="icon" type="image/png" href="skullboard_icon.png">
     <link rel="stylesheet" href="styles.css">
+    <script>document.documentElement.dataset.theme = localStorage.getItem('skb-theme') || 'dark';</script>
 </head>
 <body>
     <div class="container">
@@ -21,95 +22,110 @@
             </div>
         </div>
 
-        <article class="doc">
-            <p class="lead">Esta política explica qué datos procesa y almacena el bot de Discord <strong>SkullBoard</strong> ("el bot", "nosotros") y cómo los usamos. Al añadir el bot a un servidor aceptas esta política.</p>
+        <article class="doc cards">
+            <section class="doc-card">
+                <p class="lead">Esta política explica qué datos procesa y almacena el bot de Discord <strong>SkullBoard</strong> ("el bot", "nosotros") y cómo los usamos. Al añadir el bot a un servidor aceptas esta política.</p>
+            </section>
 
-            <h2>1. Qué datos almacenamos (y cuáles no)</h2>
-            <p>SkullBoard aplica <strong>minimización de datos</strong>: solo guardamos identificadores numéricos de Discord y contadores. Nunca guardamos el texto de los mensajes.</p>
-
-            <div class="boxes">
-                <div class="box nostore">
-                    <h3>✅ NO almacenamos</h3>
-                    <ul>
-                        <li>El contenido o texto de los mensajes</li>
-                        <li>Nombres de usuario, apodos o avatares</li>
-                        <li>Mensajes directos (DMs) privados</li>
-                        <li>Correos, pagos o ubicación</li>
-                        <li>Cualquier dato de perfil personal</li>
-                    </ul>
+            <section class="doc-card">
+                <h2>1. Qué datos almacenamos (y cuáles no)</h2>
+                <p>SkullBoard aplica <strong>minimización de datos</strong>: solo guardamos identificadores numéricos de Discord y contadores. Nunca guardamos el texto de los mensajes.</p>
+                <div class="boxes">
+                    <div class="box nostore">
+                        <h3>✅ NO almacenamos</h3>
+                        <ul>
+                            <li>El contenido o texto de los mensajes</li>
+                            <li>Nombres de usuario, apodos o avatares</li>
+                            <li>Mensajes directos (DMs) privados</li>
+                            <li>Correos, pagos o ubicación</li>
+                            <li>Cualquier dato de perfil personal</li>
+                        </ul>
+                    </div>
+                    <div class="box store">
+                        <h3>📦 SÍ almacenamos</h3>
+                        <ul>
+                            <li>ID del mensaje destacado</li>
+                            <li>ID del autor (numérico)</li>
+                            <li>ID del servidor y de los canales</li>
+                            <li>Número de reacciones 💀</li>
+                            <li>Configuración y preferencias</li>
+                        </ul>
+                    </div>
                 </div>
-                <div class="box store">
-                    <h3>📦 SÍ almacenamos</h3>
-                    <ul>
-                        <li>ID del mensaje destacado</li>
-                        <li>ID del autor (numérico)</li>
-                        <li>ID del servidor y de los canales</li>
-                        <li>Número de reacciones 💀</li>
-                        <li>Configuración y preferencias</li>
-                    </ul>
-                </div>
-            </div>
+                <p>En detalle, guardamos los siguientes registros:</p>
+                <table class="data">
+                    <tr><th>Dato</th><th>Finalidad</th></tr>
+                    <tr><td>ID de mensaje, ID de autor, ID de servidor, ID de canal y contador de 💀</td><td>Mantener el tablón, evitar duplicados, generar rankings y estadísticas, y borrar la copia destacada si el original se elimina.</td></tr>
+                    <tr><td>Configuración del servidor (canal, mínimo de reacciones, prefijo, umbral de auto-pin)</td><td>Que el bot se comporte según lo definido por los administradores.</td></tr>
+                    <tr><td>Lista de canales ignorados</td><td>Excluir del skullboard los canales que el administrador decida.</td></tr>
+                    <tr><td>Preferencia de notificación por usuario</td><td>Recordar si un usuario ha desactivado los DMs del bot.</td></tr>
+                </table>
+                <div class="note">El <strong>contenido</strong> de un mensaje destacado se reenvía en el momento a tu canal de skullboard (dentro de Discord), pero <strong>no se guarda</strong> en nuestra base de datos: se procesa de forma transitoria en memoria para construir el destacado.</div>
+            </section>
 
-            <p>En detalle, guardamos los siguientes registros:</p>
-            <table class="data">
-                <tr><th>Dato</th><th>Finalidad</th></tr>
-                <tr><td>ID de mensaje, ID de autor, ID de servidor, ID de canal y contador de 💀</td><td>Mantener el tablón, evitar duplicados, generar rankings y estadísticas, y borrar la copia destacada si el original se elimina.</td></tr>
-                <tr><td>Configuración del servidor (canal, mínimo de reacciones, prefijo, umbral de auto-pin)</td><td>Que el bot se comporte según lo definido por los administradores.</td></tr>
-                <tr><td>Lista de canales ignorados</td><td>Excluir del skullboard los canales que el administrador decida.</td></tr>
-                <tr><td>Preferencia de notificación por usuario</td><td>Recordar si un usuario ha desactivado los DMs del bot.</td></tr>
-            </table>
+            <section class="doc-card">
+                <h2>2. Intents privilegiados de Discord</h2>
+                <ul>
+                    <li><strong>Message Content Intent</strong>: leer el contenido del mensaje que alcanza el umbral de 💀 para reconstruirlo como destacado, y detectar los comandos de texto con prefijo. El contenido se usa de forma transitoria y no se almacena.</li>
+                    <li><strong>Server Members Intent</strong>: resolver el apodo y avatar actuales de los autores destacados en rankings y estadísticas. Solo consultamos a los autores concretos de mensajes destacados; no exportamos la lista de miembros.</li>
+                </ul>
+                <p>El bot <strong>no</strong> utiliza el Presence Intent ni rastrea la actividad o el estado de los usuarios.</p>
+            </section>
 
-            <div class="note">El <strong>contenido</strong> de un mensaje destacado se reenvía en el momento a tu canal de skullboard (dentro de Discord), pero <strong>no se guarda</strong> en nuestra base de datos: se procesa de forma transitoria en memoria para construir el destacado.</div>
+            <section class="doc-card">
+                <h2>3. Dónde se almacenan los datos</h2>
+                <p>Los datos se guardan en una base de datos alojada en <strong>Supabase</strong> (PostgreSQL), cifrada en reposo, y el bot se ejecuta en un proveedor de alojamiento en la nube. Todas las conexiones están cifradas (HTTPS/WSS) y el acceso a la base de datos está restringido al administrador del bot.</p>
+            </section>
 
-            <h2>2. Intents privilegiados de Discord</h2>
-            <ul>
-                <li><strong>Message Content Intent</strong>: leer el contenido del mensaje que alcanza el umbral de 💀 para reconstruirlo como destacado, y detectar los comandos de texto con prefijo. El contenido se usa de forma transitoria y no se almacena.</li>
-                <li><strong>Server Members Intent</strong>: resolver el apodo y avatar actuales de los autores destacados en rankings y estadísticas. Solo consultamos a los autores concretos de mensajes destacados; no exportamos la lista de miembros.</li>
-            </ul>
-            <p>El bot <strong>no</strong> utiliza el Presence Intent ni rastrea la actividad o el estado de los usuarios.</p>
+            <section class="doc-card">
+                <h2>4. Compartición de datos</h2>
+                <ul>
+                    <li>No vendemos, alquilamos ni compartimos datos con terceros con fines comerciales o publicitarios.</li>
+                    <li>Los datos se procesan únicamente a través de la infraestructura necesaria (Discord y Supabase).</li>
+                    <li>El contenido de los mensajes <strong>no</strong> se usa para entrenar modelos de aprendizaje automático ni de IA.</li>
+                    <li>Solo divulgaríamos datos si la ley lo exigiera.</li>
+                </ul>
+            </section>
 
-            <h2>3. Dónde se almacenan los datos</h2>
-            <p>Los datos se guardan en una base de datos alojada en <strong>Supabase</strong> (PostgreSQL), cifrada en reposo, y el bot se ejecuta en un proveedor de alojamiento en la nube. Todas las conexiones están cifradas (HTTPS/WSS) y el acceso a la base de datos está restringido al administrador del bot.</p>
+            <section class="doc-card">
+                <h2>5. Conservación y eliminación</h2>
+                <ul>
+                    <li>El registro de un mensaje destacado se <strong>elimina automáticamente</strong> cuando el mensaje original se borra en Discord.</li>
+                    <li>Como el skullboard es un tablón permanente de "lo mejor", el resto de registros se conservan mientras el bot esté en el servidor y el mensaje exista.</li>
+                    <li>Los administradores pueden borrar todos los datos del skullboard de su servidor con el comando de reset.</li>
+                    <li>Puedes solicitar la eliminación de tus datos en cualquier momento (ver Contacto).</li>
+                </ul>
+            </section>
 
-            <h2>4. Compartición de datos</h2>
-            <ul>
-                <li>No vendemos, alquilamos ni compartimos datos con terceros con fines comerciales o publicitarios.</li>
-                <li>Los datos se procesan únicamente a través de la infraestructura necesaria (Discord y Supabase).</li>
-                <li>El contenido de los mensajes <strong>no</strong> se usa para entrenar modelos de aprendizaje automático ni de IA.</li>
-                <li>Solo divulgaríamos datos si la ley lo exigiera.</li>
-            </ul>
+            <section class="doc-card">
+                <h2>6. Tus derechos y opciones</h2>
+                <ul>
+                    <li><strong>Exclusión de canales:</strong> los administradores pueden añadir canales a la lista de ignorados.</li>
+                    <li><strong>Notificaciones:</strong> cualquier usuario puede desactivar los DMs del bot con el comando de notificaciones.</li>
+                    <li><strong>Acceso y borrado:</strong> puedes solicitar qué datos guardamos sobre ti o pedir su eliminación escribiéndonos.</li>
+                </ul>
+            </section>
 
-            <h2>5. Conservación y eliminación</h2>
-            <ul>
-                <li>El registro de un mensaje destacado se <strong>elimina automáticamente</strong> cuando el mensaje original se borra en Discord.</li>
-                <li>Como el skullboard es un tablón permanente de "lo mejor", el resto de registros se conservan mientras el bot esté en el servidor y el mensaje exista.</li>
-                <li>Los administradores pueden borrar todos los datos del skullboard de su servidor con el comando de reset.</li>
-                <li>Puedes solicitar la eliminación de tus datos en cualquier momento (ver Contacto).</li>
-            </ul>
+            <section class="doc-card">
+                <h2>7. Menores de edad</h2>
+                <p>El bot debe usarse conforme a los <a href="https://discord.com/terms" target="_blank" rel="noopener">Términos de Servicio de Discord</a>, que exigen una edad mínima. No recopilamos intencionadamente datos de menores de 13 años; si los detectamos, los eliminaremos.</p>
+            </section>
 
-            <h2>6. Tus derechos y opciones</h2>
-            <ul>
-                <li><strong>Exclusión de canales:</strong> los administradores pueden añadir canales a la lista de ignorados.</li>
-                <li><strong>Notificaciones:</strong> cualquier usuario puede desactivar los DMs del bot con el comando de notificaciones.</li>
-                <li><strong>Acceso y borrado:</strong> puedes solicitar qué datos guardamos sobre ti o pedir su eliminación escribiéndonos.</li>
-            </ul>
+            <section class="doc-card">
+                <h2>8. Cambios en esta política</h2>
+                <p>Podemos actualizar esta política. Los cambios relevantes se reflejarán en esta página con una nueva fecha de actualización.</p>
+            </section>
 
-            <h2>7. Menores de edad</h2>
-            <p>El bot debe usarse conforme a los <a href="https://discord.com/terms" target="_blank" rel="noopener">Términos de Servicio de Discord</a>, que exigen una edad mínima. No recopilamos intencionadamente datos de menores de 13 años; si los detectamos, los eliminaremos.</p>
-
-            <h2>8. Cambios en esta política</h2>
-            <p>Podemos actualizar esta política. Los cambios relevantes se reflejarán en esta página con una nueva fecha de actualización.</p>
-
-            <h2>9. Contacto</h2>
-            <p>Para preguntas sobre privacidad o solicitudes de eliminación de datos, escribe a <a href="mailto:ferociouspyt1@gmail.com">ferociouspyt1@gmail.com</a>. Respondemos en un plazo de 48 horas.</p>
+            <section class="doc-card">
+                <h2>9. Contacto</h2>
+                <p>Para preguntas sobre privacidad o solicitudes de eliminación de datos, escribe a <a href="mailto:globalsupportpyt@gmail.com">globalsupportpyt@gmail.com</a>. Respondemos en un plazo de 48 horas.</p>
+            </section>
 
             <div class="doc-footer">
-                <span>© 2026 SkullBoard</span>
+                <span>© 2026 GlobalFerociouS · SkullBoard</span>
                 <a href="terms.html">Términos de Servicio →</a>
             </div>
         </article>
-
-        <footer class="site">SkullBoard · 💀</footer>
     </div>
 </body>
 </html>
