@@ -1,7 +1,7 @@
 ﻿# 🏛️ SYSTEM_CONTEXT.md — Documento Maestro de Arquitectura y Gobernanza Técnica
 
 > **ESTADO DEL DOCUMENTO:** VIVO / PRODUCCIÓN  
-> **VERSIÓN:** 2.4.0 (Post Super-Auditoría 360°)  
+> **VERSIÓN:** 2.4.1 (Verificación Rigurosa contra Código y Esquema Supabase)  
 > **FECHA DE ÚLTIMA ACTUALIZACIÓN:** 18 de agosto de 2026  
 > **PROPIETARIO TÉCNICO:** GlobalFerociouS (ID: `561225979389804544`)  
 > **APLICACIÓN / BOT ID:** `1367463352774955059`  
@@ -18,14 +18,14 @@
 > ### CLÁUSULA DE LECTURA Y CONFORMIDAD OBLIGATORIA
 > Todo agente de Inteligencia Artificial (Claude, ChatGPT, Gemini, Copilot, Cursor, Windsurf, Antigravity, etc.) y cualquier desarrollador humano **DEBE LEER ÍNTEGRAMENTE este documento antes de planificar, sugerir, refactorizar o ejecutar cualquier modificación** en la base de código.
 > 
-> **Queda estrictamente prohibido introducir parches temporales, atajos arquitectónicos o librerías externas innecesarias que violen las directrices aquí establecidas.**
+> **Queda estrictamente prohibido inventar comandos, columnas inexistentes en base de datos o introducir dependencias innecesarias.**
 
 ### 1.1. Decálogo de Invariantes Arquitectónicas (Reglas de Oro)
 
 1. **Gestión de Concurrencia Inmune a Cancelaciones (`KeyedAsyncLock`):**
-   Cualquier operación sobre un mensaje o servidor debe usar `async with await lock.acquire(key):`. Nunca instanciar locks manuales sin decremento de referencias atómico en caso de cancelación de corrutinas (`asyncio.CancelledError`).
+   Cualquier operación sobre un mensaje (`_check_locks`) o servidor (`_resync_locks`) debe usar `async with await lock.acquire(key):`. Nunca instanciar locks manuales sin decremento de referencias atómico en caso de cancelación de corrutinas (`asyncio.CancelledError`).
 2. **Prohibición de Consultas $O(N)$ en Memoria:**
-   Las estadísticas globales, leaderboards y consultas temporales se ejecutan **exclusivamente mediante Funciones RPC en PostgreSQL** (`get_guild_leaderboard`, `get_guild_server_stats`, `get_top_periodo`). Nunca descargar tablas enteras a memoria para agregarlas en bucles de Python.
+   Las estadísticas globales, leaderboards y rankings temporales se ejecutan **exclusivamente mediante Funciones RPC en PostgreSQL** (`get_guild_leaderboard`, `get_guild_server_stats`, `get_top_periodo`, `get_random_tracked_message`). Nunca descargar tablas enteras a memoria para agregarlas en bucles de Python.
 3. **Resiliencia Obligatoria en Base de Datos (`@db_retry`):**
    Toda llamada a Supabase (`db_select`, `db_insert`, `db_update`, `db_upsert`) debe estar protegida con el decorador `@db_retry` para mitigar microcortes con *exponential backoff* y *jitter*.
 4. **Desacoplamiento Estricto de I/O en Flask (`webserver.py`):**
@@ -35,20 +35,13 @@
 6. **No Retención de Contenido de Mensajes (Privacidad Absoluta):**
    Solo se almacenan en base de datos IDs numéricas (snowflakes) y contadores enteros. **Nunca guardar el texto, imágenes o adjuntos de los mensajes**.
 7. **Control de Acceso y Permisos de Discord:**
-   Los comandos administrativos deben exigir `@commands.has_permissions(administrator=True)` y validación en tiempo de ejecución (`_is_admin_or_deny()`). `sk!reset` es exclusivo del **Server Owner** (`ctx.author.id == ctx.guild.owner_id`).
+   Los comandos administrativos deben exigir `@commands.has_permissions(administrator=True)` y validación en tiempo de ejecución (`_is_admin_or_deny()`). `sk!reset` y `/reset` son exclusivos del **Server Owner** (`interaction.user.id == interaction.guild.owner_id` o `ctx.author.id == ctx.guild.owner_id`).
 8. **Sanitización y Anti-Inyección (CRLF, XSS, Markdown):**
    Todo texto proveniente de usuarios (nombres de servidor, emails, mensajes de contacto) debe ser sanitizado con `re.sub(r'[\r\n]+', ' ', ...)` y `html.escape()` antes de procesarse o enviarse por correo.
 9. **Accesibilidad Web (WCAG AA):**
    Todos los componentes interactivos del frontend deben contar con soporte de teclado (`Tab`, `Enter`, `Espacio`), roles semánticos (`role="button"`), estados `aria-expanded` y contraste de texto $\ge 4.5:1$.
 10. **Principio de Simplicidad Radical (Ponytail):**
     Preferir siempre la biblioteca estándar de Python y funciones nativas de PostgreSQL antes de añadir dependencias o capas de abstracción innecesarias.
-
-### 1.2. Protocolo de Modificación y Mantenimiento del Documento Maestro
-* **Obligación de Sincronización:** Cada vez que se agregue un nuevo comando slash/prefijo, se altere una ruta de la API, se modifique una tabla de Supabase o se actualice una función RPC, este archivo `SYSTEM_CONTEXT.md` **debe ser actualizado en el mismo commit**.
-* **Checklist de Verificación Previa:**
-  1. `python -m py_compile main.py webserver.py` (0 errores de sintaxis).
-  2. Verificación de tipos e índices en Supabase.
-  3. Verificación de Clean URLs y enlaces en el frontend.
 
 ---
 
@@ -142,23 +135,23 @@ sequenceDiagram
     REST-->>Bot: Mensaje Original (Reacciones, Adjuntos, Autor)
     
     Bot->>DB: get_guild_config(guild_id)
-    DB-->>Bot: Configuración (threshold, channel_id, self_skull, etc.)
+    DB-->>Bot: Configuración (min_skulls, skullboard_channel_id, pin_threshold, prefix)
     
-    alt Reacciones >= Umbral (Threshold)
+    alt Reacciones >= min_skulls
         Bot->>DB: select tracked_messages where message_id = ID
         alt Mensaje ya publicado en Skullboard
             Bot->>REST: edit_message(skullboard_msg_id, nuevo_conteo_embed)
             Bot->>DB: update tracked_messages (skull_count)
-        else Nuevo mensaje que supera el umbral
+        else Nuevo mensaje que supera min_skulls
             Bot->>REST: send_message(skullboard_channel, embed_con_autor_y_media)
             REST-->>Bot: skullboard_message_id
-            Bot->>DB: insert tracked_messages (message_id, sb_id, skull_count, author_id)
+            Bot->>DB: insert tracked_messages (message_id, skullboard_message_id, skull_count, author_id, guild_id)
             
-            opt Récord del Servidor Superado
+            opt pin_threshold > 0 y skull_count >= pin_threshold
                 Bot->>REST: pin_message(skullboard_message_id)
             end
         end
-    else Reacciones < Umbral y existe en Skullboard
+    else Reacciones < min_skulls y existe en Skullboard
         Bot->>REST: delete_message(skullboard_msg_id)
         Bot->>DB: delete from tracked_messages where message_id = ID
     end
@@ -170,47 +163,41 @@ sequenceDiagram
 
 ## 3. 🗄️ MODELO DE DATOS, PERSISTENCIA Y RPCs DE POSTGRESQL
 
-### 3.1. Diagrama Entidad-Relación (ERD)
+### 3.1. Diagrama Entidad-Relación (ERD Exacto de Supabase)
 
 ```mermaid
 erDiagram
     settings {
-        TEXT guild_id PK "Snowflake ID del Servidor"
-        BIGINT skullboard_channel_id "ID del canal donde se publican calaveras"
-        INTEGER skull_threshold "Umbral mínimo de calaveras (default: 3)"
-        BOOLEAN self_skull "Permitir auto-reacciones (default: false)"
-        BOOLEAN auto_pin "Auto-fijar mensajes con récord (default: true)"
-        TEXT prefix "Prefijo personalizado de comandos (default: 'sk!')"
-        TIMESTAMPTZ created_at "Fecha de creación del registro"
-        TIMESTAMPTZ updated_at "Fecha de última modificación"
+        TEXT guild_id PK "ID del Servidor de Discord"
+        BIGINT skullboard_channel_id "ID del canal skullboard (default: 0)"
+        SMALLINT min_skulls "Mínimo de calaveras para destacar (default: 1)"
+        TEXT prefix "Prefijo de comandos de texto (default: 'sk!')"
+        SMALLINT pin_threshold "Umbral para auto-pin (0 = desactivado, default: 0)"
+        TIMESTAMPTZ created_at "Fecha de creación (default: now())"
     }
 
     tracked_messages {
-        TEXT message_id PK "Snowflake ID del mensaje original"
-        BIGINT skullboard_message_id "Snowflake ID del mensaje en el skullboard"
-        INTEGER skull_count "Número actual de reacciones calavera"
-        TEXT author_id "Snowflake ID del autor del mensaje"
-        TEXT guild_id "Snowflake ID del servidor (FK conceptual)"
-        TIMESTAMPTZ created_at "Fecha de registro"
+        TEXT message_id PK "ID del mensaje original"
+        BIGINT skullboard_message_id "ID del mensaje publicado en el skullboard"
+        INTEGER skull_count "Número actual de reacciones calavera (default: 0)"
+        TEXT author_id "ID del autor del mensaje original (nullable)"
+        TEXT guild_id FK "ID del servidor (references settings.guild_id ON DELETE CASCADE)"
     }
 
     ignored_channels {
-        TEXT channel_id PK "Snowflake ID del canal ignorado"
-        TEXT guild_id "Snowflake ID del servidor"
-        TIMESTAMPTZ created_at "Fecha de adición"
+        TEXT guild_id PK, FK "ID del servidor (references settings.guild_id ON DELETE CASCADE)"
+        TEXT channel_id PK "ID del canal ignorado"
     }
 
     notify_settings {
-        BIGINT id PK "ID autoincremental"
-        TEXT guild_id "Snowflake ID del servidor"
-        TEXT user_id "Snowflake ID del usuario"
-        BOOLEAN enabled "Estado de alertas DM (default: true)"
-        TIMESTAMPTZ created_at "Fecha de configuración"
+        TEXT guild_id PK, FK "ID del servidor (references settings.guild_id ON DELETE CASCADE)"
+        TEXT user_id PK "ID del usuario"
+        BOOLEAN enabled "Alertas por DM activadas (default: true)"
     }
 
-    settings ||--o{ tracked_messages : "registra"
-    settings ||--o{ ignored_channels : "ignora"
-    settings ||--o{ notify_settings : "gestiona"
+    settings ||--o{ tracked_messages : "FK guild_id ON DELETE CASCADE"
+    settings ||--o{ ignored_channels : "FK guild_id ON DELETE CASCADE"
+    settings ||--o{ notify_settings : "FK guild_id ON DELETE CASCADE"
 ```
 
 ### 3.2. Catálogo de Índices de Alto Rendimiento
@@ -225,54 +212,57 @@ erDiagram
 ### 3.3. Especificación Técnica de Funciones Almacenadas (PostgreSQL RPCs)
 
 #### 1. `get_guild_leaderboard(p_guild_id TEXT, p_limit INT DEFAULT 10)`
-* **Objetivo:** Devuelve los autores con mayor número acumulado de calaveras en un servidor.
 * **Firma de Retorno:** `TABLE (author_id TEXT, total_skulls BIGINT, message_count BIGINT)`
 * **Seguridad:** `SECURITY INVOKER`, límites forzados entre 1 y 100 con `LEAST(GREATEST(p_limit, 1), 100)`.
+* **Comportamiento:** Agrega por autor ordenando por `total_skulls DESC, author_id ASC`.
 
 #### 2. `get_guild_server_stats(p_guild_id TEXT)`
-* **Objetivo:** Retorna las estadísticas globales de un servidor de forma 100% blindada contra `NULL` (usando `COALESCE`).
 * **Firma de Retorno:** `TABLE (total_messages BIGINT, total_skulls BIGINT, record_count INT, top_author_id TEXT, top_author_skulls BIGINT)`
 * **Comportamiento:** Si el servidor no tiene mensajes registrados, devuelve ceros limpios `(0, 0, 0, NULL, 0)` evitando `TypeError` en Python.
 
 #### 3. `get_random_tracked_message(p_guild_id TEXT)`
-* **Objetivo:** Selecciona 1 mensaje destacado aleatorio directamente en la base de datos sin descargar la tabla a RAM.
 * **Firma de Retorno:** `TABLE (message_id TEXT, skullboard_message_id BIGINT, skull_count INT, author_id TEXT, guild_id TEXT)`
+* **Comportamiento:** Selecciona 1 fila aleatoria con `ORDER BY random() LIMIT 1`.
 
 #### 4. `get_top_periodo(p_guild_id TEXT, p_min_snowflake BIGINT, p_limit INT DEFAULT 10)`
-* **Objetivo:** Filtra mensajes generados a partir de un timestamp de Discord (snowflake) mediante regex numérico seguro `message_id ~ '^[0-9]{15,21}$'`.
 * **Firma de Retorno:** `TABLE (message_id TEXT, skullboard_message_id BIGINT, skull_count INT, author_id TEXT)`
+* **Comportamiento:** Filtra mensajes por snowflake con regex seguro `message_id ~ '^[0-9]{15,21}$'`.
 
 ---
 
-## 4. 📜 CATÁLOGO COMPLETO DE COMANDOS Y API ENDPOINTS
+## 4. 📜 CATÁLOGO COMPLETO DE COMANDOS Y API ENDPOINTS (100% REAL)
 
 ### 4.1. Comandos de Discord (Slash & Prefijo)
 
-| Comando Slash | Comando Prefijo | Permisos Requeridos | Descripción y Parámetros |
-| :--- | :--- | :--- | :--- |
-| `/help` | `sk!help` | Todos | Muestra la guía interactiva con paginación (`HelpView`). |
-| `/dashboard` | `sk!dashboard` | Todos | Enlaces oficiales a la web, TOS, privacidad y botón de invitación. |
-| `/server_stats`| `sk!serverstats` | Todos | Muestra el resumen del servidor (mensajes, calaveras, récord y MVP). |
-| `/top` | `sk!top` | Todos | Mensajes con más calaveras históricas del servidor. |
-| `/top_month` | `sk!topmonth` | Todos | Mensajes más votados en los últimos 30 días. |
-| `/top_year` | `sk!topyear` | Todos | Mensajes más votados en los últimos 365 días. |
-| `/leaderboard`| `sk!leaderboard`| Todos | Ranking de los 10 usuarios con más calaveras acumuladas. |
-| `/random` | `sk!random` | Todos | Muestra un mensaje al azar que haya alcanzado el skullboard. |
-| `/stats` | `sk!stats` | Todos | Estadísticas globales de un usuario (`user: Member`). |
-| `/notify` | `sk!notify` | Todos | Activa o desactiva las notificaciones por mensaje directo (`enabled: bool`). |
-| `/setup` | `sk!setup` | Administrador | Asistente de configuración del canal skullboard y umbral. |
-| `/set_channel`| `sk!setchannel`| Administrador | Define el canal de publicación (`channel: TextChannel`). |
-| `/set_skulls` | `sk!setskulls` | Administrador | Define el umbral de calaveras (`count: int`, entre 1 y 50). |
-| `/self_skull` | `sk!selfskull` | Administrador | Permite o prohíbe que los autores voten sus propios mensajes (`allow: bool`). |
-| `/autopin` | `sk!autopin` | Administrador | Activa/desactiva fijar automáticamente los récords (`enabled: bool`). |
-| `/ignore` | `sk!ignore` | Administrador | Añade un canal a la lista negra de calaveras (`channel: TextChannel`). |
-| `/unignore` | `sk!unignore` | Administrador | Elimina un canal de la lista negra (`channel: TextChannel`). |
-| `/ignored` | `sk!ignored` | Administrador | Lista todos los canales ignorados del servidor. |
-| `/resync` | `sk!resync` | Administrador | Escanea y resincroniza todas las calaveras corrigiendo descuadres. |
-| `—` | `sk!prefix` | Administrador | Cambia el prefijo de comandos de texto (`nuevo_prefijo: str`). |
-| `—` | `sk!reset` | **Server Owner** | Restablece toda la configuración y borra el historial del servidor. |
-| `—` | `sk!announce` | **Bot Owner** | Envía un comunicado oficial a todos los canales skullboard configurados. |
-| `—` | `sk!backfill` | **Bot Owner** | Reconcilia IDs originales de mensajes antiguos leyendo el historial. |
+| Comando Slash | Comando Prefijo (Aliases) | Categoría | Permisos Requeridos | Parámetros y Descripción |
+| :--- | :--- | :--- | :--- | :--- |
+| `/ajustes` | `sk!ajustes` (`settings`) | General | Todos | Muestra un embed con la configuración actual del servidor. |
+| `/prefix` | `sk!prefix` (`set_prefix`) | Admin | Administrador | `nuevo_prefijo: str` (máx 10 caracteres). Cambia el prefijo de texto. |
+| `/set_channel`| `sk!set_channel` (`channel`) | Admin | Administrador | `channel: TextChannel`. Configura el canal de publicación del skullboard. |
+| `/set_min` | `sk!set_min` (`min`) | Admin | Administrador | `cantidad: int` ($\ge 1$). Fija el mínimo de calaveras para destacar. |
+| `/ping` | `sk!ping` | General | Todos | Muestra la latencia del bot en milisegundos y estado de conexión. |
+| `/invite` | `sk!invite` | General | Todos | Genera el enlace de invitación oficial para añadir el bot. |
+| `/dashboard` | `sk!dashboard` (`web`, `panel`) | General | Todos | Envía un embed con botones interactivos hacia la web, TOS, privacidad y novedades. |
+| `/help` | `sk!help` (`ayuda`, `comandos`) | General | Todos | Menú de ayuda interactivo y paginado con botones. |
+| `/top` | `sk!top` | Calaveras | Todos | Top 10 mensajes más reaccionados históricamente en el servidor. |
+| `/random` | `sk!random` | Calaveras | Todos | Muestra un mensaje aleatorio que esté publicado en el skullboard. |
+| `/stats` | `sk!stats` (`estadisticas`)| Calaveras | Todos | `usuario: Member = None`. Estadísticas y mejor mensaje del usuario. |
+| `/ignore` | `sk!ignore` | Admin | Administrador | `canal: TextChannel`. Añade un canal a la lista negra para no contar calaveras. |
+| `/unignore` | `sk!unignore` | Admin | Administrador | `canal: TextChannel`. Reincorpora un canal previamente ignorado. |
+| `/ignored` | `sk!ignored` | Calaveras | Todos | Lista todos los canales ignorados del servidor. |
+| `/notify` | `sk!notify` | General | Todos | `estado: Choice['on', 'off'] = None`. Activa/desactiva avisos por DM al entrar al skullboard. |
+| `/setup_pin` | `sk!setuppin` (`setup_pin`) | Admin | Administrador | `umbral: int` ($\ge 0$). Fija calaveras para auto-pin de mensajes ($0 = desactivar$). |
+| `/leaderboard`| `sk!leaderboard` (`lb`, `topusers`)| Rankings | Todos | Top 10 usuarios con más calaveras acumuladas en el servidor. |
+| `/server_stats`| `sk!serverstats` (`sstats`, `server_stats`)| Rankings | Todos | Estadísticas globales: total de mensajes, calaveras, récord y MVP. |
+| `/top_month` | `sk!topmonth` (`monthly`, `top_month`)| Rankings | Todos | Top mensajes destacados publicados en el mes en curso. |
+| `/top_year` | `sk!topyear` (`yearly`, `top_year`)| Rankings | Todos | Top mensajes destacados publicados en el año en curso. |
+| `/resync` | `sk!resync` (`sync`) | Admin | Administrador | Re-escanea el canal skullboard, sincroniza conteos y purga duplicados. |
+| `/reset` | `sk!reset` (hidden) | Admin | **Server Owner** | Restablece la configuración del servidor y borra los registros rastreados. |
+| `—` | `sk!announce` (hidden) | Owner | **Bot Owner** | Envía un comunicado oficial a todos los canales skullboard activos. |
+| `—` | `sk!editannounce` (hidden) | Owner | **Bot Owner** | `message_id: int`. Edita el comunicado enviado en todos los servidores. |
+| `—` | `sk!servers` (hidden) | Owner | **Bot Owner** | Muestra la lista de servidores donde el bot está presente. |
+| `—` | `sk!serverinfo` (hidden) | Owner | **Bot Owner** | `guild_id: int`. Muestra información técnica detallada de un servidor. |
+| `—` | `sk!backfill` (hidden) | Owner | **Bot Owner** | Reconcilia y migra IDs de mensajes antiguos desde el historial. |
 
 ---
 
@@ -329,7 +319,7 @@ Discord Permissions Integer: 277025508352
 3. **`Embed Links` (Insertar Enlaces):** Necesario para formatear y renderizar las tarjetas visuales de los mensajes destacados.
 4. **`Read Message History` (Leer el Historial de Mensajes):** Fundamental para reconstruir mensajes originales y validar conteos reales en `/resync` y `sk!backfill`.
 5. **`Add Reactions` (Añadir Reacciones):** Permite al bot interactuar con confirmaciones visuales.
-6. **`Pin Messages` (Fijar Mensajes):** Requerido exclusivamente cuando el servidor tiene activada la función de auto-pin de récord (`/autopin true`).
+6. **`Pin Messages` (Fijar Mensajes):** Requerido cuando el servidor tiene configurado auto-pin (`pin_threshold > 0`).
 
 #### Privileged Gateway Intents
 * **`Message Content Intent`:** Requerido para leer adjuntos, avatares y texto al momento de publicar el embed en el skullboard.
