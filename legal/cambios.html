@@ -56,7 +56,8 @@
             <p>Todo el registro de mejoras, nuevas funciones, parches de seguridad y optimizaciones de SkullBoard.</p>
             <div class="changelog-meta-pills">
                 <div class="pill"><span class="dot"></span> Versión actual: <b>v2.4.2</b></div>
-                <div class="pill">Última actualización: <b>18 de Agosto, 2026</b></div>
+                <div class="pill"><b>9 Versiones</b> documentadas</div>
+                <div class="pill">Historial desde <b>Mayo 2025</b> hasta <b>Agosto 2026</b></div>
             </div>
         </header>
 
@@ -87,17 +88,19 @@
                             <li><strong>Rediseño de Marca y Calavera Interactiva:</strong> Emblema de marca squircle con micro-rotación dinámica al pasar el ratón y botón rápido de retorno al inicio.</li>
                             <li><strong>Buscador Instantáneo y Botón de Copiado:</strong> Cada una de las 22 tarjetas de comandos incluye un botón interactivo de copiado directo con confirmación instantánea (`✓ Copiado!`) y búsqueda en tiempo real.</li>
                             <li><strong>Hero Minimalista y Ligero:</strong> Eliminación del mockup 3D para una carga instantánea sin consumo innecesario de GPU en dispositivos móviles.</li>
+                            <li><strong>Clean URLs y Redirecciones:</strong> Eliminación completa de extensiones <code>.html</code> en enlaces y metadatos con redirecciones 301/308 limpias.</li>
                         </ul>
                     </div>
 
                     <div class="change-section">
                         <div class="change-section-head">
-                            <span class="tag-pill fix">Correcciones</span>
-                            <span>Alineación y Métricas</span>
+                            <span class="tag-pill fix">Correcciones & Resiliencia</span>
+                            <span>Alineación, Métricas y Cloudflare</span>
                         </div>
                         <ul class="change-list">
                             <li><strong>Desglose de Comandos 1:1:</strong> Separación individual de tarjetas para <code>/ignore</code> y <code>/unignore</code> e inclusión de <code>/dashboard</code>, cuadrando la cuenta exacta de 22 comandos en el filtro y cabecera.</li>
                             <li><strong>Especificidad CSS Corregida:</strong> Solucionado el conflicto entre <code>display: flex</code> y el atributo <code>[hidden]</code> para que los filtros por categorías respondan de forma instantánea.</li>
+                            <li><strong>Tolerancia a Bloqueos 429:</strong> Loop asíncrono con *exponential backoff* en el arranque del bot ante errores 1015 de Cloudflare en IPs compartidas de Render.</li>
                         </ul>
                     </div>
                 </div>
@@ -123,7 +126,7 @@
                             <span>Motor de Base de Datos y Consultas</span>
                         </div>
                         <ul class="change-list">
-                            <li><strong>Motor de Consultas PostgreSQL (RPCs):</strong> Tablas de clasificación, estadísticas de servidor y rankings mensuales/anuales ahora se calculan directamente en Supabase con agregación nativa $O(1)$ en memoria.</li>
+                            <li><strong>Motor de Consultas PostgreSQL (RPCs):</strong> Tablas de clasificación, estadísticas de servidor y rankings mensuales/anuales ahora se calculan directamente en Supabase con agregación nativa $O(1)$ en memoria (<code>get_guild_leaderboard</code>, <code>get_guild_server_stats</code>, <code>get_top_periodo</code>, <code>get_random_tracked_message</code>).</li>
                             <li><strong>Resiliencia Automática (<code>@db_retry</code>):</strong> Decorador con <em>exponential backoff</em> y <em>jitter</em> para mantener la conectividad del bot ante microcortes o caídas transitorias de red.</li>
                             <li><strong>Ampliación de Calaveras:</strong> Columna de conteo migrada a <code>INTEGER</code> en PostgreSQL, eliminando la antigua restricción de 32.767 calaveras por mensaje.</li>
                         </ul>
@@ -131,8 +134,8 @@
 
                     <div class="change-section">
                         <div class="change-section-head">
-                            <span class="tag-pill sec">Seguridad</span>
-                            <span>Concurrencia y Control de Acceso</span>
+                            <span class="tag-pill sec">Seguridad & Concurrencia</span>
+                            <span>Blindaje y Control de Acceso</span>
                         </div>
                         <ul class="change-list">
                             <li><strong>Concurrencia Blindada:</strong> Nuevo gestor <code>KeyedAsyncLock</code> inmune a cancelaciones de corrutinas (`asyncio.CancelledError`) y debouncer generacional de reacciones de 2.0s.</li>
@@ -143,14 +146,14 @@
                 </div>
             </article>
 
-            <!-- Release v2.3.0 (14 Julio 2026) -->
+            <!-- Release v2.3.1 (14 Julio 2026) -->
             <article class="timeline-entry">
                 <div class="timeline-dot"></div>
                 <div class="timeline-card">
                     <div class="t-header">
                         <div>
                             <div class="t-version-row">
-                                <span class="t-version-tag">v2.3.0</span>
+                                <span class="t-version-tag">v2.3.1</span>
                             </div>
                             <h2 class="t-title">Dashboard Web Oficial y Estadísticas en Vivo</h2>
                         </div>
@@ -159,19 +162,60 @@
 
                     <div class="change-section">
                         <div class="change-section-head">
-                            <span class="tag-pill new">Novedades</span>
-                            <span>Web y Comandos</span>
+                            <span class="tag-pill new">Novedades Web</span>
+                            <span>Portal y Endpoints Públicos</span>
                         </div>
                         <ul class="change-list">
-                            <li><strong>Nueva Web en Vercel:</strong> Lanzamiento del portal web con buscador de comandos por categoría, selector de tema claro/oscuro y páginas de Términos y Privacidad.</li>
-                            <li><strong>Métricas Dinámicas:</strong> Contador en vivo de servidores activos y mensajes destacados en la portada conectado a la API de Flask.</li>
+                            <li><strong>Nueva Web en Vercel:</strong> Lanzamiento del portal web oficial con buscador de comandos por categoría, selector de tema claro/oscuro y páginas legales de Términos y Privacidad.</li>
+                            <li><strong>Métricas Dinámicas (<code>/api/stats</code>):</strong> Contador en vivo de servidores activos y mensajes destacados en la portada conectado a la API de Flask con caché en memoria.</li>
+                            <li><strong>Formulario de Contacto (<code>/api/contact</code>):</strong> Envío de consultas de soporte vía Resend con protección honeypot y rate limiting por IP.</li>
                             <li><strong>Comando de Estadísticas de Texto:</strong> Incorporación de <code>sk!stats</code> para servidores que prefieren invocar el bot con prefijo.</li>
+                        </ul>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill fix">Correcciones</span>
+                            <span>Robustez y Nombres de Usuario</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Resolución de Autores Antiguos:</strong> Los usuarios que abandonaron el servidor vuelven a mostrar su nombre real en rankings mediante fallback con <code>bot.fetch_user()</code>.</li>
+                            <li><strong>Protección contra Inyección Markdown:</strong> Sanitización de nombres especiales para evitar enlaces maliciosos dentro de los embeds de Discord.</li>
                         </ul>
                     </div>
                 </div>
             </article>
 
-            <!-- Release v2.2.0 (24 Junio 2026) -->
+            <!-- Release v2.3.0 (02 - 05 Julio 2026) -->
+            <article class="timeline-entry">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="t-header">
+                        <div>
+                            <div class="t-version-row">
+                                <span class="t-version-tag">v2.3.0</span>
+                            </div>
+                            <h2 class="t-title">Control de Purgas Masivas, Rate Limiting Global y Estabilidad</h2>
+                        </div>
+                        <div class="t-date">05 de Julio, 2026</div>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill sec">Rendimiento & Estabilidad</span>
+                            <span>Gestión de Memoria y Concurrencia</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Protección contra OOM en Purgas:</strong> Semáforo de borrado <code>_delete_sem = asyncio.Semaphore(8)</code> y procesamiento por lotes (chunks de 100) en <code>on_raw_bulk_message_delete</code>.</li>
+                            <li><strong>Rate Limiter Global para Resync:</strong> Implementación de <code>_GlobalRateLimiter(8)</code> para no saturar las cuotas de la API de Discord (~50 req/s).</li>
+                            <li><strong>Manejo de Comandos en DMs:</strong> Mensajes de error claros e informativos cuando un usuario intenta ejecutar comandos de servidor por mensaje directo.</li>
+                            <li><strong>Favicon Oficial:</strong> Integración del isotipo <code>skullboard_icon.png</code> en todas las páginas web con control de versión <code>?v=2</code>.</li>
+                        </ul>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Release v2.2.0 (24 - 26 Junio 2026) -->
             <article class="timeline-entry">
                 <div class="timeline-dot"></div>
                 <div class="timeline-card">
@@ -180,7 +224,7 @@
                             <div class="t-version-row">
                                 <span class="t-version-tag">v2.2.0</span>
                             </div>
-                            <h2 class="t-title">Resync con Limpieza de Duplicados y Rankings Temporales</h2>
+                            <h2 class="t-title">Resync Anti-Duplicados y Gobernanza de Servidor</h2>
                         </div>
                         <div class="t-date">24 de Junio, 2026</div>
                     </div>
@@ -188,13 +232,142 @@
                     <div class="change-section">
                         <div class="change-section-head">
                             <span class="tag-pill new">Novedades</span>
-                            <span>Comandos y Automatizaciones</span>
+                            <span>Herramientas Administrativas</span>
                         </div>
                         <ul class="change-list">
-                            <li><strong>Comando <code>/resync</code>:</strong> Recuenta las 💀 reales del servidor, elimina mensajes duplicados y corrige descuadres con barra de progreso.</li>
-                            <li><strong>Rankings Periódicos:</strong> Comandos <code>/top_month</code> y <code>/top_year</code> para premiar a los mejores momentos del mes y del año.</li>
-                            <li><strong>Auto-Pin y Notificaciones:</strong> Soporte de auto-pin automático a partir de un umbral (`/setup_pin`) y gestión de DMs personales (`/notify`).</li>
-                            <li><strong>Seguridad de Dueño:</strong> Restricción estricta de <code>sk!reset</code> y <code>/reset</code> exclusiva para el propietario del servidor.</li>
+                            <li><strong>Comando <code>/resync</code>:</strong> Herramienta para recontar las 💀 reales de los mensajes, eliminar entradas duplicadas en el skullboard y sincronizar marcadores con barra de progreso en vivo.</li>
+                            <li><strong>Seguridad Exclusiva de Dueño:</strong> Restricción estricta de <code>sk!reset</code> y <code>/reset</code> para que únicamente el Propietario del Servidor (Server Owner) pueda reiniciar la configuración.</li>
+                            <li><strong>Auditoría de Seguridad Multi-Agente:</strong> Refactorización profunda de validaciones de entrada, manejo de excepciones y estructura de permisos.</li>
+                            <li><strong>Páginas Legales:</strong> Publicación de las páginas oficiales de Términos de Servicio y Política de Privacidad.</li>
+                        </ul>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Release v2.1.0 (07 - 08 Mayo 2026) -->
+            <article class="timeline-entry">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="t-header">
+                        <div>
+                            <div class="t-version-row">
+                                <span class="t-version-tag">v2.1.0</span>
+                            </div>
+                            <h2 class="t-title">Rankings Periódicos, Auto-Pin y Backfill Definitivo</h2>
+                        </div>
+                        <div class="t-date">08 de Mayo, 2026</div>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill new">Comandos de Comunidad</span>
+                            <span>Estadísticas y Automatizaciones</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Comandos de Rankings:</strong> Creación de <code>/leaderboard</code>, <code>/server_stats</code>, <code>/top_month</code> y <code>/top_year</code> para destacar a los usuarios con más calaveras acumuladas en el mes y año.</li>
+                            <li><strong>Sistema de Auto-Pin:</strong> Comando <code>/setup_pin</code> para anclar automáticamente al canal los mensajes que superen un umbral histórico de calaveras.</li>
+                            <li><strong>Notificaciones Personales:</strong> Comando <code>/notify</code> para permitir a los miembros activar o silenciar los avisos por mensaje directo cuando su contenido sea destacado.</li>
+                        </ul>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill sec">Base de Datos & Owner</span>
+                            <span>Integridad Relacional y Backfill</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Integridad Relacional en Supabase:</strong> Definición de claves foráneas con <code>ON DELETE CASCADE</code> e índices compuestos para búsquedas ultrarrápidas.</li>
+                            <li><strong>Migración a Service Role Key:</strong> Conexión blindada a Supabase mediante variables de entorno seguras.</li>
+                            <li><strong>Comando <code>sk!backfill</code>:</strong> Algoritmo de importación histórica con IDs puras, timeout de 10s por mensaje y reporte cada 50 elementos para no bloquear conexiones.</li>
+                            <li><strong>Comandos de Anuncios:</strong> Herramientas para el dueño del bot (<code>sk!announce</code> y <code>sk!editannounce</code>) y ayuda paginada interactiva en <code>sk!help</code>.</li>
+                        </ul>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Release v2.0.0 (Diciembre 2025 - Febrero 2026) -->
+            <article class="timeline-entry">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="t-header">
+                        <div>
+                            <div class="t-version-row">
+                                <span class="t-version-tag">v2.0.0</span>
+                            </div>
+                            <h2 class="t-title">El Gran Salto Asíncrono y Estadísticas Globales</h2>
+                        </div>
+                        <div class="t-date">30 de Diciembre, 2025</div>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill new">Arquitectura Asíncrona</span>
+                            <span>Rendimiento y No-Bloqueo</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Supabase Async Client:</strong> Transición completa a operaciones de base de datos asíncronas con <code>supabase.AsyncClient</code>, liberando el event loop de Discord.</li>
+                            <li><strong>Comando <code>/stats</code>:</strong> Visualización de métricas de uso del bot (total de servidores y mensajes destacados procesados).</li>
+                            <li><strong>Logging Estructurado:</strong> Reemplazo de llamadas <code>print()</code> por el módulo estándar <code>logging</code> con timestamps y niveles de severidad.</li>
+                        </ul>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Release v1.5.0 (Junio - Julio 2025) -->
+            <article class="timeline-entry">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="t-header">
+                        <div>
+                            <div class="t-version-row">
+                                <span class="t-version-tag">v1.5.0</span>
+                            </div>
+                            <h2 class="t-title">Migración a PostgreSQL en la Nube y Discord Linked Roles</h2>
+                        </div>
+                        <div class="t-date">19 de Junio, 2025</div>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill new">Persistencia & OAuth2</span>
+                            <span>Migración a Supabase y Roles Vinculados</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Persistencia en la Nube con Supabase:</strong> Sustitución del almacenamiento en archivos JSON locales por tablas PostgreSQL escalables (<code>settings</code>, <code>tracked_messages</code>, <code>ignored_channels</code>).</li>
+                            <li><strong>Eventos de Reacción en Bruto (RAW):</strong> Implementación de <code>on_raw_reaction_add</code> y <code>on_raw_reaction_remove</code> para capturar reacciones en mensajes no cacheados en memoria.</li>
+                            <li><strong>OAuth2 & Linked Roles de Discord:</strong> Rutas <code>/verify</code> y <code>/callback</code> en el servidor web Flask para vincular metadatos de usuario con roles de conexión verificados.</li>
+                            <li><strong>Prefijos Personalizables:</strong> Comando <code>sk!prefix</code> / <code>/prefix</code> para cambiar el prefijo del bot en cada servidor de forma independiente.</li>
+                            <li><strong>Gobernanza de Owner:</strong> Establecimiento de <code>GlobalFerociouS</code> como único dueño del bot.</li>
+                        </ul>
+                    </div>
+                </div>
+            </article>
+
+            <!-- Release v1.0.0 (Mayo 2025) -->
+            <article class="timeline-entry">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="t-header">
+                        <div>
+                            <div class="t-version-row">
+                                <span class="t-version-tag">v1.0.0</span>
+                            </div>
+                            <h2 class="t-title">Nacimiento de SkullBoard: El Starboard de Calaveras 💀</h2>
+                        </div>
+                        <div class="t-date">01 de Mayo, 2025</div>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill new">Lanzamiento Inicial</span>
+                            <span>Funcionalidad Nuclear y Servidor 24/7</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Creación de SkullBoard:</strong> Bot de Discord especializado en detectar y destacar automáticamente mensajes que reciben reacciones de calavera 💀 al alcanzar un umbral mínimo configurable.</li>
+                            <li><strong>Servidor Web Flask en Segundo Plano (<code>webserver.keep_alive()</code>):</strong> Servidor WSGI multihilo en el puerto 8080 para mantener el bot activo 24/7 en servicios de nube como Render.</li>
+                            <li><strong>Soporte Multimedia Completo:</strong> Renderizado automático en los embeds de imágenes adjuntas, GIFs de Tenor, enlaces de salto al mensaje original y marcas de tiempo UTC.</li>
+                            <li><strong>Comandos Base de Configuración:</strong> Conjunto inicial de comandos de texto y slash: <code>sk!setup</code> (canal de destacados), <code>sk!min</code> (umbral mínimo de 💀), <code>sk!ignore</code> y <code>sk!unignore</code> (exclusión de canales), <code>sk!help</code>, <code>sk!servers</code> y <code>sk!serverinfo</code>.</li>
+                            <li><strong>Control Antiduplicados Básico:</strong> Verificación de mensajes ya destacados para evitar reposts redundantes.</li>
                         </ul>
                     </div>
                 </div>
