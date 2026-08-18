@@ -506,9 +506,10 @@ async def build_ajustes_embed(guild_id) -> discord.Embed:
     return embed
 
 # ─── Dashboard & Web Links ───────────────────────────────────────────────────
-DASHBOARD_URL = "https://skullboard.vercel.app/index.html"
-PRIVACY_URL   = "https://skullboard.vercel.app/privacy.html"
-TERMS_URL     = "https://skullboard.vercel.app/terms.html"
+DASHBOARD_URL = "https://skullboard.vercel.app/"
+PRIVACY_URL   = "https://skullboard.vercel.app/privacy"
+TERMS_URL     = "https://skullboard.vercel.app/terms"
+CHANGES_URL   = "https://skullboard.vercel.app/cambios"
 
 class DashboardView(discord.ui.View):
     def __init__(self):
@@ -516,6 +517,7 @@ class DashboardView(discord.ui.View):
         self.add_item(discord.ui.Button(label="🌐 Panel Web", url=DASHBOARD_URL, style=discord.ButtonStyle.link))
         self.add_item(discord.ui.Button(label="🔒 Privacidad", url=PRIVACY_URL, style=discord.ButtonStyle.link))
         self.add_item(discord.ui.Button(label="📋 Términos", url=TERMS_URL, style=discord.ButtonStyle.link))
+        self.add_item(discord.ui.Button(label="📜 Novedades", url=CHANGES_URL, style=discord.ButtonStyle.link))
 
 def build_dashboard_embed() -> discord.Embed:
     embed = discord.Embed(
@@ -526,6 +528,7 @@ def build_dashboard_embed() -> discord.Embed:
             f"• 🏠 **Web oficial:** [skullboard.vercel.app]({DASHBOARD_URL})\n"
             f"• 🔒 **Política de Privacidad:** [Ver política]({PRIVACY_URL})\n"
             f"• 📋 **Términos de Servicio:** [Ver términos]({TERMS_URL})\n"
+            f"• 📜 **Historial de Cambios:** [Ver cambios]({CHANGES_URL})\n"
             f"• 🔗 **Invitar al bot:** [Enlace directo]({get_invite_url()})"
         ),
         color=0x8b5cf6

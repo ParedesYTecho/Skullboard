@@ -206,10 +206,22 @@ def api_contact():
 
 @app.route('/<path:filename>')
 def serve_legal_files(filename):
+    # Si viene con .html, redirigir permanentemente (301) a la URL limpia
+    if filename.endswith(".html"):
+        clean_name = filename[:-5]
+        return redirect(f"/{clean_name}", code=301)
+
     try:
-        return send_from_directory('legal', filename)
+        # 1. Si existe el archivo directo (ej. styles.css, skullboard_icon.png, robots.txt, sitemap.xml)
+        if os.path.isfile(os.path.join('legal', filename)):
+            return send_from_directory('legal', filename)
+        # 2. Si existe con terminación .html (ej. /privacy -> legal/privacy.html)
+        html_name = f"{filename}.html"
+        if os.path.isfile(os.path.join('legal', html_name)):
+            return send_from_directory('legal', html_name)
     except Exception:
-        return "❌ Archivo no encontrado.", 404
+        pass
+    return "❌ Archivo no encontrado.", 404
 
 # ── OAuth2: protección anti-CSRF ──────────────────────────────────────────────
 def _new_state() -> str:
