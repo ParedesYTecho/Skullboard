@@ -1,15 +1,93 @@
-# Python
+# ==============================================================================
+# SkullBoard — .gitignore
+# ==============================================================================
+
+# ── Python & Bytecode ────────────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
 *.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ── Entornos Virtuales ────────────────────────────────────────────────────────
 .venv/
 venv/
+ENV/
 env/
+env.bak/
+venv.bak/
 
-# Secrets
+# ── Secretos y Variables de Entorno ──────────────────────────────────────────
 .env
 .env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.cert
 
-# Tooling
+# ── IDEs y Editores de Código ────────────────────────────────────────────────
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# ── Sistema Operativo y Basura Local ─────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ── Logs y Diagnósticos ───────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Testing & Linting ────────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+
+# ── Herramientas de IA y Scratch ──────────────────────────────────────────────
 .claude/
+.gemini/
 graphify-out/
+scratch/
+tmp/
+temp/

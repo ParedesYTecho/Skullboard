@@ -71,7 +71,7 @@ flowchart LR
     Web <-->|REST API Counts| Supa
 ```
 
-Para más detalles, consulta el documento exhaustivo [ARCHITECTURE.md](ARCHITECTURE.md).
+Para más detalles, consulta el documento exhaustivo [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ---
 
@@ -176,5 +176,6 @@ python main.py
 
 ## 📚 Documentación Técnica Adicional
 
-- 📐 **[ARCHITECTURE.md](ARCHITECTURE.md)**: Arquitectura detallada, diagramas de secuencia, política de sincronización y análisis de rendimiento.
-- 📖 **[COMMANDS.md](COMMANDS.md)**: Manual exhaustivo de todos los comandos de texto, slash commands y comandos administrativos.
+- 📐 **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Arquitectura detallada, diagramas de secuencia, política de sincronización y análisis de rendimiento.
+- 📖 **[COMMANDS.md](docs/COMMANDS.md)**: Manual exhaustivo de todos los comandos de texto, slash commands y comandos administrativos.
+- 🏛️ **[SYSTEM_CONTEXT.md](docs/SYSTEM_CONTEXT.md)**: Documento maestro de gobernanza técnica, invariantes arquitectónicas y reglas de desarrollo.
