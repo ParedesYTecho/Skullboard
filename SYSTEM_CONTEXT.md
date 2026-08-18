@@ -42,6 +42,8 @@
    Todos los componentes interactivos del frontend deben contar con soporte de teclado (`Tab`, `Enter`, `Espacio`), roles semánticos (`role="button"`), estados `aria-expanded` y contraste de texto $\ge 4.5:1$.
 10. **Principio de Simplicidad Radical (Ponytail):**
     Preferir siempre la biblioteca estándar de Python y funciones nativas de PostgreSQL antes de añadir dependencias o capas de abstracción innecesarias.
+11. **Registro Obligatorio en Historial de Cambios (`legal/cambios.html`):**
+    Cualquier modificación, nueva funcionalidad, refactorización de interfaz, ajuste en comandos o parche de seguridad/rendimiento **DEBE registrarse inmediatamente en `legal/cambios.html`** dentro del Timeline de cambios con su fecha, número de versión, badges de categoría (`ui`, `new`, `sec`, `fix`) y desglose conciso.
 
 ---
 
