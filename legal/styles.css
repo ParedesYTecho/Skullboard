@@ -155,23 +155,25 @@ svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColo
 .btn:hover { text-decoration: none; transform: translateY(-2px); }
 .btn:active { transform: translateY(0) scale(0.98); }
 
-/* Botón Principal (Discord Blurple Premium con Brillo y Micro-rotación) */
+/* Botón Principal (Clean Luxury Platinum / Monocromático) */
 .btn-primary {
     position: relative;
     overflow: hidden;
-    color: #ffffff !important;
-    background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
-    border: 1px solid rgba(255, 255, 255, 0.22);
-    box-shadow: 0 4px 18px rgba(88, 101, 242, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.35);
-    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-    font-weight: 600;
+    color: #0a0a0c !important;
+    background: linear-gradient(135deg, #ffffff 0%, #dcdce6 100%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35), inset 0 1px 0 #ffffff;
+    font-weight: 700;
     letter-spacing: 0.2px;
+}
+.btn-primary svg {
+    color: #0a0a0c;
 }
 .btn-primary::before {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, transparent 60%);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.25) 0%, transparent 60%);
     pointer-events: none;
 }
 .btn-primary::after {
@@ -181,22 +183,23 @@ svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColo
     left: -80%;
     width: 45%;
     height: 200%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
     transform: rotate(25deg);
     transition: left 0.65s cubic-bezier(0.4, 0, 0.2, 1);
     pointer-events: none;
 }
 .btn-primary:hover {
-    background: linear-gradient(135deg, #6370ff 0%, #4f5be3 100%);
-    border-color: rgba(255, 255, 255, 0.35);
-    box-shadow: 0 8px 30px rgba(88, 101, 242, 0.58), 0 2px 8px rgba(88, 101, 242, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.45);
-    color: #ffffff !important;
+    background: #ffffff;
+    border-color: #ffffff;
+    box-shadow: 0 8px 28px rgba(255, 255, 255, 0.18), 0 4px 14px rgba(0, 0, 0, 0.45);
+    color: #0a0a0c !important;
+    transform: translateY(-2px);
 }
 .btn-primary:hover::after {
     left: 140%;
 }
 .btn-primary:hover svg {
-    transform: scale(1.15) rotate(-6deg);
+    transform: scale(1.12);
 }
 
 .btn-ghost { color: var(--ink); background: var(--surface); border-color: var(--border); box-shadow: 0 2px 8px rgba(0,0,0, 0.08); }
@@ -717,11 +720,11 @@ footer.site-footer {
     --surface-2: #ced5df;
     --border: #b8c0cc;
     --border-strong: #8a94a6;
-    --violet: #4f46e5;
-    --violet-2: #6366f1;
-    --violet-deep: #3730a3;
+    --violet: #1e293b;
+    --violet-2: #0b111e;
+    --violet-deep: #334155;
     --gold: #b45309;
-    --glow: rgba(99, 102, 241, 0.12);
+    --glow: rgba(0, 0, 0, 0.08);
     --ink: #0b111e;
     --ink-soft: #273444;
     --ink-dim: #505d6e;
@@ -732,9 +735,9 @@ footer.site-footer {
 
 :root[data-theme="light"] body::before {
     background:
-        radial-gradient(70vw 55vh at 50% -5%, rgba(99, 102, 241, 0.06), transparent 60%),
-        radial-gradient(50vw 45vh at 90% 15%, rgba(100, 116, 139, 0.09), transparent 60%),
-        radial-gradient(50vw 45vh at 10% 35%, rgba(100, 116, 139, 0.07), transparent 60%);
+        radial-gradient(70vw 55vh at 50% -5%, rgba(0, 0, 0, 0.03), transparent 60%),
+        radial-gradient(50vw 45vh at 90% 15%, rgba(100, 116, 139, 0.07), transparent 60%),
+        radial-gradient(50vw 45vh at 10% 35%, rgba(100, 116, 139, 0.05), transparent 60%);
 }
 
 :root[data-theme="light"] body::after {
@@ -742,7 +745,7 @@ footer.site-footer {
 }
 
 :root[data-theme="light"] a {
-    color: #4f46e5;
+    color: #0b111e;
 }
 
 :root[data-theme="light"] .nav {
@@ -763,7 +766,7 @@ footer.site-footer {
 
 :root[data-theme="light"] .brand:hover .mark {
     border-color: #7b8798;
-    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.18);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
 }
 
 :root[data-theme="light"] .nav-links .nav-link {
@@ -807,15 +810,19 @@ footer.site-footer {
 
 :root[data-theme="light"] .btn-primary {
     color: #ffffff !important;
-    background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
-    border: 1px solid rgba(255, 255, 255, 0.25);
-    box-shadow: 0 4px 18px rgba(88, 101, 242, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    background: linear-gradient(135deg, #0b111e 0%, #1e293b 100%);
+    border: 1px solid #0b111e;
+    box-shadow: 0 4px 16px rgba(11, 17, 30, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.20);
+}
+
+:root[data-theme="light"] .btn-primary svg {
+    color: #ffffff;
 }
 
 :root[data-theme="light"] .btn-primary:hover {
-    background: linear-gradient(135deg, #6370ff 0%, #4f5be3 100%);
-    border-color: rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 30px rgba(88, 101, 242, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+    border-color: #1e293b;
+    box-shadow: 0 8px 26px rgba(11, 17, 30, 0.35);
     color: #ffffff !important;
 }
 
@@ -854,7 +861,7 @@ footer.site-footer {
 }
 
 :root[data-theme="light"] .kicker {
-    color: #4f46e5;
+    color: #b45309;
 }
 
 :root[data-theme="light"] .bento-card {
@@ -938,8 +945,8 @@ footer.site-footer {
 
 :root[data-theme="light"] .cmd-search-wrap input:focus {
     background: #f8fafc;
-    border-color: #4f46e5;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18), 0 4px 12px rgba(0, 0, 0, 0.04);
+    border-color: #0b111e;
+    box-shadow: 0 0 0 3px rgba(11, 17, 30, 0.12), 0 4px 12px rgba(0, 0, 0, 0.04);
 }
 
 :root[data-theme="light"] .cmd-search-wrap input::placeholder {
@@ -1020,9 +1027,9 @@ footer.site-footer {
 }
 
 :root[data-theme="light"] .cmd-type.slash {
-    background: #e0e7ff;
-    color: #3730a3;
-    border-color: #c7d2fe;
+    background: #dce1e8;
+    color: #0b111e;
+    border-color: #b8c0cc;
 }
 
 :root[data-theme="light"] .copy-btn {
@@ -1049,9 +1056,9 @@ footer.site-footer {
 }
 
 :root[data-theme="light"] .param-name {
-    color: #4338ca;
-    background: #e0e7ff;
-    border: 1px solid #c7d2fe;
+    color: #0b111e;
+    background: #dce1e8;
+    border: 1px solid #b8c0cc;
 }
 
 :root[data-theme="light"] .param-desc {
@@ -1082,8 +1089,8 @@ footer.site-footer {
 :root[data-theme="light"] .contact-form input:focus,
 :root[data-theme="light"] .contact-form textarea:focus {
     background: #f8fafc;
-    border-color: #4f46e5;
-    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+    border-color: #0b111e;
+    box-shadow: 0 0 0 3px rgba(11, 17, 30, 0.12);
 }
 
 :root[data-theme="light"] .contact-form label {
@@ -1178,17 +1185,17 @@ footer.site-footer {
 
 /* Timeline Changelog en Modo Claro */
 :root[data-theme="light"] .timeline-container::before {
-    background: linear-gradient(180deg, #4f46e5 0%, #b8c0cc 60%, rgba(184, 192, 204, 0.2) 100%);
+    background: linear-gradient(180deg, #8a94a6 0%, #b8c0cc 60%, rgba(184, 192, 204, 0.2) 100%);
 }
 
 :root[data-theme="light"] .timeline-dot {
     background: #edf1f6;
-    border-color: #4f46e5;
-    box-shadow: 0 0 10px rgba(79, 70, 229, 0.25);
+    border-color: #0b111e;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.12);
 }
 
 :root[data-theme="light"] .timeline-dot::after {
-    background: #4f46e5;
+    background: #0b111e;
 }
 
 :root[data-theme="light"] .timeline-card {
@@ -1214,9 +1221,9 @@ footer.site-footer {
 }
 
 :root[data-theme="light"] .tag-pill.ui {
-    background: #e0f2fe;
-    color: #0369a1;
-    border-color: #7dd3fc;
+    background: #dce1e8;
+    color: #0b111e;
+    border-color: #b8c0cc;
 }
 
 :root[data-theme="light"] .tag-pill.new {
