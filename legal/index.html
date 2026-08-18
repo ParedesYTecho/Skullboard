@@ -512,8 +512,9 @@
         const cmds  = document.querySelectorAll('#cmd-grid .cmd');
 
         function filterCommands() {
-            const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
-            if (searchClear) searchClear.style.display = query ? 'grid' : 'none';
+            const rawQuery = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            const cleanQuery = rawQuery.replace(/^(sk!|\/|!)/, '');
+            if (searchClear) searchClear.style.display = rawQuery ? 'grid' : 'none';
             const activeChip = document.querySelector('.filter-chip.active');
             const activeCat = activeChip ? activeChip.dataset.cat : 'all';
 
@@ -521,18 +522,25 @@
             cmds.forEach(cmd => {
                 const text = cmd.textContent.toLowerCase();
                 const cat = cmd.dataset.cat;
-                const matchesCat = activeCat === 'all' || cat === activeCat;
-                const matchesQuery = !query || text.includes(query);
+                const matchesCat = (activeCat === 'all' || cat === activeCat);
+                const matchesQuery = (!rawQuery || text.includes(rawQuery) || (cleanQuery && text.includes(cleanQuery)));
                 const isVisible = matchesCat && matchesQuery;
+
                 cmd.hidden = !isVisible;
+                cmd.classList.toggle('is-hidden', !isVisible);
+                cmd.style.display = isVisible ? 'flex' : 'none';
                 if (isVisible) visibleCount++;
             });
 
-            if (cmdEmpty) cmdEmpty.hidden = visibleCount > 0;
+            if (cmdEmpty) {
+                cmdEmpty.hidden = (visibleCount > 0);
+                cmdEmpty.style.display = (visibleCount > 0) ? 'none' : 'block';
+            }
         }
 
         if (searchInput) {
             searchInput.addEventListener('input', filterCommands);
+            searchInput.addEventListener('keyup', filterCommands);
         }
 
         if (searchClear) {
@@ -545,7 +553,7 @@
             });
         }
 
-        chips.forEach(chip => chip.addEventListener('click', () => {
+        chips.forEach(chip => chip.addEventListener('click', (e) => {
             chips.forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
             filterCommands();

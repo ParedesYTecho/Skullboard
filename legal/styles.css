@@ -287,6 +287,14 @@ svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColo
 .cmd-empty .e-icon { font-size: 2rem; margin-bottom: 8px; }
 .cmd-empty p { font-size: 0.95rem; color: var(--ink-soft); }
 
+/* Visibilidad de comandos y elementos ocultos */
+[hidden],
+.cmd[hidden],
+.cmd.is-hidden,
+.cmd-empty[hidden] {
+    display: none !important;
+}
+
 /* ====== Scroll Reveal Animations ====== */
 [data-reveal] {
     opacity: 0;
