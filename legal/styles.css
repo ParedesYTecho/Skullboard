@@ -140,18 +140,71 @@ svg { display: block; width: 24px; height: 24px; fill: none; stroke: currentColo
 
 /* ====== Buttons ====== */
 .btn {
-    padding: 12px 22px; border-radius: 999px; font-weight: 600; font-size: 0.95rem;
-    display: inline-flex; align-items: center; gap: 9px; cursor: pointer;
-    transition: transform .2s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease;
+    padding: 12px 24px; border-radius: 999px; font-weight: 600; font-size: 0.95rem;
+    display: inline-flex; align-items: center; justify-content: center; gap: 9px; cursor: pointer;
+    transition: transform .22s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow .22s ease, background .22s ease, border-color .22s ease, filter .22s ease;
     border: 1px solid transparent;
+    text-decoration: none;
+    user-select: none;
 }
-.btn svg { width: 18px; height: 18px; }
+.btn svg {
+    width: 20px; height: 20px;
+    flex-shrink: 0;
+    transition: transform .25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
 .btn:hover { text-decoration: none; transform: translateY(-2px); }
-.btn-primary { color: #14141a; background: linear-gradient(135deg, #f2f2f6 0%, #cfcfd8 100%); box-shadow: 0 10px 30px rgba(0,0,0, 0.35); }
-.btn-primary:hover { box-shadow: 0 14px 38px rgba(0,0,0, 0.45); }
-.btn-ghost { color: var(--ink); background: var(--surface); border-color: var(--border); }
-.btn-ghost:hover { background: var(--surface-2); border-color: var(--border-strong); }
-.btn-sm { padding: 9px 16px; font-size: 0.88rem; }
+.btn:active { transform: translateY(0) scale(0.98); }
+
+/* Botón Principal (Discord Blurple Premium con Brillo y Micro-rotación) */
+.btn-primary {
+    position: relative;
+    overflow: hidden;
+    color: #ffffff !important;
+    background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow: 0 4px 18px rgba(88, 101, 242, 0.40), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+.btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.16) 0%, transparent 60%);
+    pointer-events: none;
+}
+.btn-primary::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -80%;
+    width: 45%;
+    height: 200%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+    transform: rotate(25deg);
+    transition: left 0.65s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: none;
+}
+.btn-primary:hover {
+    background: linear-gradient(135deg, #6370ff 0%, #4f5be3 100%);
+    border-color: rgba(255, 255, 255, 0.35);
+    box-shadow: 0 8px 30px rgba(88, 101, 242, 0.58), 0 2px 8px rgba(88, 101, 242, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    color: #ffffff !important;
+}
+.btn-primary:hover::after {
+    left: 140%;
+}
+.btn-primary:hover svg {
+    transform: scale(1.15) rotate(-6deg);
+}
+
+.btn-ghost { color: var(--ink); background: var(--surface); border-color: var(--border); box-shadow: 0 2px 8px rgba(0,0,0, 0.08); }
+.btn-ghost:hover { background: var(--surface-2); border-color: var(--border-strong); color: var(--ink); }
+.btn-ghost svg { width: 18px; height: 18px; }
+
+.btn-sm { padding: 8px 16px; font-size: 0.86rem; }
+.nav-cta { padding: 8px 17px; font-size: 0.85rem; }
 
 /* ====== Hero ====== */
 .hero { text-align: center; padding: 70px 0 26px; }
@@ -753,14 +806,17 @@ footer.site-footer {
 }
 
 :root[data-theme="light"] .btn-primary {
-    color: #ffffff;
-    background: linear-gradient(135deg, #0b111e 0%, #1e293b 100%);
-    box-shadow: 0 4px 14px rgba(11, 17, 30, 0.22);
+    color: #ffffff !important;
+    background: linear-gradient(135deg, #5865F2 0%, #4752C4 100%);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 4px 18px rgba(88, 101, 242, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 
 :root[data-theme="light"] .btn-primary:hover {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    box-shadow: 0 8px 22px rgba(11, 17, 30, 0.30);
+    background: linear-gradient(135deg, #6370ff 0%, #4f5be3 100%);
+    border-color: rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 30px rgba(88, 101, 242, 0.52), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+    color: #ffffff !important;
 }
 
 :root[data-theme="light"] .btn-ghost {
