@@ -56,6 +56,8 @@
             <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></symbol>
             <symbol id="i-discord" viewBox="0 0 24 24"><path d="M19.3 5.6A17 17 0 0 0 15 4.3l-.2.4a13 13 0 0 1 3.7 1.9 12 12 0 0 0-10.9 0 13 13 0 0 1 3.7-1.9L11 4.3A17 17 0 0 0 6.7 5.6C4 9.6 3.3 13.5 3.6 17.3a17 17 0 0 0 5.2 2.6l.6-1a11 11 0 0 1-1.8-.9l.4-.3a12 12 0 0 0 10 0l.4.3c-.6.4-1.2.7-1.8.9l.6 1a17 17 0 0 0 5.2-2.6c.4-4.4-.6-8.3-3.1-11.7ZM9.5 15c-.9 0-1.6-.8-1.6-1.9 0-1 .7-1.9 1.6-1.9s1.7.9 1.6 1.9c0 1.1-.7 1.9-1.6 1.9Zm5 0c-.9 0-1.6-.8-1.6-1.9 0-1 .7-1.9 1.6-1.9s1.7.9 1.6 1.9c0 1.1-.7 1.9-1.6 1.9Z" fill="currentColor" stroke="none"/></symbol>
             <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+            <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+            <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
             <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
             <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></symbol>
         </defs>
@@ -88,53 +90,6 @@
                     <svg><use href="#i-discord"/></svg> Añadir a Discord
                 </a>
                 <a class="btn btn-ghost" href="#comandos"><svg><use href="#i-hash"/></svg> Ver comandos</a>
-            </div>
-
-            <!-- 3D Interactive Mockup (Estilo Apple / Discord) -->
-            <div class="hero-showcase" id="hero-showcase">
-                <div class="hero-glow-backdrop"></div>
-                <div class="mockup-card" id="mockup-card">
-                    <div class="mockup-sheen" id="mockup-sheen"></div>
-                    <div class="mockup-header">
-                        <div class="mockup-dots"><span></span><span></span><span></span></div>
-                        <div class="mockup-channel"><svg><use href="#i-hash"/></svg> general</div>
-                        <div class="mockup-tag">Live Preview</div>
-                    </div>
-                    <div class="mockup-body">
-                        <div class="discord-msg">
-                            <div class="msg-avatar">👑</div>
-                            <div class="msg-content">
-                                <div class="msg-header">
-                                    <span class="msg-user">GlobalFerociouS</span>
-                                    <span class="msg-badge">DEV</span>
-                                    <span class="msg-time">hoy a las 18:30</span>
-                                </div>
-                                <div class="msg-text">¡Nuevo récord del servidor! Este momento se va directo al skullboard 💀🔥</div>
-                                <div class="msg-reactions">
-                                    <button class="reaction-btn active" id="skull-counter-btn" type="button" aria-label="Reaccionar con calavera">
-                                        <span class="r-emoji">💀</span>
-                                        <span class="r-count" id="live-skull-count">12</span>
-                                    </button>
-                                    <span class="reaction-hint">← Haz clic para reaccionar</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="skullboard-embed-preview">
-                            <div class="embed-sidebar"></div>
-                            <div class="embed-body">
-                                <div class="embed-head">
-                                    <span class="embed-channel">Publicado en #💀-skullboard</span>
-                                    <span class="embed-score" id="embed-score-badge">💀 12</span>
-                                </div>
-                                <div class="embed-desc">¡Nuevo récord del servidor! Este momento se va directo al skullboard 💀🔥</div>
-                                <div class="embed-footer">
-                                    <span>ID: 1367463352774955059</span> • <a href="#como-funciona" class="embed-jump">Ir al mensaje ↗</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
         </header>
 
@@ -229,6 +184,7 @@
             <div class="cmd-search-box">
                 <svg><use href="#i-search"/></svg>
                 <input type="text" id="cmd-search" placeholder="Buscar comando (ej: /top, stats, pin, prefix, reset)..." autocomplete="off" aria-label="Buscar comandos">
+                <button class="cmd-search-clear" id="cmd-search-clear" type="button" aria-label="Limpiar búsqueda">✕</button>
             </div>
 
             <div class="filters" role="tablist" aria-label="Filtrar comandos">
@@ -240,31 +196,252 @@
             </div>
 
             <div class="cmd-grid" id="cmd-grid">
-                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-gear"/></svg></span><div><code>/ajustes</code><div class="c-desc">Ver la configuración actual del bot.</div></div></div>
-                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-bolt"/></svg></span><div><code>/ping</code><div class="c-desc">Latencia y estado del bot.</div></div></div>
-                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-link"/></svg></span><div><code>/invite</code><div class="c-desc">Enlace para añadir el bot a otro servidor.</div></div></div>
-                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-link"/></svg></span><div><code>/dashboard</code><div class="c-desc">Enlace a la web oficial y panel de SkullBoard.</div></div></div>
-                <div class="cmd has-params" data-cat="general"><span class="c-ico"><svg><use href="#i-bell"/></svg></span><span class="c-caret">▾</span><div><code>/notify</code><div class="c-desc">Activa o desactiva tus avisos por DM.</div><div class="c-params"><div class="param"><code>estado</code><span class="opt">opcional</span><span class="ptype">on / off</span></div><div class="pdesc">Sin valor, muestra tu estado actual. <code>on</code> activa, <code>off</code> desactiva.</div></div></div></div>
-                <div class="cmd" data-cat="general"><span class="c-ico"><svg><use href="#i-info"/></svg></span><div><code>/help</code><div class="c-desc">Lista completa de comandos.</div></div></div>
+                <!-- General (6) -->
+                <div class="cmd" data-cat="general">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-gear"/></svg></span>
+                        <div class="cmd-names"><code>/ajustes</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/ajustes"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Ver la configuración actual del bot en el servidor.</div>
+                </div>
 
-                <div class="cmd" data-cat="skull"><span class="c-ico"><svg><use href="#i-trophy"/></svg></span><div><code>/top</code><div class="c-desc">Mensajes con más 💀 del servidor.</div></div></div>
-                <div class="cmd has-params" data-cat="skull"><span class="c-ico"><svg><use href="#i-chart"/></svg></span><span class="c-caret">▾</span><div><code>/stats</code><div class="c-desc">Estadísticas de un usuario.</div><div class="c-params"><div class="param"><code>usuario</code><span class="opt">opcional</span><span class="ptype">miembro</span></div><div class="pdesc">Usuario del que ver las estadísticas. Si lo omites, muestra las tuyas.</div></div></div></div>
-                <div class="cmd" data-cat="skull"><span class="c-ico"><svg><use href="#i-dice"/></svg></span><div><code>/random</code><div class="c-desc">Un mensaje aleatorio del tablón.</div></div></div>
-                <div class="cmd" data-cat="skull"><span class="c-ico"><svg><use href="#i-eye-off"/></svg></span><div><code>/ignored</code><div class="c-desc">Ver los canales ignorados.</div></div></div>
+                <div class="cmd" data-cat="general">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-bolt"/></svg></span>
+                        <div class="cmd-names"><code>/ping</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/ping"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Comprueba la latencia del WebSocket y estado del bot.</div>
+                </div>
 
-                <div class="cmd" data-cat="rank"><span class="c-ico"><svg><use href="#i-crown"/></svg></span><div><code>/leaderboard</code><div class="c-desc">Top usuarios por 💀 totales.</div></div></div>
-                <div class="cmd" data-cat="rank"><span class="c-ico"><svg><use href="#i-chart"/></svg></span><div><code>/server_stats</code><div class="c-desc">Estadísticas globales del servidor.</div></div></div>
-                <div class="cmd" data-cat="rank"><span class="c-ico"><svg><use href="#i-trophy"/></svg></span><div><code>/top_month</code><div class="c-desc">Top de mensajes del mes.</div></div></div>
-                <div class="cmd" data-cat="rank"><span class="c-ico"><svg><use href="#i-trophy"/></svg></span><div><code>/top_year</code><div class="c-desc">Top de mensajes del año.</div></div></div>
+                <div class="cmd" data-cat="general">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-link"/></svg></span>
+                        <div class="cmd-names"><code>/invite</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/invite"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Enlace oficial para invitar a SkullBoard a tu servidor de Discord.</div>
+                </div>
 
-                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-hash"/></svg></span><span class="c-caret">▾</span><div><code>/set_channel</code> <span class="tag">Admin</span><div class="c-desc">Define el canal del skullboard.</div><div class="c-params"><div class="param"><code>channel</code><span class="req">obligatorio</span><span class="ptype">canal de texto</span></div><div class="pdesc">Canal donde se publicarán los mensajes destacados.</div></div></div></div>
-                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-sliders"/></svg></span><span class="c-caret">▾</span><div><code>/set_min</code> <span class="tag">Admin</span><div class="c-desc">Mínimo de 💀 para destacar.</div><div class="c-params"><div class="param"><code>cantidad</code><span class="req">obligatorio</span><span class="ptype">número ≥ 1</span></div><div class="pdesc">Reacciones 💀 necesarias para que un mensaje llegue al tablón.</div></div></div></div>
-                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-gear"/></svg></span><span class="c-caret">▾</span><div><code>/prefix</code> <span class="tag">Admin</span><div class="c-desc">Cambia el prefijo de texto.</div><div class="c-params"><div class="param"><code>nuevo_prefijo</code><span class="req">obligatorio</span><span class="ptype">texto (máx 10)</span></div><div class="pdesc">Prefijo para los comandos de texto (por defecto <code>sk!</code>).</div></div></div></div>
-                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-eye-off"/></svg></span><span class="c-caret">▾</span><div><code>/ignore</code> <span class="tag">Admin</span><div class="c-desc">Excluye un canal del skullboard.</div><div class="c-params"><div class="param"><code>canal</code><span class="req">obligatorio</span><span class="ptype">canal de texto</span></div><div class="pdesc">Canal a excluir del skullboard.</div></div></div></div>
-                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-eye-off"/></svg></span><span class="c-caret">▾</span><div><code>/unignore</code> <span class="tag">Admin</span><div class="c-desc">Vuelve a incluir un canal en el skullboard.</div><div class="c-params"><div class="param"><code>canal</code><span class="req">obligatorio</span><span class="ptype">canal de texto</span></div><div class="pdesc">Canal a volver a incluir en el skullboard.</div></div></div></div>
-                <div class="cmd has-params" data-cat="admin"><span class="c-ico"><svg><use href="#i-target"/></svg></span><span class="c-caret">▾</span><div><code>/setup_pin</code> <span class="tag">Admin</span><div class="c-desc">Auto-pin a partir de un umbral.</div><div class="c-params"><div class="param"><code>umbral</code><span class="req">obligatorio</span><span class="ptype">número ≥ 0</span></div><div class="pdesc">💀 para fijar el mensaje automáticamente. <code>0</code> desactiva el auto-pin.</div></div></div></div>
-                <div class="cmd" data-cat="admin"><span class="c-ico"><svg><use href="#i-sync"/></svg></span><div><code>/resync</code> <span class="tag">Admin</span><div class="c-desc">Recuenta las 💀 y limpia duplicados.</div></div></div>
-                <div class="cmd" data-cat="admin"><span class="c-ico"><svg><use href="#i-trash"/></svg></span><div><code>/reset</code> <span class="tag">Dueño</span><div class="c-desc">Reinicia el tablón (solo el propietario).</div></div></div>
+                <div class="cmd" data-cat="general">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-link"/></svg></span>
+                        <div class="cmd-names"><code>/dashboard</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/dashboard"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Enlace a la web oficial y panel de recursos de SkullBoard.</div>
+                </div>
+
+                <div class="cmd has-params" data-cat="general">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-bell"/></svg></span>
+                        <div class="cmd-names"><code>/notify</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/notify"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Activa o desactiva tus notificaciones personales por DM.</div>
+                    <div class="c-toggle-hint"><span>Ver parámetros</span> <span class="c-caret">▾</span></div>
+                    <div class="c-params">
+                        <div class="param"><code>estado</code><span class="opt">opcional</span><span class="ptype">on / off</span></div>
+                        <div class="pdesc">Sin valor muestra tu estado actual. <code>on</code> activa las alertas, <code>off</code> las desactiva.</div>
+                    </div>
+                </div>
+
+                <div class="cmd" data-cat="general">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-info"/></svg></span>
+                        <div class="cmd-names"><code>/help</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/help"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Lista completa de comandos organizados por categorías.</div>
+                </div>
+
+                <!-- Skullboard (4) -->
+                <div class="cmd" data-cat="skull">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-trophy"/></svg></span>
+                        <div class="cmd-names"><code>/top</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/top"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Muestra los mensajes con más reacciones 💀 de todo el servidor.</div>
+                </div>
+
+                <div class="cmd has-params" data-cat="skull">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-chart"/></svg></span>
+                        <div class="cmd-names"><code>/stats</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/stats"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Estadísticas detalladas de un usuario en el skullboard.</div>
+                    <div class="c-toggle-hint"><span>Ver parámetros</span> <span class="c-caret">▾</span></div>
+                    <div class="c-params">
+                        <div class="param"><code>usuario</code><span class="opt">opcional</span><span class="ptype">miembro</span></div>
+                        <div class="pdesc">Usuario a consultar. Si se omite, muestra tus estadísticas personales.</div>
+                    </div>
+                </div>
+
+                <div class="cmd" data-cat="skull">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-dice"/></svg></span>
+                        <div class="cmd-names"><code>/random</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/random"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Obtén un mensaje destacado al azar del tablón de honor.</div>
+                </div>
+
+                <div class="cmd" data-cat="skull">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-eye-off"/></svg></span>
+                        <div class="cmd-names"><code>/ignored</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/ignored"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Lista los canales de texto actualmente excluidos del skullboard.</div>
+                </div>
+
+                <!-- Rankings (4) -->
+                <div class="cmd" data-cat="rank">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-crown"/></svg></span>
+                        <div class="cmd-names"><code>/leaderboard</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/leaderboard"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Top 10 usuarios con más calaveras 💀 acumuladas en el servidor.</div>
+                </div>
+
+                <div class="cmd" data-cat="rank">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-chart"/></svg></span>
+                        <div class="cmd-names"><code>/server_stats</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/server_stats"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Métricas y estadísticas globales de actividad del skullboard.</div>
+                </div>
+
+                <div class="cmd" data-cat="rank">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-trophy"/></svg></span>
+                        <div class="cmd-names"><code>/top_month</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/top_month"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Los mejores mensajes destacados del mes en curso.</div>
+                </div>
+
+                <div class="cmd" data-cat="rank">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-trophy"/></svg></span>
+                        <div class="cmd-names"><code>/top_year</code></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/top_year"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Los mejores mensajes destacados de todo el año actual.</div>
+                </div>
+
+                <!-- Administración (8) -->
+                <div class="cmd has-params" data-cat="admin">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-hash"/></svg></span>
+                        <div class="cmd-names"><code>/set_channel</code> <span class="tag">Admin</span></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/set_channel"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Define el canal de texto donde se publicarán los mensajes destacados.</div>
+                    <div class="c-toggle-hint"><span>Ver parámetros</span> <span class="c-caret">▾</span></div>
+                    <div class="c-params">
+                        <div class="param"><code>channel</code><span class="req">obligatorio</span><span class="ptype">canal de texto</span></div>
+                        <div class="pdesc">Canal destino del skullboard.</div>
+                    </div>
+                </div>
+
+                <div class="cmd has-params" data-cat="admin">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-sliders"/></svg></span>
+                        <div class="cmd-names"><code>/set_min</code> <span class="tag">Admin</span></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/set_min"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Establece el mínimo de reacciones 💀 para publicar un mensaje.</div>
+                    <div class="c-toggle-hint"><span>Ver parámetros</span> <span class="c-caret">▾</span></div>
+                    <div class="c-params">
+                        <div class="param"><code>cantidad</code><span class="req">obligatorio</span><span class="ptype">número ≥ 1</span></div>
+                        <div class="pdesc">Cantidad requerida de reacciones de calavera.</div>
+                    </div>
+                </div>
+
+                <div class="cmd has-params" data-cat="admin">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-gear"/></svg></span>
+                        <div class="cmd-names"><code>/prefix</code> <span class="tag">Admin</span></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/prefix"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Cambia el prefijo para los comandos de texto (por defecto <code>sk!</code>).</div>
+                    <div class="c-toggle-hint"><span>Ver parámetros</span> <span class="c-caret">▾</span></div>
+                    <div class="c-params">
+                        <div class="param"><code>nuevo_prefijo</code><span class="req">obligatorio</span><span class="ptype">texto (máx 10)</span></div>
+                        <div class="pdesc">Nuevo prefijo para invocar comandos de texto.</div>
+                    </div>
+                </div>
+
+                <div class="cmd has-params" data-cat="admin">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-eye-off"/></svg></span>
+                        <div class="cmd-names"><code>/ignore</code> <span class="tag">Admin</span></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/ignore"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Excluye un canal de texto para que sus mensajes no se cuenten.</div>
+                    <div class="c-toggle-hint"><span>Ver parámetros</span> <span class="c-caret">▾</span></div>
+                    <div class="c-params">
+                        <div class="param"><code>canal</code><span class="req">obligatorio</span><span class="ptype">canal de texto</span></div>
+                        <div class="pdesc">Canal que no participará en el skullboard.</div>
+                    </div>
+                </div>
+
+                <div class="cmd has-params" data-cat="admin">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-eye-off"/></svg></span>
+                        <div class="cmd-names"><code>/unignore</code> <span class="tag">Admin</span></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/unignore"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Reincorpora un canal previamente ignorado al skullboard.</div>
+                    <div class="c-toggle-hint"><span>Ver parámetros</span> <span class="c-caret">▾</span></div>
+                    <div class="c-params">
+                        <div class="param"><code>canal</code><span class="req">obligatorio</span><span class="ptype">canal de texto</span></div>
+                        <div class="pdesc">Canal a habilitar nuevamente.</div>
+                    </div>
+                </div>
+
+                <div class="cmd has-params" data-cat="admin">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-target"/></svg></span>
+                        <div class="cmd-names"><code>/setup_pin</code> <span class="tag">Admin</span></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/setup_pin"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Configura el fijado automático (Auto-Pin) a partir de un umbral.</div>
+                    <div class="c-toggle-hint"><span>Ver parámetros</span> <span class="c-caret">▾</span></div>
+                    <div class="c-params">
+                        <div class="param"><code>umbral</code><span class="req">obligatorio</span><span class="ptype">número ≥ 0</span></div>
+                        <div class="pdesc">Calaveras para auto-pin. Especificar <code>0</code> desactiva el auto-pin.</div>
+                    </div>
+                </div>
+
+                <div class="cmd" data-cat="admin">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-sync"/></svg></span>
+                        <div class="cmd-names"><code>/resync</code> <span class="tag">Admin</span></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/resync"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Recuenta las 💀 reales del servidor y limpia duplicados o borrados.</div>
+                </div>
+
+                <div class="cmd" data-cat="admin">
+                    <div class="cmd-top">
+                        <span class="c-ico"><svg><use href="#i-trash"/></svg></span>
+                        <div class="cmd-names"><code>/reset</code> <span class="tag owner">Dueño</span></div>
+                        <button class="copy-btn" type="button" aria-label="Copiar comando" data-copy="/reset"><svg><use href="#i-copy"/></svg> Copiar</button>
+                    </div>
+                    <div class="c-desc">Reinicia el tablón del servidor (exclusivo para el propietario).</div>
+                </div>
+            </div>
+
+            <div class="cmd-empty" id="cmd-empty" hidden>
+                <div class="e-icon">🔍</div>
+                <p>No se encontraron comandos que coincidan con tu búsqueda.</p>
             </div>
         </section>
 
@@ -327,75 +504,45 @@
             ? 'http://localhost:8080' 
             : 'https://skullboard-fqf1.onrender.com';
 
-        // 3D Tilt interactivo (Apple / Linear style) para el Mockup del Hero
-        const showcase = document.getElementById('hero-showcase');
-        const card = document.getElementById('mockup-card');
-        const sheen = document.getElementById('mockup-sheen');
-
-        if (showcase && card && window.matchMedia('(hover: hover)').matches) {
-            let rafId = null;
-            showcase.addEventListener('mousemove', (e) => {
-                if (rafId) cancelAnimationFrame(rafId);
-                rafId = requestAnimationFrame(() => {
-                    const rect = card.getBoundingClientRect();
-                    const x = e.clientX - rect.left;
-                    const y = e.clientY - rect.top;
-                    const centerX = rect.width / 2;
-                    const centerY = rect.height / 2;
-                    const rotateX = ((y - centerY) / centerY) * -9;
-                    const rotateY = ((x - centerX) / centerX) * 9;
-                    
-                    card.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`;
-                    if (sheen) {
-                        sheen.style.setProperty('--mouse-x', `${(x / rect.width * 100).toFixed(1)}%`);
-                        sheen.style.setProperty('--mouse-y', `${(y / rect.height * 100).toFixed(1)}%`);
-                    }
-                });
-            });
-
-            showcase.addEventListener('mouseleave', () => {
-                if (rafId) cancelAnimationFrame(rafId);
-                card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
-            });
-        }
-
-        // Reacción interactiva con Calavera en el Hero Mockup
-        const skullBtn = document.getElementById('skull-counter-btn');
-        const liveCount = document.getElementById('live-skull-count');
-        const scoreBadge = document.getElementById('embed-score-badge');
-        let countVal = 12;
-        if (skullBtn) {
-            skullBtn.addEventListener('click', () => {
-                countVal++;
-                skullBtn.classList.remove('pop');
-                void skullBtn.offsetWidth; // Trigger reflow
-                skullBtn.classList.add('pop');
-                if (liveCount) liveCount.textContent = countVal;
-                if (scoreBadge) scoreBadge.textContent = `💀 ${countVal}`;
-            });
-        }
-
         // Buscador y Filtros de Comandos
         const searchInput = document.getElementById('cmd-search');
+        const searchClear = document.getElementById('cmd-search-clear');
+        const cmdEmpty    = document.getElementById('cmd-empty');
         const chips = document.querySelectorAll('.filter-chip');
         const cmds  = document.querySelectorAll('#cmd-grid .cmd');
 
         function filterCommands() {
             const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            if (searchClear) searchClear.style.display = query ? 'grid' : 'none';
             const activeChip = document.querySelector('.filter-chip.active');
             const activeCat = activeChip ? activeChip.dataset.cat : 'all';
 
+            let visibleCount = 0;
             cmds.forEach(cmd => {
                 const text = cmd.textContent.toLowerCase();
                 const cat = cmd.dataset.cat;
                 const matchesCat = activeCat === 'all' || cat === activeCat;
                 const matchesQuery = !query || text.includes(query);
-                cmd.hidden = !(matchesCat && matchesQuery);
+                const isVisible = matchesCat && matchesQuery;
+                cmd.hidden = !isVisible;
+                if (isVisible) visibleCount++;
             });
+
+            if (cmdEmpty) cmdEmpty.hidden = visibleCount > 0;
         }
 
         if (searchInput) {
             searchInput.addEventListener('input', filterCommands);
+        }
+
+        if (searchClear) {
+            searchClear.addEventListener('click', () => {
+                if (searchInput) {
+                    searchInput.value = '';
+                    searchInput.focus();
+                    filterCommands();
+                }
+            });
         }
 
         chips.forEach(chip => chip.addEventListener('click', () => {
@@ -404,12 +551,31 @@
             filterCommands();
         }));
 
+        // Copiar comandos al portapapeles con feedback instantáneo
+        document.querySelectorAll('.copy-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation(); // No activa el toggle de parámetros si está dentro
+                const textToCopy = btn.dataset.copy;
+                if (!textToCopy) return;
+                navigator.clipboard.writeText(textToCopy).then(() => {
+                    const origHtml = btn.innerHTML;
+                    btn.classList.add('copied');
+                    btn.innerHTML = '<svg><use href="#i-check"/></svg> Copiado!';
+                    setTimeout(() => {
+                        btn.classList.remove('copied');
+                        btn.innerHTML = origHtml;
+                    }, 1600);
+                }).catch(() => {});
+            });
+        });
+
         // Expandir parámetros al pulsar una tarjeta de comando (Accesible por Click y Teclado)
         document.querySelectorAll('#cmd-grid .cmd.has-params').forEach(c => {
             c.setAttribute('tabindex', '0');
             c.setAttribute('role', 'button');
             c.setAttribute('aria-expanded', 'false');
-            const toggle = () => {
+            const toggle = (e) => {
+                if (e.target.closest('.copy-btn')) return;
                 const isOpen = c.classList.toggle('open');
                 c.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
             };
@@ -417,7 +583,7 @@
             c.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    toggle();
+                    toggle(e);
                 }
             });
         });
