@@ -55,6 +55,7 @@
             <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20 11A8 8 0 0 0 6.3 6.3L4 8M4 4v4h4M4 13a8 8 0 0 0 13.7 4.7L20 16M20 20v-4h-4"/></symbol>
             <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></symbol>
             <symbol id="i-discord" viewBox="0 0 24 24"><path d="M19.3 5.6A17 17 0 0 0 15 4.3l-.2.4a13 13 0 0 1 3.7 1.9 12 12 0 0 0-10.9 0 13 13 0 0 1 3.7-1.9L11 4.3A17 17 0 0 0 6.7 5.6C4 9.6 3.3 13.5 3.6 17.3a17 17 0 0 0 5.2 2.6l.6-1a11 11 0 0 1-1.8-.9l.4-.3a12 12 0 0 0 10 0l.4.3c-.6.4-1.2.7-1.8.9l.6 1a17 17 0 0 0 5.2-2.6c.4-4.4-.6-8.3-3.1-11.7ZM9.5 15c-.9 0-1.6-.8-1.6-1.9 0-1 .7-1.9 1.6-1.9s1.7.9 1.6 1.9c0 1.1-.7 1.9-1.6 1.9Zm5 0c-.9 0-1.6-.8-1.6-1.9 0-1 .7-1.9 1.6-1.9s1.7.9 1.6 1.9c0 1.1-.7 1.9-1.6 1.9Z" fill="currentColor" stroke="none"/></symbol>
+            <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
             <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
             <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></symbol>
         </defs>
@@ -77,7 +78,7 @@
     </nav>
 
     <div class="container">
-        <header class="hero">
+        <header class="hero" data-reveal>
             <div class="emblem">💀</div>
             <div class="pill"><span class="dot"></span> En línea · <span id="pill-servers">—</span> servidores</div>
             <h1>Lo mejor de tu<br>servidor, destacado.</h1>
@@ -88,55 +89,116 @@
                 </a>
                 <a class="btn btn-ghost" href="#comandos"><svg><use href="#i-hash"/></svg> Ver comandos</a>
             </div>
+
+            <!-- 3D Interactive Mockup (Estilo Apple / Discord) -->
+            <div class="hero-showcase" id="hero-showcase">
+                <div class="hero-glow-backdrop"></div>
+                <div class="mockup-card" id="mockup-card">
+                    <div class="mockup-sheen" id="mockup-sheen"></div>
+                    <div class="mockup-header">
+                        <div class="mockup-dots"><span></span><span></span><span></span></div>
+                        <div class="mockup-channel"><svg><use href="#i-hash"/></svg> general</div>
+                        <div class="mockup-tag">Live Preview</div>
+                    </div>
+                    <div class="mockup-body">
+                        <div class="discord-msg">
+                            <div class="msg-avatar">👑</div>
+                            <div class="msg-content">
+                                <div class="msg-header">
+                                    <span class="msg-user">GlobalFerociouS</span>
+                                    <span class="msg-badge">DEV</span>
+                                    <span class="msg-time">hoy a las 18:30</span>
+                                </div>
+                                <div class="msg-text">¡Nuevo récord del servidor! Este momento se va directo al skullboard 💀🔥</div>
+                                <div class="msg-reactions">
+                                    <button class="reaction-btn active" id="skull-counter-btn" type="button" aria-label="Reaccionar con calavera">
+                                        <span class="r-emoji">💀</span>
+                                        <span class="r-count" id="live-skull-count">12</span>
+                                    </button>
+                                    <span class="reaction-hint">← Haz clic para reaccionar</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="skullboard-embed-preview">
+                            <div class="embed-sidebar"></div>
+                            <div class="embed-body">
+                                <div class="embed-head">
+                                    <span class="embed-channel">Publicado en #💀-skullboard</span>
+                                    <span class="embed-score" id="embed-score-badge">💀 12</span>
+                                </div>
+                                <div class="embed-desc">¡Nuevo récord del servidor! Este momento se va directo al skullboard 💀🔥</div>
+                                <div class="embed-footer">
+                                    <span>ID: 1367463352774955059</span> • <a href="#como-funciona" class="embed-jump">Ir al mensaje ↗</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </header>
 
-        <section class="stats" aria-label="Resumen">
+        <section class="stats" aria-label="Resumen" data-reveal>
             <div class="stat"><div class="num" id="stat-servers">—</div><div class="lbl">Servidores activos</div></div>
             <div class="stat"><div class="num" id="stat-highlighted">—</div><div class="lbl">Mensajes destacados</div></div>
             <div class="stat"><div class="num" id="stat-commands">22</div><div class="lbl">Comandos slash y de texto</div></div>
         </section>
 
-        <section class="section">
+        <section class="section" data-reveal>
             <div class="section-head">
                 <span class="kicker">Qué hace</span>
                 <h2>Diseñado para resaltar tu comunidad</h2>
-                <p>Todo lo que necesita un buen starboard, sin configuraciones complicadas.</p>
+                <p>Todo lo que necesita un buen starboard moderno, sin configuraciones complicadas.</p>
             </div>
-            <div class="features">
-                <div class="feature">
-                    <div class="ico"><svg class="icon"><use href="#i-skull"/></svg></div>
-                    <h3>Resalta lo mejor</h3>
-                    <p>Al alcanzar las 💀 que definas, el mensaje se reenvía automáticamente a tu canal de skullboard.</p>
+            <div class="bento-grid">
+                <div class="bento-card bento-8">
+                    <div>
+                        <div class="ico"><svg class="icon"><use href="#i-skull"/></svg></div>
+                        <h3>Tablón Automatizado & Auto-Pin</h3>
+                        <p>Al alcanzar el umbral de 💀 configurado, el mensaje se reenvía al instante a tu canal de skullboard. Además, puedes fijar automáticamente los récords del servidor.</p>
+                    </div>
                 </div>
-                <div class="feature">
-                    <div class="ico"><svg class="icon"><use href="#i-trophy"/></svg></div>
-                    <h3>Rankings y stats</h3>
-                    <p>Leaderboard de usuarios, top del mes y del año, y estadísticas por persona y por servidor.</p>
+                <div class="bento-card bento-4">
+                    <div>
+                        <div class="ico"><svg class="icon"><use href="#i-crown"/></svg></div>
+                        <h3>Rankings & Podio</h3>
+                        <p>Leaderboard en vivo de usuarios, tops mensuales y anuales.</p>
+                        <div class="podium">
+                            <div class="podium-item silver"><div class="p-med">🥈 #2</div><div class="p-skulls">98 💀</div></div>
+                            <div class="podium-item gold"><div class="p-med">🥇 #1</div><div class="p-skulls">142 💀</div></div>
+                            <div class="podium-item bronze"><div class="p-med">🥉 #3</div><div class="p-skulls">76 💀</div></div>
+                        </div>
+                    </div>
                 </div>
-                <div class="feature">
-                    <div class="ico"><svg class="icon"><use href="#i-pin"/></svg></div>
-                    <h3>Auto-pin y avisos</h3>
-                    <p>Fija los récords automáticamente y avisa por DM al autor, con opción de desactivarlo.</p>
+                <div class="bento-card bento-4">
+                    <div>
+                        <div class="ico"><svg class="icon"><use href="#i-shield"/></svg></div>
+                        <h3>Privacidad Zero-Data</h3>
+                        <p>Guardamos solo identificadores numéricos y contadores. Jamás almacenamos el texto de tus mensajes.</p>
+                    </div>
                 </div>
-                <div class="feature">
-                    <div class="ico"><svg class="icon"><use href="#i-gear"/></svg></div>
-                    <h3>Totalmente configurable</h3>
-                    <p>Canal, mínimo de 💀, prefijo, canales ignorados y umbral de fijado. Todo a tu gusto.</p>
+                <div class="bento-card bento-4">
+                    <div>
+                        <div class="ico"><svg class="icon"><use href="#i-bolt"/></svg></div>
+                        <h3>Motor Asíncrono</h3>
+                        <p>Construido sobre asyncio y PostgreSQL nativo para una respuesta en milisegundos.</p>
+                        <div class="ping-meter">
+                            <div class="ping-pulse"><span class="p-dot"></span> Latencia API</div>
+                            <div class="ping-val">~18ms</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="feature">
-                    <div class="ico"><svg class="icon"><use href="#i-shield"/></svg></div>
-                    <h3>Datos mínimos</h3>
-                    <p>Guardamos solo identificadores y contadores. Nunca almacenamos el texto de tus mensajes.</p>
-                </div>
-                <div class="feature">
-                    <div class="ico"><svg class="icon"><use href="#i-bolt"/></svg></div>
-                    <h3>Rápido y estable</h3>
-                    <p>Construido con discord.py y Supabase, con control de concurrencia para evitar bloqueos.</p>
+                <div class="bento-card bento-4">
+                    <div>
+                        <div class="ico"><svg class="icon"><use href="#i-sliders"/></svg></div>
+                        <h3>100% Configurable</h3>
+                        <p>Canales ignorados, prefijo personalizado, umbrales de 💀 y notificaciones por DM a tu medida.</p>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section class="section" id="como-funciona">
+        <section class="section" id="como-funciona" data-reveal>
             <div class="section-head">
                 <span class="kicker">Cómo funciona</span>
                 <h2>En tres pasos</h2>
@@ -157,11 +219,16 @@
             </div>
         </section>
 
-        <section class="section" id="comandos">
+        <section class="section" id="comandos" data-reveal>
             <div class="section-head">
                 <span class="kicker">Comandos</span>
                 <h2>Todo lo que puedes hacer</h2>
                 <p>Disponibles como comandos slash <code>/</code> y de texto con tu prefijo (por defecto <code>sk!</code>).</p>
+            </div>
+
+            <div class="cmd-search-box">
+                <svg><use href="#i-search"/></svg>
+                <input type="text" id="cmd-search" placeholder="Buscar comando (ej: /top, stats, pin, prefix, reset)..." autocomplete="off" aria-label="Buscar comandos">
             </div>
 
             <div class="filters" role="tablist" aria-label="Filtrar comandos">
@@ -199,7 +266,7 @@
             </div>
         </section>
 
-        <section class="cta-band">
+        <section class="cta-band" data-reveal>
             <h2>Dale voz a los mejores momentos</h2>
             <p>Añade SkullBoard a tu servidor en segundos. Gratis y sin permisos innecesarios.</p>
             <a class="btn btn-primary" href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">
@@ -207,7 +274,7 @@
             </a>
         </section>
 
-        <section class="section" id="contacto">
+        <section class="section" id="contacto" data-reveal>
             <div class="section-head">
                 <span class="kicker">Contacto</span>
                 <h2>¿Dudas o sugerencias?</h2>
@@ -258,13 +325,81 @@
             ? 'http://localhost:8080' 
             : 'https://skullboard-fqf1.onrender.com';
 
+        // 3D Tilt interactivo (Apple / Linear style) para el Mockup del Hero
+        const showcase = document.getElementById('hero-showcase');
+        const card = document.getElementById('mockup-card');
+        const sheen = document.getElementById('mockup-sheen');
+
+        if (showcase && card && window.matchMedia('(hover: hover)').matches) {
+            let rafId = null;
+            showcase.addEventListener('mousemove', (e) => {
+                if (rafId) cancelAnimationFrame(rafId);
+                rafId = requestAnimationFrame(() => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    const centerX = rect.width / 2;
+                    const centerY = rect.height / 2;
+                    const rotateX = ((y - centerY) / centerY) * -9;
+                    const rotateY = ((x - centerX) / centerX) * 9;
+                    
+                    card.style.transform = `perspective(1000px) rotateX(${rotateX.toFixed(2)}deg) rotateY(${rotateY.toFixed(2)}deg) scale3d(1.02, 1.02, 1.02)`;
+                    if (sheen) {
+                        sheen.style.setProperty('--mouse-x', `${(x / rect.width * 100).toFixed(1)}%`);
+                        sheen.style.setProperty('--mouse-y', `${(y / rect.height * 100).toFixed(1)}%`);
+                    }
+                });
+            });
+
+            showcase.addEventListener('mouseleave', () => {
+                if (rafId) cancelAnimationFrame(rafId);
+                card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)';
+            });
+        }
+
+        // Reacción interactiva con Calavera en el Hero Mockup
+        const skullBtn = document.getElementById('skull-counter-btn');
+        const liveCount = document.getElementById('live-skull-count');
+        const scoreBadge = document.getElementById('embed-score-badge');
+        let countVal = 12;
+        if (skullBtn) {
+            skullBtn.addEventListener('click', () => {
+                countVal++;
+                skullBtn.classList.remove('pop');
+                void skullBtn.offsetWidth; // Trigger reflow
+                skullBtn.classList.add('pop');
+                if (liveCount) liveCount.textContent = countVal;
+                if (scoreBadge) scoreBadge.textContent = `💀 ${countVal}`;
+            });
+        }
+
+        // Buscador y Filtros de Comandos
+        const searchInput = document.getElementById('cmd-search');
         const chips = document.querySelectorAll('.filter-chip');
         const cmds  = document.querySelectorAll('#cmd-grid .cmd');
+
+        function filterCommands() {
+            const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
+            const activeChip = document.querySelector('.filter-chip.active');
+            const activeCat = activeChip ? activeChip.dataset.cat : 'all';
+
+            cmds.forEach(cmd => {
+                const text = cmd.textContent.toLowerCase();
+                const cat = cmd.dataset.cat;
+                const matchesCat = activeCat === 'all' || cat === activeCat;
+                const matchesQuery = !query || text.includes(query);
+                cmd.hidden = !(matchesCat && matchesQuery);
+            });
+        }
+
+        if (searchInput) {
+            searchInput.addEventListener('input', filterCommands);
+        }
+
         chips.forEach(chip => chip.addEventListener('click', () => {
             chips.forEach(c => c.classList.remove('active'));
             chip.classList.add('active');
-            const cat = chip.dataset.cat;
-            cmds.forEach(cmd => { cmd.hidden = cat !== 'all' && cmd.dataset.cat !== cat; });
+            filterCommands();
         }));
 
         // Expandir parámetros al pulsar una tarjeta de comando (Accesible por Click y Teclado)
@@ -292,7 +427,39 @@
             localStorage.setItem('skb-theme', next);
         });
 
-        // Stats en vivo con Timeout de 8 segundos (anti-bloqueo ante cold starts)
+        // Scroll Reveal Animations (IntersectionObserver)
+        const revealEls = document.querySelectorAll('[data-reveal]');
+        if ('IntersectionObserver' in window) {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('revealed');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+            revealEls.forEach(el => observer.observe(el));
+        } else {
+            revealEls.forEach(el => el.classList.add('revealed'));
+        }
+
+        // Animación suave de subida de números (Number Ticker)
+        function animateValue(el, start, end, duration) {
+            if (!el || isNaN(end)) return;
+            const startTime = performance.now();
+            function update(now) {
+                const elapsed = now - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeOut = 1 - Math.pow(1 - progress, 3);
+                const current = Math.floor(start + (end - start) * easeOut);
+                el.textContent = current.toLocaleString('es-ES');
+                if (progress < 1) requestAnimationFrame(update);
+                else el.textContent = end.toLocaleString('es-ES');
+            }
+            requestAnimationFrame(update);
+        }
+
+        // Stats en vivo con Timeout de 8 segundos y animación de conteo
         async function fetchStats() {
             const controller = new AbortController();
             const timer = setTimeout(() => controller.abort(), 8000);
@@ -302,11 +469,14 @@
                 const d = await res.json();
                 const fmt = n => (n == null ? '—' : Number(n).toLocaleString('es-ES'));
                 if (d.servers != null) {
-                    document.getElementById('pill-servers').textContent = fmt(d.servers);
-                    document.getElementById('stat-servers').textContent = fmt(d.servers);
+                    const pill = document.getElementById('pill-servers');
+                    const stat = document.getElementById('stat-servers');
+                    if (pill) pill.textContent = fmt(d.servers);
+                    if (stat) animateValue(stat, 0, Number(d.servers), 1200);
                 }
                 if (d.highlighted != null) {
-                    document.getElementById('stat-highlighted').textContent = fmt(d.highlighted);
+                    const hl = document.getElementById('stat-highlighted');
+                    if (hl) animateValue(hl, 0, Number(d.highlighted), 1600);
                 }
                 if (d.commands != null) {
                     const elCmd = document.getElementById('stat-commands');
