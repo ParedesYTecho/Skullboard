@@ -58,23 +58,25 @@
             <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
             <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
             <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
+            <symbol id="i-arrow-left" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></symbol>
             <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></symbol>
             <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5 19 19M19 5l-1.5 1.5M6.5 17.5 5 19"/></symbol>
         </defs>
     </svg>
 
     <nav class="nav">
-        <a class="brand" href="/"><span class="mark">💀</span> SkullBoard</a>
+        <a class="brand" href="/" aria-label="SkullBoard Inicio"><span class="mark">💀</span> SkullBoard</a>
         <div class="nav-links">
-            <a href="#comandos">Comandos</a>
-            <a href="#como-funciona">Cómo funciona</a>
-            <a href="cambios">Cambios</a>
-            <a href="privacy">Privacidad</a>
+            <a href="#comandos" class="nav-link">Comandos</a>
+            <a href="#como-funciona" class="nav-link">Cómo funciona</a>
+            <a href="cambios" class="nav-link">Cambios</a>
+            <a href="terms" class="nav-link">Términos</a>
+            <a href="privacy" class="nav-link">Privacidad</a>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
                 <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
             </button>
             <a class="btn btn-primary btn-sm nav-cta" href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">
-                <svg><use href="#i-discord"/></svg> Añadir a Discord
+                <svg><use href="#i-discord"/></svg> <span>Añadir a Discord</span>
             </a>
         </div>
     </nav>
@@ -491,6 +493,7 @@
                 </div>
                 <div class="f-links">
                     <a href="#contacto">Contáctanos</a>
+                    <a href="cambios">Cambios</a>
                     <a href="terms">Términos de Servicio</a>
                     <a href="privacy">Política de Privacidad</a>
                 </div>
