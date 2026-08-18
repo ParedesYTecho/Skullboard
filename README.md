@@ -81,9 +81,10 @@ El módulo `webserver.py` se ejecuta en un hilo de fondo (`threading.Thread`) so
 
 ### 1. Portal Web y Landing Legal (`legal/`)
 - **`GET /`**: Página de inicio (`index.html`) con resumen de características, lista de comandos destacados y diseño moderno optimizado para móvil y escritorio.
-- **`GET /privacy.html`**: Política de Privacidad completa, adaptada a las directrices de desarrollador de Discord y normativas de minimización de datos.
-- **`GET /terms.html`**: Términos de Servicio oficiales del bot.
-- **`GET /<filename>`**: Servidor de estáticos para estilos (`styles.css`) y logos (`skullboard_icon.png`).
+- **`GET /privacy`**: Política de Privacidad completa (redirección 301 para `/privacy.html`).
+- **`GET /terms`**: Términos de Servicio oficiales del bot (redirección 301 para `/terms.html`).
+- **`GET /cambios`**: Historial de cambios y novedades (redirección 301 para `/cambios.html`).
+- **`GET /<filename>`**: Servidor de estáticos con Clean URLs para estilos (`styles.css`), sitemap (`sitemap.xml`) y logos (`skullboard_icon.png`).
 
 ### 2. Endpoints de API REST
 - **`GET /api/stats`**:

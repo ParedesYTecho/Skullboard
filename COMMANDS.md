@@ -66,7 +66,7 @@ Comandos ocultos accesibles únicamente por el ID definido en `OWNER_ID` (`56122
 ### `dashboard` / `web` / `panel`
 - **Sintaxis Texto:** `sk!dashboard`
 - **Sintaxis Slash:** `/dashboard`
-- **Comportamiento:** Muestra un embed enriquecido con los enlaces a la web oficial y landing page (`https://paredesytecho.github.io/index.html`), política de privacidad y términos de servicio, acompañado de una botonera de enlaces (`DashboardView`).
+- **Comportamiento:** Muestra un embed enriquecido con los enlaces a la web oficial y landing page (`https://skullboard.vercel.app/`), política de privacidad y términos de servicio, acompañado de una botonera de enlaces (`DashboardView`).
 
 ### `set_channel` / `channel`
 - **Sintaxis Texto:** `sk!set_channel <#canal>`
@@ -97,11 +97,11 @@ Comandos ocultos accesibles únicamente por el ID definido en `OWNER_ID` (`56122
 
 ### `top` / `top_month` / `top_year`
 - **`top`:** Consulta los 10 mensajes con mayor `skull_count` histórico en el servidor.
-- **`top_month` / `top_year`:** Filtra en memoria los mensajes de `tracked_messages` extrayendo el timestamp del snowflake de `message_id` mediante la función `snowflake_to_datetime()` y devuelve los 10 con mayor puntuación en el rango temporal.
+- **`top_month` / `top_year`:** Utiliza la función RPC `get_top_periodo` de PostgreSQL para filtrar eficientemente a nivel de base de datos los mensajes del mes o año en curso mediante el snowflake mínimo calculado (`min_snowflake`).
 
 ### `leaderboard` / `lb` / `topusers`
 - **Sintaxis:** `sk!leaderboard` o `/leaderboard`
-- **Comportamiento:** Agrupa la suma de `skull_count` por cada `author_id` del servidor y lista los 10 usuarios con mayor puntuación acumulada. Los nombres se resuelven de forma segura mediante `resolve_display_name()`, evitando inyecciones de markdown.
+- **Comportamiento:** Invoca la RPC `get_guild_leaderboard` para agregar la suma de `skull_count` por cada `author_id` del servidor en PostgreSQL y lista los 10 usuarios con mayor puntuación acumulada. Los nombres se resuelven de forma segura mediante `resolve_display_name()`, evitando inyecciones de markdown.
 
 ### `setup_pin` / `setuppin`
 - **Sintaxis Texto:** `sk!setuppin <umbral>`

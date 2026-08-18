@@ -26,11 +26,11 @@ flowchart TD
             Tree["GuildOnlyTree (app_commands.CommandTree)"]
             
             subgraph Concurrency_Control["Mecanismos de Concurrencia"]
-                Debounce["Debouncer Coalescente\n(processing_messages: dict[mid, TimerHandle])"]
-                MsgLocks["Locks por Mensaje\n(_check_locks / _check_counts)"]
+                Debounce["Debouncer Coalescente\n(MessageDebouncer: 2.0s generacional)"]
+                KeyedLocks["KeyedAsyncLock Inmune a Cancelaciones\n(_check_locks / _resync_locks)"]
                 DelSem["Semáforo de Borrado\n(_delete_sem = Semaphore(8))"]
                 ResyncLimiter["Rate Limiter Global\n(_GlobalRateLimiter(8))"]
-                ResyncLocks["Locks por Servidor\n(_resync_guild_locks: dict[gid, Lock])"]
+                DBRetry["Decorador de Resiliencia\n(@db_retry con Exponential Backoff)"]
             end
             
             subgraph State_Caches["Caché de Estado en Memoria (RAM)"]
@@ -100,9 +100,9 @@ El bot minimiza las lecturas a Supabase mediante variables globales con polític
    - Cuando se añade o quita una reacción `💀`, `_schedule_check()` cancela cualquier temporizador previo para ese `message_id` y programa un `call_later(2.0, ...)`.
    - Si 20 usuarios reaccionan en ráfaga a un mensaje en menos de 2 segundos, solo se ejecuta un único ciclo de verificación (`_run_check`), evitando el spam de peticiones a la API de Discord y a la base de datos.
 
-2. **Lock por Mensaje con Conteo de Referencias (`_check_locks` + `_check_counts`):**
-   - Garantiza que dos eventos simultáneos sobre el mismo mensaje se procesen de forma estrictamente secuencial.
-   - Utiliza `_check_counts[mid]` para llevar un conteo de tareas esperando el lock y eliminarlo de memoria de forma limpia en el bloque `finally` cuando el conteo llega a cero, previniendo fugas de memoria por locks huérfanos.
+2. **Locks Asíncronos con Gestión de Ciclo de Vida (`KeyedAsyncLock`):**
+   - Garantiza que dos eventos simultáneos sobre el mismo mensaje o servidor se procesen de forma estrictamente secuencial (`_check_locks` para mensajes y `_resync_locks` para servidores).
+   - Implementa un mecanismo cancellation-safe: si una corrutina se cancela mientras espera `acquire()`, el contador de referencias se decrementa inmediatamente y el lock se desaloja en `except BaseException`, evitando bloqueos fantasmas o fugas de memoria en RAM.
 
 3. **Semáforo de Borrado Concurrente (`_delete_sem = asyncio.Semaphore(8)`):**
    - Limita a 8 las tareas concurrentes que procesan eliminaciones de mensajes.
@@ -112,8 +112,8 @@ El bot minimiza las lecturas a Supabase mediante variables globales con polític
    - Implementa un algoritmo de *Token Bucket / Leaky Bucket* con `asyncio.Lock` que limita a **8 peticiones/segundo** el total agregado de llamadas a la API de Discord efectuadas por tareas de resincronización en todo el proceso.
    - Protege el bot contra el baneo temporal por superar el rate limit global de Discord (~50 req/s), aislando la ejecución concurrente de `/resync` en múltiples servidores.
 
-5. **Aislamiento por Servidor en Resync (`_resync_guild_locks`):**
-   - Un `asyncio.Lock` por `guild_id` que impide que se lancen dos resyncs paralelos sobre el mismo servidor.
+5. **Decorador de Resiliencia de Red (`@db_retry`):**
+   - Envuelve las consultas a Supabase con reintentos automáticos (hasta 3 intentos) con *exponential backoff* y *jitter* aleatorio para absorber desconexiones transitorias sin causar caídas.
 
 ---
 
