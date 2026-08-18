@@ -2340,7 +2340,33 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
         pass
     logger.error(f"Error en slash command: {error}", exc_info=error)
 
-# ─── Ejecución ────────────────────────────────────────────────────────────────
+# ─── Ejecución Resiliente con Protección contra 429 / Cloudflare ────────────
+async def main_runner():
+    """Ejecutor asíncrono con reintentos y backoff ante bloqueos temporales de IP (Cloudflare 1015 / 429)."""
+    delay = 30
+    while True:
+        try:
+            async with bot:
+                await bot.start(DISCORD_TOKEN)
+            break
+        except discord.HTTPException as e:
+            if e.status == 429:
+                logger.warning(
+                    f"⚠️ [Rate Limit Cloudflare/Discord 429] IP bloqueada temporalmente por Cloudflare (Error 1015). "
+                    f"Esperando {delay}s antes de reintentar para no reiniciar el baneo de IP..."
+                )
+                await asyncio.sleep(delay)
+                delay = min(delay * 2, 600)  # Exponential backoff hasta 10 min
+            else:
+                logger.error(f"Error HTTP al iniciar bot: {e}")
+                await asyncio.sleep(15)
+        except (discord.GatewayNotFound, discord.ConnectionClosed) as e:
+            logger.warning(f"Desconexión de Gateway al iniciar ({e}). Reintentando en 10s...")
+            await asyncio.sleep(10)
+        except Exception as e:
+            logger.error(f"Error inesperado al iniciar bot: {e}", exc_info=e)
+            await asyncio.sleep(15)
+
 if __name__ == "__main__":
     faltan = [n for n, v in {
         "DISCORD_TOKEN": DISCORD_TOKEN,
@@ -2350,4 +2376,4 @@ if __name__ == "__main__":
     if faltan:
         raise SystemExit(f"❌ Faltan variables de entorno: {', '.join(faltan)}")
     webserver.keep_alive()
-    bot.run(DISCORD_TOKEN)
+    asyncio.run(main_runner())
