@@ -2341,11 +2341,20 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     logger.error(f"Error en slash command: {error}", exc_info=error)
 
 # ─── Ejecución Resiliente con Protección contra 429 / Cloudflare ────────────
+def _reset_bot_session():
+    """Limpia el estado interno y el conector HTTP cerrado para permitir reintentos limpios."""
+    bot._closing_task = None
+    bot.http.connector = discord.utils.MISSING
+    bot.loop = asyncio.get_running_loop()
+    if hasattr(bot, "_ready") and bot._ready is not discord.utils.MISSING:
+        bot._ready.clear()
+
 async def main_runner():
     """Ejecutor asíncrono con reintentos y backoff ante bloqueos temporales de IP (Cloudflare 1015 / 429)."""
     delay = 30
     while True:
         try:
+            _reset_bot_session()
             async with bot:
                 await bot.start(DISCORD_TOKEN)
             break
