@@ -1,4 +1,4 @@
-﻿# 🏛️ SYSTEM_CONTEXT.md — Documento Maestro de Arquitectura y Gobernanza Técnica
+# 🏛️ SYSTEM_CONTEXT.md — Documento Maestro de Arquitectura y Gobernanza Técnica
 
 > **ESTADO DEL DOCUMENTO:** VIVO / PRODUCCIÓN  
 > **VERSIÓN:** 2.4.1 (Verificación Rigurosa contra Código y Esquema Supabase)  
