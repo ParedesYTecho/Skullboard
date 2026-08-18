@@ -93,7 +93,7 @@
         <section class="stats" aria-label="Resumen">
             <div class="stat"><div class="num" id="stat-servers">—</div><div class="lbl">Servidores activos</div></div>
             <div class="stat"><div class="num" id="stat-highlighted">—</div><div class="lbl">Mensajes destacados</div></div>
-            <div class="stat"><div class="num">21</div><div class="lbl">Comandos slash y de texto</div></div>
+            <div class="stat"><div class="num" id="stat-commands">22</div><div class="lbl">Comandos slash y de texto</div></div>
         </section>
 
         <section class="section">
@@ -307,6 +307,10 @@
                 }
                 if (d.highlighted != null) {
                     document.getElementById('stat-highlighted').textContent = fmt(d.highlighted);
+                }
+                if (d.commands != null) {
+                    const elCmd = document.getElementById('stat-commands');
+                    if (elCmd) elCmd.textContent = fmt(d.commands);
                 }
             } catch (err) {
                 // Mantiene silenciosamente el fallback '—' si el backend está iniciando

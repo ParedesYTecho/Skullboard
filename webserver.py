@@ -94,6 +94,8 @@ def index():
     except Exception:
         return "Hello, I am alive!"
 
+_STATS_COMMANDS = 22
+
 @app.route('/api/stats')
 def api_stats():
     now = time.time()
@@ -111,7 +113,7 @@ def api_stats():
             srv = _sb_count("settings")
             hl  = _sb_count("tracked_messages")
             if srv is not None:
-                new_data = {"servers": srv, "highlighted": hl}
+                new_data = {"servers": srv, "highlighted": hl, "commands": _STATS_COMMANDS}
                 with _stats_lock:
                     _stats_cache["ts"] = time.time()
                     _stats_cache["data"] = new_data
