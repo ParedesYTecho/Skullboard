@@ -346,7 +346,7 @@ footer.site .f-copy { margin-top: 22px; padding-top: 16px; border-top: 1px solid
     --bg: #f4f4f7; --bg-soft: #ffffff;
     --surface: rgba(20, 20, 26, 0.035); --surface-2: rgba(20, 20, 26, 0.06);
     --border: rgba(20, 20, 26, 0.10); --border-strong: rgba(20, 20, 26, 0.32);
-    --ink: #17171c; --ink-soft: #55555f; --ink-dim: #8a8a94;
+    --ink: #17171c; --ink-soft: #55555f; --ink-dim: #6e6e78;
     --glow: rgba(20, 20, 26, 0.14);
 }
 :root[data-theme="light"] body::before {

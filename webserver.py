@@ -37,7 +37,7 @@ def set_security_headers(response):
 
 # ─── Thread-Safe Caches ───────────────────────────────────────────────────────
 _stats_lock = Lock()
-_stats_cache = {"ts": 0.0, "data": {"servers": None, "highlighted": None}}
+_stats_cache = {"ts": 0.0, "data": {"servers": None, "highlighted": None}, "refreshing": False}
 _STATS_TTL = 60
 
 _contact_lock = Lock()
@@ -100,11 +100,10 @@ def api_stats():
     needs_refresh = False
     with _stats_lock:
         cached = _stats_cache["data"]
-        if now - _stats_cache["ts"] >= _STATS_TTL or cached["servers"] is None:
+        if (now - _stats_cache["ts"] >= _STATS_TTL or cached["servers"] is None) and not _stats_cache.get("refreshing", False):
+            _stats_cache["refreshing"] = True
             needs_refresh = True
-            data = cached
-        else:
-            data = cached
+        data = cached
 
     if needs_refresh:
         try:
@@ -116,9 +115,15 @@ def api_stats():
                 with _stats_lock:
                     _stats_cache["ts"] = time.time()
                     _stats_cache["data"] = new_data
+                    _stats_cache["refreshing"] = False
                 data = new_data
+            else:
+                with _stats_lock:
+                    _stats_cache["refreshing"] = False
         except Exception as e:
             print(f"⚠️ /api/stats error: {e}")
+            with _stats_lock:
+                _stats_cache["refreshing"] = False
 
     resp = app.response_class(json.dumps(data), mimetype="application/json")
     resp.headers["Access-Control-Allow-Origin"] = "*"
