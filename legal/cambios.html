@@ -28,7 +28,7 @@
         </defs>
     </svg>
 
-    <nav class="nav">
+    <nav class="nav" id="top">
         <a class="brand" href="/" aria-label="SkullBoard Inicio"><span class="mark">💀</span> SkullBoard</a>
         <div class="nav-links">
             <a href="/#comandos" class="nav-link">Comandos</a>
@@ -86,6 +86,7 @@
                         <ul class="change-list">
                             <li><strong>Navegación Global Sincronizada:</strong> Barra de navegación fija con <em>glassmorphism</em> (`backdrop-filter: blur(18px)`) y selector de tema claro/oscuro unificado en todas las páginas (`/`, `/terms`, `/privacy`, `/cambios`).</li>
                             <li><strong>Rediseño de Marca y Calavera Interactiva:</strong> Emblema de marca squircle con micro-rotación dinámica al pasar el ratón y botón rápido de retorno al inicio.</li>
+                            <li><strong>Rediseño Estructural del Pie de Página:</strong> Nueva tarjeta de pie de página multipropósito con cuadrícula de 4 columnas, indicador de estado de sistemas en vivo, ficha de autor de GlobalFerociouS y botón interactivo «Volver arriba».</li>
                             <li><strong>Buscador Instantáneo y Botón de Copiado:</strong> Cada una de las 22 tarjetas de comandos incluye un botón interactivo de copiado directo con confirmación instantánea (`✓ Copiado!`) y búsqueda en tiempo real.</li>
                             <li><strong>Hero Minimalista y Ligero:</strong> Eliminación del mockup 3D para una carga instantánea sin consumo innecesario de GPU en dispositivos móviles.</li>
                             <li><strong>Clean URLs y Redirecciones:</strong> Eliminación completa de extensiones <code>.html</code> en enlaces y metadatos con redirecciones 301/308 limpias.</li>
@@ -375,23 +376,81 @@
 
         </div>
 
-        <footer class="site">
-            <div class="f-top">
-                <div class="f-brand">
-                    <span class="mark">💀</span>
-                    <div>
-                        <div class="f-name">SkullBoard</div>
-                        <div class="f-made">Desarrollado y mantenido por <b>GlobalFerociouS</b></div>
+        <footer class="site-footer">
+            <div class="footer-card">
+                <div class="footer-grid">
+                    <!-- Columna 1: Marca y Estado -->
+                    <div class="footer-brand-col">
+                        <a class="footer-brand" href="/" aria-label="SkullBoard Inicio">
+                            <span class="mark">💀</span>
+                            <div class="footer-brand-meta">
+                                <div class="footer-brand-name">
+                                    <span>SkullBoard</span>
+                                    <span class="bot-badge">BOT</span>
+                                </div>
+                                <span class="footer-tagline">El Starboard de las calaveras para Discord</span>
+                            </div>
+                        </a>
+                        <p class="footer-desc">
+                            Destaca automáticamente los momentos más épicos y divertidos de tu comunidad con reacciones 💀, rankings y estadísticas en tiempo real.
+                        </p>
+                        <div class="footer-status">
+                            <span class="status-indicator"></span>
+                            <span>Sistemas 100% operativos · Discord API v10</span>
+                        </div>
+                    </div>
+
+                    <!-- Columna 2: Producto -->
+                    <div class="footer-col">
+                        <div class="footer-heading">Producto</div>
+                        <ul class="footer-links">
+                            <li><a href="/#comandos">Comandos (22)</a></li>
+                            <li><a href="/#como-funciona">Cómo funciona</a></li>
+                            <li><a href="cambios">Historial de Cambios <span class="badge-mini">v2.4.2</span></a></li>
+                            <li><a href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">Añadir a Discord</a></li>
+                        </ul>
+                    </div>
+
+                    <!-- Columna 3: Legal & Soporte -->
+                    <div class="footer-col">
+                        <div class="footer-heading">Legal & Soporte</div>
+                        <ul class="footer-links">
+                            <li><a href="/#contacto">Formulario de Contacto</a></li>
+                            <li><a href="terms">Términos de Servicio</a></li>
+                            <li><a href="privacy">Política de Privacidad</a></li>
+                            <li><a href="mailto:globalsupportpyt@gmail.com">globalsupportpyt@gmail.com</a></li>
+                        </ul>
+                    </div>
+
+                    <!-- Columna 4: Desarrollo -->
+                    <div class="footer-col">
+                        <div class="footer-heading">Desarrollo</div>
+                        <ul class="footer-links">
+                            <li>
+                                <div class="dev-card">
+                                    <div>
+                                        <span class="dev-label">Desarrollado y mantenido por</span>
+                                        <span class="dev-name">GlobalFerociouS</span>
+                                    </div>
+                                </div>
+                            </li>
+                            <li><a href="https://github.com/ParedesYTecho/Skullboard" target="_blank" rel="noopener">Repositorio en GitHub ↗</a></li>
+                        </ul>
                     </div>
                 </div>
-                <div class="f-links">
-                    <a href="/#contacto">Contáctanos</a>
-                    <a href="cambios">Cambios</a>
-                    <a href="terms">Términos de Servicio</a>
-                    <a href="privacy">Política de Privacidad</a>
+
+                <div class="footer-bottom">
+                    <div class="footer-copy">
+                        © 2025 – 2026 <b>SkullBoard</b>. Creado por <b>GlobalFerociouS</b>. Todos los derechos reservados.
+                    </div>
+                    <div class="footer-bottom-actions">
+                        <a href="#top" class="back-to-top" aria-label="Volver arriba">
+                            <span>Volver arriba</span>
+                            <svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6"/></svg>
+                        </a>
+                    </div>
                 </div>
             </div>
-            <div class="f-copy">© 2026 GlobalFerociouS · SkullBoard</div>
         </footer>
     </div>
 
