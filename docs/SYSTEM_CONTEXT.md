@@ -324,5 +324,16 @@ Discord Permissions Integer: 277025508352
 6. **`Pin Messages` (Fijar Mensajes):** Requerido cuando el servidor tiene configurado auto-pin (`pin_threshold > 0`).
 
 #### Privileged Gateway Intents
-* **`Message Content Intent`:** Requerido para leer adjuntos, avatares y texto al momento de publicar el embed en el skullboard.
-* **`Guild Members Intent`:** Requerido para resolver nombres de usuario, avatares actualizados y menciones en los rankings.
+* **`Message Content Intent`:** Requerido exclusivamente para leer el texto (`msg.content`), imágenes y adjuntos al momento de publicar el embed en el canal `#skullboard` tras recibir la reacción `💀`. Sin este intent, Discord vacía el contenido a `""`.
+* **`Server Members Intent`:** Requerido para resolver nombres de usuario, apodos locales del servidor y avatares actualizados en los rankings `/leaderboard` y tarjetas de `/stats` sin saturar los límites de peticiones REST HTTP de Discord.
+
+---
+
+## 7. 🛡️ GOBERNANZA DE PRIVILEGIOS GATEWAY Y VERIFICACIÓN EN DISCORD (10K+ USUARIOS)
+
+### 7.1. Reglas Inmutables para Revisiones de Discord
+1. **Paridad Total con Slash Commands:** Todo comando accesible para el usuario final debe estar implementado como un Discord Application Command (`/top`, `/leaderboard`, `/stats`, etc.). El bot NUNCA debe argumentar el uso de `Message Content Intent` para procesar comandos de texto.
+2. **Justificación del Vacío de Contenido (`""`):** La defensa técnica ante Discord Developer Support debe basarse en el hecho indiscutible de que `on_raw_reaction_add` y `channel.fetch_message()` devuelven `message.content = ""` si el intent está ausente, destruyendo la función básica del Starboard.
+3. **Aislamiento Estricto de Material Multimedia:** Las capturas y vídeos remitidos a Discord deben provenir única y exclusivamente del entorno de SkullBoard, mostrando comandos slash con autocompletado y embeds generados. Queda estrictamente prohibido incluir imágenes de otros bots (ej. Werewolf) o capturas con comandos de prefijo (`sk!`, `ww!`).
+4. **Procesamiento Transitorio en Memoria:** El texto de los mensajes solo se procesa de forma efímera en memoria RAM para construir el embed y NUNCA se almacena en la base de datos Supabase/PostgreSQL.
+
