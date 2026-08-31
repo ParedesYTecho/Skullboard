@@ -1,4 +1,4 @@
-﻿# 🧭 Manual Maestro de Skills, Servidores MCP y Comandos Especiales — SkullBoard
+# 🧭 Manual Maestro de Skills, Servidores MCP y Comandos Especiales — SkullBoard
 
 Este documento sirve como la **guía de referencia definitiva** para desarrolladores y agentes de IA en el repositorio de **SkullBoard**. Aquí se detalla cada servidor MCP, cada Skill y cada Slash Command disponible en el ecosistema, explicando con precisión **cuándo usarlos, cuándo evitarlos y cómo combinarlos** para lograr la máxima calidad y fiabilidad en el código.
 
@@ -144,6 +144,10 @@ Las skills son bibliotecas de procedimientos especializados que guían al agente
 ### 6. `code-review`
 * **Qué hace:** Ejecuta una revisión paralela en dos ejes: **Estándares** (buenas prácticas del repo) y **Especificación** (si cumple lo pedido por el usuario), reportando hallazgos antes de commitear.
 * **Cuándo se activa:** Cuando el usuario pide auditar una rama o revisar los cambios pendientes.
+
+### 7. `modern-ui-ux-design-system`
+* **Qué hace:** Sistema de diseño estético avanzado inspirado en Magic UI, Aceternity UI y Shadcn: tokens cromáticos de lujo en modo oscuro/claro, micro-interacciones físicas con curvas de resorte (`cubic-bezier`), toasts flotantes y simuladores interactivos de Discord en vivo.
+* **Cuándo se activa:** Al crear o mejorar componentes visuales, animaciones o interfaces de usuario.
 
 ---
 
