@@ -149,14 +149,37 @@ Las skills son bibliotecas de procedimientos especializados que guían al agente
 * **Qué hace:** Sistema de diseño estético avanzado inspirado en Magic UI, Aceternity UI y Shadcn: tokens cromáticos de lujo en modo oscuro/claro, micro-interacciones físicas con curvas de resorte (`cubic-bezier`), toasts flotantes y simuladores interactivos de Discord en vivo.
 * **Cuándo se activa:** Al crear o mejorar componentes visuales, animaciones o interfaces de usuario.
 
+### 8. `python-asyncio-performance`
+* **Qué hace:** Optimización de alto rendimiento para aplicaciones asíncronas en Python (`discord.py` y Flask): serialización ultra rápida con `orjson`, bucle de eventos acelerado con `uvloop`, caché TTL con límites de memoria (`cachetools`) y reutilización de sesiones HTTP (`aiohttp.ClientSession`).
+* **Cuándo se activa:** Al optimizar latencias del bot, reducir consumo de RAM en Render o procesar ráfagas de miles de eventos de Discord Gateway.
+
+### 9. `web-seo-and-social-cards`
+* **Qué hace:** Estándares para generación de previsualizaciones sociales enriquecidas (*OpenGraph / Twitter Cards*), meta etiquetas temáticas para colorear embeds en chats de Discord (`<meta name="theme-color">`), manifest PWA y esquemas estructurados JSON-LD.
+* **Cuándo se activa:** Al optimizar la indexación web, presencia en motores de búsqueda y cómo se ve el enlace al compartirse en Discord/Twitter.
+
 ---
 
-## 🎯 5. Matriz de Decisión Rápida
+## 🔬 5. ¿Cómo Activar el Modo "Deep Research" en Antigravity?
+
+Para solicitar una investigación profunda y exhaustiva donde el agente se tome su tiempo analizando múltiples fuentes, foros y repositorios (similar a Gemini Deep Research):
+
+1. **Combina `/goal` con la directiva "Deep Research":**
+   * Al escribir `/goal Realiza un deep research exhaustivo sobre X`, el agente entra en bucle autónomo continuo, ejecutando múltiples búsquedas web sucesivas, navegando por documentación técnica y contrastando repositorios antes de emitir conclusiones.
+2. **Subagentes Especializados con Modelo Pro (`Model: "pro"`):**
+   * El agente puede desplegar subagentes con razonamiento profundo en paralelo para investigar distintas áreas de forma simultánea (ej. un subagente investigando el frontend y otro el backend).
+
+---
+
+## 🎯 6. Matriz de Decisión Rápida
 
 | Si lo que quieres hacer es... | La mejor combinación de herramientas es: |
 | :--- | :--- |
 | **Diseñar una feature compleja nueva** | Escribe **`/grill-me`** para la entrevista inicial $\to$ Usa **`/goal`** para implementarla. |
+| **Investigación profunda de librerías/foros** | Usa **`/goal`** solicitando *Deep Research* exhaustivo. |
 | **Comprobar el diseño móvil en iPhone/Android** | Usa **`/browser`** junto con la skill **`playwright-visual-testing`**. |
+| **Optimizar la velocidad del bot y consumo de RAM**| Usa la skill **`python-asyncio-performance`** (`orjson`, `cachetools`). |
+| **Mejorar la estética visual y micro-animaciones** | Usa la skill **`modern-ui-ux-design-system`** (Magic UI / Aceternity). |
+| **Optimizar la previsualización del link en Discord**| Usa la skill **`web-seo-and-social-cards`** (OpenGraph y Social Cards). |
 | **Optimizar una consulta lenta de Supabase** | Usa el MCP **`supabase`** (`execute_sql`, `query_logs`) + la skill **`supabase-postgres-best-practices`**. |
 | **Simular 200 personas reaccionando a la vez** | Usa la skill **`locust-discord-load-testing`** con scripts de estrés asíncronos en scratch. |
 | **Persistir una regla fija para futuros chats** | Usa **`/learn`** y la directriz quedará grabada en `.agents/rules/`. |
