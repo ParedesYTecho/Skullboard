@@ -179,3 +179,4 @@ python main.py
 - 📐 **[ARCHITECTURE.md](docs/ARCHITECTURE.md)**: Arquitectura detallada, diagramas de secuencia, política de sincronización y análisis de rendimiento.
 - 📖 **[COMMANDS.md](docs/COMMANDS.md)**: Manual exhaustivo de todos los comandos de texto, slash commands y comandos administrativos.
 - 🏛️ **[SYSTEM_CONTEXT.md](docs/SYSTEM_CONTEXT.md)**: Documento maestro de gobernanza técnica, invariantes arquitectónicas y reglas de desarrollo.
+- 🧭 **[MCP_AND_SKILLS.md](docs/MCP_AND_SKILLS.md)**: Manual maestro de servidores MCP, Agent Skills y protocolo `/grill-me` + `/goal` para tareas complejas.
