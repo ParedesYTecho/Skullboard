@@ -1381,10 +1381,6 @@ footer.site-footer {
         padding: 5px 9px;
         font-size: 0.78rem;
     }
-    /* Ocultar 'Cómo funciona' en pantallas móviles para que quepan 'Comandos' y 'Cambios' */
-    .nav-links .nav-link[href*="como-funciona"] {
-        display: none;
-    }
     .nav-cta {
         padding: 6px 11px;
         font-size: 0.8rem;
