@@ -1,8 +1,8 @@
 # 🏛️ SYSTEM_CONTEXT.md — Documento Maestro de Arquitectura y Gobernanza Técnica
 
 > **ESTADO DEL DOCUMENTO:** VIVO / PRODUCCIÓN  
-> **VERSIÓN:** 2.4.1 (Verificación Rigurosa contra Código y Esquema Supabase)  
-> **FECHA DE ÚLTIMA ACTUALIZACIÓN:** 18 de agosto de 2026  
+> **VERSIÓN:** 2.4.2 (Spotlight Glow, Sonner Toasts, orjson y Cachés TTL Anti-Fugas)  
+> **FECHA DE ÚLTIMA ACTUALIZACIÓN:** 1 de septiembre de 2026  
 > **PROPIETARIO TÉCNICO:** GlobalFerociouS (ID: `561225979389804544`)  
 > **APLICACIÓN / BOT ID:** `1367463352774955059`  
 > **DOMINIOS OFICIALES:**  

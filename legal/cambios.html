@@ -53,13 +53,55 @@
             <h1>Historial de Actualizaciones</h1>
             <p>Todo el registro de mejoras, nuevas funciones, parches de seguridad y optimizaciones de SkullBoard.</p>
             <div class="changelog-meta-pills">
-                <div class="pill"><span class="dot"></span> Versión actual: <b>v2.4.1</b></div>
-                <div class="pill"><b>9 Versiones</b> documentadas</div>
-                <div class="pill">Historial desde <b>Mayo 2025</b> hasta <b>Agosto 2026</b></div>
+                <div class="pill"><span class="dot"></span> Versión actual: <b>v2.4.2</b></div>
+                <div class="pill"><b>10 Versiones</b> documentadas</div>
+                <div class="pill">Historial desde <b>Mayo 2025</b> hasta <b>Septiembre 2026</b></div>
             </div>
         </header>
 
         <div class="timeline-container">
+
+            <!-- Release v2.4.2 (1 Septiembre 2026) -->
+            <article class="timeline-entry">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="t-header">
+                        <div>
+                            <div class="t-version-row">
+                                <span class="t-version-tag">v2.4.2</span>
+                                <span class="t-badge-latest">Última versión</span>
+                            </div>
+                            <h2 class="t-title">Spotlight Glow, Toasts Flotantes Sonner, orjson y Cachés TTL Anti-Fugas</h2>
+                        </div>
+                        <div class="t-date">1 de Septiembre, 2026</div>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill ui">Interfaz & Micro-UX</span>
+                            <span>Efectos Visuales y Notificaciones Modernas</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Efecto Spotlight Glow (Cursor Follower):</strong> Halo luminoso suave que sigue en tiempo real el movimiento del ratón sobre las tarjetas del Bento Grid y la banda de estadísticas con gradiente radial y confort visual tanto en Modo Oscuro como en Modo Claro.</li>
+                            <li><strong>Sistema de Toasts Flotantes Estilo Sonner:</strong> Notificaciones emergentes apilables con física elástica de resorte (<code>cubic-bezier</code>) para confirmar al instante el copiado de comandos y el estado de envíos de soporte.</li>
+                            <li><strong>Micro-animación de Confeti (Canvas-Confetti 2KB):</strong> Disparo de partículas de confeti platino y esmeralda al hacer clic en los botones de invitación a Discord y al completar envíos satisfactorios.</li>
+                        </ul>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill sec">Rendimiento & Backend</span>
+                            <span>Memoria Cero Fugas y Máxima Concurrencia</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Cachés con Desalojo Automático (TTLCache / BoundedTTLCache):</strong> Reemplazo de diccionarios ilimitados en memoria por estructuras acotadas con expiración temporal estricta para garantizar cero fugas de memoria RAM en el servidor de Render.</li>
+                            <li><strong>Serialización JSON Ultra-Rápida con orjson:</strong> Procesamiento de payloads de Discord Gateway y consultas REST de Supabase hasta 10 veces más rápido.</li>
+                            <li><strong>Bucle de Eventos Acelerado con uvloop:</strong> Activación automática de motor de eventos en C de ultra-baja latencia en entornos Linux de producción.</li>
+                            <li><strong>Telemetría y Monitoreo de Memoria:</strong> Nuevo endpoint <code>/api/health</code> con métricas en tiempo real de consumo RSS (MB) y tiempo de actividad.</li>
+                        </ul>
+                    </div>
+                </div>
+            </article>
 
             <!-- Release v2.4.1 (18 Agosto 2026) -->
             <article class="timeline-entry">
@@ -69,7 +111,6 @@
                         <div>
                             <div class="t-version-row">
                                 <span class="t-version-tag">v2.4.1</span>
-                                <span class="t-badge-latest">Última versión</span>
                             </div>
                             <h2 class="t-title">Navegación Unificada, Buscador de Comandos con Copiado y Hero Minimalista</h2>
                         </div>

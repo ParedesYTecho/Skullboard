@@ -1,3 +1,4 @@
+import sys
 import discord
 import logging
 import os
@@ -12,6 +13,36 @@ from discord import app_commands
 from supabase import acreate_client, AsyncClient
 import discord.abc
 from typing import Optional
+
+# ─── Optimización de Event Loop (uvloop en Linux/Render) ─────────────────────
+if sys.platform != "win32":
+    try:
+        import uvloop
+        uvloop.install()
+        logging.info("🚀 [Performance] uvloop activado como Event Loop principal")
+    except ImportError:
+        pass
+
+# ─── Serialización JSON Ultra-Rápida (orjson) ────────────────────────────────
+try:
+    import orjson
+    def json_dumps(obj) -> str:
+        return orjson.dumps(obj).decode("utf-8")
+    def json_loads(s):
+        return orjson.loads(s)
+except ImportError:
+    import json
+    def json_dumps(obj) -> str:
+        return json.dumps(obj)
+    def json_loads(s):
+        return json.loads(s)
+
+# ─── Cachés con Desalojo Automático (cachetools) ──────────────────────────────
+try:
+    from cachetools import TTLCache
+    HAS_CACHETOOLS = True
+except ImportError:
+    HAS_CACHETOOLS = False
 
 # ─── Logging ─────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -105,17 +136,60 @@ class MessageDebouncer:
         handle = loop.call_later(self.delay, _fire, gen)
         self._handles[mid_str] = (handle, gen)
 
+class BoundedTTLCache:
+    """Caché LRU auto-gestionada con expiración (TTL) y límite estricto de memoria (anti-fugas)."""
+    def __init__(self, maxsize: int = 5000, ttl: float = 300.0):
+        self.maxsize = maxsize
+        self.ttl = ttl
+        self._data: dict[str, tuple[any, float]] = {}
+
+    def __contains__(self, key: str) -> bool:
+        if key not in self._data:
+            return False
+        val, ts = self._data[key]
+        if time.time() - ts > self.ttl:
+            self._data.pop(key, None)
+            return False
+        return True
+
+    def get(self, key: str, default=None):
+        if self.__contains__(key):
+            return self._data[key][0]
+        return default
+
+    def __getitem__(self, key: str):
+        if self.__contains__(key):
+            return self._data[key][0]
+        raise KeyError(key)
+
+    def __setitem__(self, key: str, value):
+        if len(self._data) >= self.maxsize:
+            oldest_k = next(iter(self._data))
+            self._data.pop(oldest_k, None)
+        self._data[key] = (value, time.time())
+
+    def pop(self, key: str, default=None):
+        item = self._data.pop(key, None)
+        if item is not None:
+            return item[0]
+        return default
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+def _create_cache(maxsize: int, ttl: float):
+    if HAS_CACHETOOLS:
+        return TTLCache(maxsize=maxsize, ttl=ttl)
+    return BoundedTTLCache(maxsize=maxsize, ttl=ttl)
+
 _msg_locks = KeyedAsyncLock()
 _resync_locks = KeyedAsyncLock()
 _debouncer = MessageDebouncer(delay=2.0)
 
-_prefix_cache: dict[str, tuple[str, float]] = {}
-PREFIX_CACHE_TTL = 120
-
-_guild_config_cache: dict[str, tuple[dict, float]] = {}
-_ignored_channels_cache: dict[str, tuple[set[str], float]] = {}
-_guild_record_cache: dict[str, tuple[int, float]] = {}
-CACHE_TTL = 300  # 5 minutos
+_prefix_cache           = _create_cache(maxsize=2000, ttl=120.0)
+_guild_config_cache     = _create_cache(maxsize=5000, ttl=300.0)
+_ignored_channels_cache = _create_cache(maxsize=5000, ttl=300.0)
+_guild_record_cache     = _create_cache(maxsize=5000, ttl=300.0)
 
 SPANISH_MONTHS = {
     1: "enero", 2: "febrero", 3: "marzo", 4: "abril", 5: "mayo", 6: "junio",
@@ -146,16 +220,16 @@ def db_retry(max_retries: int = 3, base_delay: float = 0.3, max_delay: float = 2
         return wrapper
     return decorator
 
-# ─── Wrappers Async ───────────────────────────────────────────────────────────
-@db_retry(max_retries=3, base_delay=0.3)
+# ─── Wrappers Async para Supabase ───────────────────────────────────────────
+@db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 async def db_select(table: str, match_col: str, match_val: str, select_cols: str = "*"):
     try:
         return await supabase.table(table).select(select_cols).eq(match_col, match_val).execute()
     except Exception as e:
-        logger.error(f"Error en db_select ({table}.{match_col}={match_val}): {e}")
+        logger.error(f"Error en db_select en tabla {table}: {e}")
         raise
 
-@db_retry(max_retries=3, base_delay=0.3)
+@db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 async def db_insert(table: str, data: dict):
     try:
         return await supabase.table(table).insert(data).execute()
@@ -163,18 +237,25 @@ async def db_insert(table: str, data: dict):
         logger.error(f"Error en db_insert en tabla {table}: {e}")
         raise
 
-@db_retry(max_retries=3, base_delay=0.3)
+@db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 async def db_update(table: str, updates: dict, match_col: str, match_val: str):
     try:
-        return await supabase.table(table).update(updates).eq(match_col, match_val).execute()
+        updates_copy = dict(updates)
+        updates_copy.pop("guild_id", None)
+        if not updates_copy:
+            return None
+        return await supabase.table(table).update(updates_copy).eq(match_col, match_val).execute()
     except Exception as e:
-        logger.error(f"Error en db_update ({table}.{match_col}={match_val}): {e}")
+        logger.error(f"Error en db_update en tabla {table}: {e}")
         raise
 
-@db_retry(max_retries=3, base_delay=0.3)
+@db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 async def db_upsert(table: str, data: dict):
     try:
-        return await supabase.table(table).upsert(data).execute()
+        data_copy = dict(data)
+        if "skull_count" in data_copy and isinstance(data_copy["skull_count"], int):
+            data_copy["skull_count"] = max(0, data_copy["skull_count"])
+        return await supabase.table(table).upsert(data_copy).execute()
     except Exception as e:
         logger.error(f"Error en db_upsert en tabla {table}: {e}")
         raise
@@ -182,11 +263,8 @@ async def db_upsert(table: str, data: dict):
 # ─── Config ───────────────────────────────────────────────────────────────────
 async def get_guild_config(guild_id) -> dict:
     gid = str(guild_id)
-    now = time.time()
     if gid in _guild_config_cache:
-        cached_cfg, cached_at = _guild_config_cache[gid]
-        if now - cached_at < CACHE_TTL:
-            return cached_cfg
+        return _guild_config_cache[gid]
     try:
         resp = await db_select("settings", "guild_id", gid)
         if resp.data:
@@ -194,7 +272,7 @@ async def get_guild_config(guild_id) -> dict:
         else:
             cfg = {"guild_id": gid, "skullboard_channel_id": 0, "min_skulls": 1, "prefix": "sk!"}
             await db_insert("settings", cfg)
-        _guild_config_cache[gid] = (cfg, now)
+        _guild_config_cache[gid] = cfg
         return cfg
     except Exception as e:
         logger.error(f"Error al obtener configuración de guild {gid}: {e}")
@@ -241,18 +319,15 @@ async def update_tracked_count(message_id: str, count: int):
 
 async def get_guild_record(guild_id: str) -> int:
     gid = str(guild_id)
-    now = time.time()
     if gid in _guild_record_cache:
-        cached_rec, cached_at = _guild_record_cache[gid]
-        if now - cached_at < CACHE_TTL:
-            return cached_rec
+        return _guild_record_cache[gid]
     try:
         resp = await supabase.table("tracked_messages").select("skull_count") \
             .eq("guild_id", gid).order("skull_count", desc=True).limit(1).execute()
         rec = 0
         if resp.data:
             rec = resp.data[0]["skull_count"] or 0
-        _guild_record_cache[gid] = (rec, now)
+        _guild_record_cache[gid] = rec
         return rec
     except Exception as e:
         logger.error(f"Error al obtener récord de guild {gid}: {e}")
@@ -261,15 +336,12 @@ async def get_guild_record(guild_id: str) -> int:
 # ─── Ignored channels ─────────────────────────────────────────────────────────
 async def get_ignored_channels(guild_id: str) -> list:
     gid = str(guild_id)
-    now = time.time()
     if gid in _ignored_channels_cache:
-        cached_chans, cached_at = _ignored_channels_cache[gid]
-        if now - cached_at < CACHE_TTL:
-            return list(cached_chans)
+        return list(_ignored_channels_cache[gid])
     try:
         resp = await supabase.table("ignored_channels").select("channel_id").eq("guild_id", gid).execute()
         chans = [r["channel_id"] for r in resp.data] if resp.data else []
-        _ignored_channels_cache[gid] = (set(chans), now)
+        _ignored_channels_cache[gid] = set(chans)
         return chans
     except Exception as e:
         logger.error(f"Error al obtener canales ignorados de guild {gid}: {e}")
@@ -334,14 +406,11 @@ async def get_prefix(bot, message):
     if not message.guild:
         return "sk!"
     gid = str(message.guild.id)
-    now = time.time()
     if gid in _prefix_cache:
-        cached_prefix, cached_at = _prefix_cache[gid]
-        if now - cached_at < PREFIX_CACHE_TTL:
-            return cached_prefix
+        return _prefix_cache[gid]
     cfg = await get_guild_config(message.guild.id)
     prefix = cfg.get("prefix", "sk!")
-    _prefix_cache[gid] = (prefix, now)
+    _prefix_cache[gid] = prefix
     return prefix
 
 # ─── Bot ──────────────────────────────────────────────────────────────────────

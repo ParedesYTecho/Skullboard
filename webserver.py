@@ -6,9 +6,28 @@ import requests
 import os
 import secrets
 import time
-import json
 import re
 import html
+
+# ─── Serialización y Métricas de Rendimiento ─────────────────────────────────
+try:
+    import orjson
+    def json_dumps(obj) -> str:
+        return orjson.dumps(obj).decode("utf-8")
+except ImportError:
+    import json
+    def json_dumps(obj) -> str:
+        return json.dumps(obj)
+
+try:
+    import psutil
+    def get_memory_mb() -> float:
+        return round(psutil.Process().memory_info().rss / (1024 * 1024), 2)
+except ImportError:
+    def get_memory_mb() -> float:
+        return 0.0
+
+_START_TIME = time.time()
 
 app = Flask(__name__)
 
@@ -127,9 +146,21 @@ def api_stats():
             with _stats_lock:
                 _stats_cache["refreshing"] = False
 
-    resp = app.response_class(json.dumps(data), mimetype="application/json")
+    resp = app.response_class(json_dumps(data), mimetype="application/json")
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Cache-Control"] = "public, max-age=60"
+    return resp
+
+@app.route('/api/health')
+def api_health():
+    data = {
+        "status": "healthy",
+        "uptime_seconds": round(time.time() - _START_TIME, 1),
+        "memory_rss_mb": get_memory_mb(),
+        "timestamp": int(time.time())
+    }
+    resp = app.response_class(json_dumps(data), mimetype="application/json")
+    resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
 @app.route('/api/contact', methods=["POST", "OPTIONS"])
