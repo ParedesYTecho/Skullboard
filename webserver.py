@@ -218,7 +218,49 @@ def api_health():
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
+def _is_guild_authorized(perms_int: int, is_owner: bool) -> bool:
+    """Valida permisos estilo Sapphire/Werewolf: ADMINISTRATOR (0x8), MANAGE_GUILD (0x20) o OWNER."""
+    return bool(perms_int & 0x8) or bool(perms_int & 0x20) or bool(is_owner)
+
 # ─── Dashboard API Endpoints (Discord OAuth2 Secured) ────────────────────────
+@app.route('/api/auth/token', methods=["POST", "OPTIONS"])
+def api_auth_token():
+    """Intercambia Authorization Code por Access Token seguro con el client secret."""
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    
+    body = request.get_json(silent=True) or {}
+    code = body.get("code")
+    redirect_uri = body.get("redirect_uri", "https://skullboard.vercel.app/dashboard")
+    
+    if not code:
+        return _cors(jsonify(ok=False, error="Código de autorización faltante")), 400
+    
+    if not DISCORD_CLIENT_SECRET:
+        return _cors(jsonify(ok=False, error="DISCORD_CLIENT_SECRET no configurado en el servidor")), 500
+
+    data = {
+        "client_id": APPLICATION_ID,
+        "client_secret": DISCORD_CLIENT_SECRET,
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri
+    }
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    try:
+        r = requests.post("https://discord.com/api/v10/oauth2/token", data=data, headers=headers, timeout=8)
+        if r.status_code != 200:
+            return _cors(jsonify(ok=False, error="Discord rechazó el código de autorización", details=r.text)), 400
+        token_data = r.json()
+        access_token = token_data.get("access_token")
+        
+        user_res = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {access_token}"}, timeout=6)
+        user_info = user_res.json() if user_res.status_code == 200 else {}
+        
+        return _cors(jsonify(ok=True, token=access_token, user=user_info))
+    except Exception as e:
+        return _cors(jsonify(ok=False, error=str(e))), 500
+
 @app.route('/api/auth/me', methods=["GET", "OPTIONS"])
 def api_auth_me():
     if request.method == "OPTIONS":
@@ -241,13 +283,13 @@ def api_auth_guilds():
     admin_guilds = []
     for g in guilds:
         perms = int(g.get("permissions", 0))
-        is_admin = bool(perms & 0x8) or g.get("owner", False)
-        if is_admin:
+        is_owner = g.get("owner", False)
+        if _is_guild_authorized(perms, is_owner):
             admin_guilds.append({
                 "id": str(g.get("id")),
                 "name": g.get("name"),
                 "icon": g.get("icon"),
-                "owner": g.get("owner", False),
+                "owner": is_owner,
                 "permissions": perms
             })
 
@@ -268,6 +310,41 @@ def api_auth_guilds():
 
     return _cors(jsonify(ok=True, guilds=admin_guilds))
 
+@app.route('/api/guild/<guild_id>/channels', methods=["GET", "OPTIONS"])
+def api_guild_channels(guild_id: str):
+    """Devuelve los canales de texto del servidor para poblar el dropdown de configuración."""
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    
+    token = _extract_bearer(request)
+    guilds = _fetch_discord_guilds(token)
+    if guilds is None:
+        return _cors(jsonify(ok=False, error="No autorizado")), 401
+    
+    matching = next((g for g in guilds if str(g.get("id")) == str(guild_id)), None)
+    if not matching or not _is_guild_authorized(int(matching.get("permissions", 0)), matching.get("owner", False)):
+        return _cors(jsonify(ok=False, error="Permisos insuficientes")), 403
+
+    channels = []
+    if DISCORD_BOT_TOKEN:
+        try:
+            r = requests.get(
+                f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+                headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"},
+                timeout=6
+            )
+            if r.status_code == 200:
+                raw_chans = r.json()
+                channels = [
+                    {"id": str(c["id"]), "name": c["name"], "type": c["type"]}
+                    for c in raw_chans
+                    if c.get("type") in (0, 5) # 0 = Texto, 5 = Anuncios
+                ]
+        except Exception:
+            pass
+            
+    return _cors(jsonify(ok=True, channels=channels))
+
 @app.route('/api/guild/<guild_id>/config', methods=["GET", "POST", "OPTIONS"])
 def api_guild_config(guild_id: str):
     if request.method == "OPTIONS":
@@ -279,7 +356,7 @@ def api_guild_config(guild_id: str):
         return _cors(jsonify(ok=False, error="No autorizado")), 401
     
     matching = next((g for g in guilds if str(g.get("id")) == str(guild_id)), None)
-    if not matching or not (bool(int(matching.get("permissions", 0)) & 0x8) or matching.get("owner", False)):
+    if not matching or not _is_guild_authorized(int(matching.get("permissions", 0)), matching.get("owner", False)):
         return _cors(jsonify(ok=False, error="Permisos insuficientes en este servidor")), 403
 
     if request.method == "GET":

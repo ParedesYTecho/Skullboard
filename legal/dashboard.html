@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="utf-8">
@@ -116,9 +116,12 @@
 
                 <form id="guild-config-form" style="display:flex; flex-direction:column; gap:22px;">
                     <div>
-                        <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Canal de Starboard (ID numérico de Discord):</label>
-                        <input type="text" id="cfg-channel" name="channel" class="form-control-input" placeholder="Ej: 123456789012345678">
-                        <small style="color:var(--ink-dim); font-size:0.8rem; margin-top:6px; display:block;">Copia la ID del canal de texto donde SkullBoard publicará los mensajes destacados.</small>
+                        <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Canal de Starboard:</label>
+                        <select id="cfg-channel-select" class="form-control-input" style="margin-bottom:8px;">
+                            <option value="">Cargando canales del servidor…</option>
+                        </select>
+                        <input type="text" id="cfg-channel" name="channel" class="form-control-input" placeholder="O pega directamente la ID del canal">
+                        <small style="color:var(--ink-dim); font-size:0.8rem; margin-top:6px; display:block;">Selecciona el canal de texto donde SkullBoard publicará los mensajes destacados.</small>
                     </div>
 
                     <div>
@@ -266,8 +269,29 @@
             showToast(next === 'dark' ? 'Modo Oscuro activado' : 'Modo Claro activado', next === 'dark' ? '🌙' : '☀️');
         });
 
-        // Parse token from URL hash (Implicit Grant)
-        function checkAuthToken() {
+        // Authorization Code + Implicit Grant Handler
+        async function getOrExchangeAuthToken() {
+            // 1. Check Code in query parameters (Authorization Code Flow)
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            if (code) {
+                try {
+                    const res = await fetch(`${API_BASE}/api/auth/token`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
+                    });
+                    const data = await res.json();
+                    if (data.ok && data.token) {
+                        sessionStorage.setItem('skb_auth_token', data.token);
+                    }
+                } catch (e) {
+                    console.error('Error intercambiando código OAuth2:', e);
+                }
+                window.history.replaceState(null, null, window.location.pathname);
+            }
+
+            // 2. Check token in hash (fallback)
             if (window.location.hash) {
                 const params = new URLSearchParams(window.location.hash.substring(1));
                 const token = params.get('access_token');
@@ -279,11 +303,9 @@
             return sessionStorage.getItem('skb_auth_token');
         }
 
-        const token = checkAuthToken();
-
-        // Discord Login Trigger
+        // Discord Login Trigger (Authorization Code Flow)
         document.getElementById('btn-login-discord').addEventListener('click', () => {
-            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=token&scope=identify%20guilds`;
+            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds&prompt=consent`;
             window.location.href = authUrl;
         });
 
@@ -300,6 +322,15 @@
         const valPin = document.getElementById('cfg-pin-val');
         rangePin.addEventListener('input', () => {
             valPin.textContent = rangePin.value > 0 ? `${rangePin.value} 💀` : 'Desactivado';
+        });
+
+        // Channel Select Sync
+        const selectChannel = document.getElementById('cfg-channel-select');
+        const inputChannel = document.getElementById('cfg-channel');
+        selectChannel.addEventListener('change', () => {
+            if (selectChannel.value) {
+                inputChannel.value = selectChannel.value;
+            }
         });
 
         // Tabs switcher
@@ -333,6 +364,8 @@
             const loginView = document.getElementById('view-login');
             const guildsView = document.getElementById('view-guilds');
 
+            const token = await getOrExchangeAuthToken();
+
             if (!token) {
                 loadingView.style.display = 'none';
                 loginView.style.display = 'block';
@@ -364,7 +397,7 @@
                     window.location.reload();
                 });
 
-                // Fetch Admin Guilds
+                // Fetch Admin & Manage Guilds
                 loadingView.style.display = 'none';
                 guildsView.style.display = 'block';
 
@@ -392,6 +425,9 @@
                         ? '<span class="tag-pill new" style="font-size:0.75rem;">✓ Conectado</span>'
                         : '<span class="tag-pill" style="font-size:0.75rem; color:var(--ink-dim);">No instalado</span>';
 
+                    // Direct invite link pre-selecting that specific guild (Sapphire style)
+                    const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${g.id}&disable_guild_select=true`;
+
                     card.innerHTML = `
                         <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
                             <img src="${iconUrl}" alt="${g.name}" style="width:48px; height:48px; border-radius:14px; border:1px solid var(--border); object-fit:cover; flex-shrink:0;">
@@ -403,7 +439,7 @@
                         <div style="margin-top:auto; padding-top:8px;">
                             ${hasBot
                                 ? `<button class="btn btn-primary btn-sm btn-manage-guild" style="width:100%; justify-content:center;" data-id="${g.id}" data-name="${g.name}">⚙️ Gestionar</button>`
-                                : `<a href="https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${g.id}" target="_blank" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center;">+ Añadir Bot</a>`
+                                : `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center;">+ Invitar Bot</a>`
                             }
                         </div>
                     `;
@@ -426,11 +462,35 @@
 
         async function openManageGuild(guildId, guildName) {
             currentGuildId = guildId;
+            const token = sessionStorage.getItem('skb_auth_token');
             document.getElementById('manage-guild-name').textContent = guildName;
             document.getElementById('view-guilds').style.display = 'none';
             document.getElementById('view-manage').style.display = 'block';
 
-            // Cargar Configuración
+            // 1. Cargar Canales de Texto (Dropdown)
+            const selectChan = document.getElementById('cfg-channel-select');
+            selectChan.innerHTML = '<option value="">Cargando canales…</option>';
+            try {
+                const chanRes = await fetch(`${API_BASE}/api/guild/${guildId}/channels`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const chanData = await chanRes.json();
+                if (chanData.ok && chanData.channels && chanData.channels.length > 0) {
+                    selectChan.innerHTML = '<option value="">-- Selecciona un canal de texto --</option>';
+                    chanData.channels.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = `# ${c.name}`;
+                        selectChan.appendChild(opt);
+                    });
+                } else {
+                    selectChan.innerHTML = '<option value="">(Canales no disponibles)</option>';
+                }
+            } catch (e) {
+                selectChan.innerHTML = '<option value="">(Error al cargar canales)</option>';
+            }
+
+            // 2. Cargar Configuración Actual
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${guildId}/config`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -438,7 +498,11 @@
                 const data = await res.json();
                 if (data.ok && data.config) {
                     const cfg = data.config;
-                    document.getElementById('cfg-channel').value = cfg.skullboard_channel_id || '';
+                    const chanId = cfg.skullboard_channel_id ? String(cfg.skullboard_channel_id) : '';
+                    document.getElementById('cfg-channel').value = chanId;
+                    if (chanId && selectChan.querySelector(`option[value="${chanId}"]`)) {
+                        selectChan.value = chanId;
+                    }
                     document.getElementById('cfg-skulls').value = cfg.min_skulls || 1;
                     document.getElementById('cfg-skulls-val').textContent = `${cfg.min_skulls || 1} 💀`;
                     document.getElementById('cfg-prefix').value = cfg.prefix || 'sk!';
@@ -451,6 +515,7 @@
         }
 
         async function loadGuildLeaderboard(guildId) {
+            const token = sessionStorage.getItem('skb_auth_token');
             const list = document.getElementById('lb-messages-list');
             list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink-dim);">Cargando mensajes destacados…</div>';
             try {
@@ -490,6 +555,7 @@
         // Form Submit
         document.getElementById('guild-config-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const token = sessionStorage.getItem('skb_auth_token');
             const btn = document.getElementById('btn-save-cfg');
             const status = document.getElementById('cfg-save-status');
             btn.disabled = true;
