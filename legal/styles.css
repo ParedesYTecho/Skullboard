@@ -489,9 +489,16 @@ table.data td { color: var(--ink-soft); }
 /* ====== Timeline Changelog (Linear & Raycast Style) ====== */
 .changelog-hero { text-align: center; padding: 34px 0 16px; }
 .changelog-hero h1 {
-    font-family: var(--display); font-size: clamp(2.2rem, 6vw, 3.4rem); font-weight: 700;
-    letter-spacing: -1.5px; margin-top: 8px;
-    background: linear-gradient(120deg, #fff 0%, #e8e8ee 60%, #d6d6de 100%);
+    font-family: var(--display); font-size: clamp(2.2rem, 6vw, 3.4rem); font-weight: 800;
+    letter-spacing: -1.5px; margin-top: 8px; line-height: 1.15;
+    color: var(--ink);
+}
+:root[data-theme="dark"] .changelog-hero h1 {
+    background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 70%, #94a3b8 100%);
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+:root[data-theme="light"] .changelog-hero h1 {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 70%, #334155 100%);
     -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 .changelog-hero p { color: var(--ink-soft); font-size: 1.05rem; max-width: 580px; margin: 12px auto 0; }

@@ -383,6 +383,31 @@ def api_guild_config(guild_id: str):
             return _cors(jsonify(ok=True, config=payload))
         return _cors(jsonify(ok=False, error="Error al guardar configuración")), 500
 
+@app.route('/api/leaderboard/global', methods=["GET", "OPTIONS"])
+def api_leaderboard_global():
+    """Devuelve los mensajes con más calaveras a nivel global de forma pública."""
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    
+    msgs = _sb_select("tracked_messages", {
+        "order": "skull_count.desc",
+        "limit": 20
+    })
+    return _cors(jsonify(ok=True, messages=msgs))
+
+@app.route('/api/guild/<guild_id>/leaderboard/public', methods=["GET", "OPTIONS"])
+def api_guild_leaderboard_public(guild_id: str):
+    """Devuelve el leaderboard público de un servidor específico sin requerir login."""
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+
+    msgs = _sb_select("tracked_messages", {
+        "guild_id": f"eq.{guild_id}",
+        "order": "skull_count.desc",
+        "limit": 25
+    })
+    return _cors(jsonify(ok=True, messages=msgs))
+
 @app.route('/api/guild/<guild_id>/leaderboard', methods=["GET", "OPTIONS"])
 def api_guild_leaderboard(guild_id: str):
     if request.method == "OPTIONS":
