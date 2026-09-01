@@ -9,8 +9,10 @@
     <meta property="og:url" content="https://skullboard.vercel.app/cambios">
     <meta property="og:title" content="SkullBoard · Historial de Cambios">
     <meta property="og:description" content="Todas las novedades, mejoras y correcciones de SkullBoard.">
-    <meta property="og:image" content="https://skullboard.vercel.app/skullboard_icon.png">
+    <meta property="og:image" content="https://skullboard-fqf1.onrender.com/api/og">
     <meta property="og:type" content="website">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#0b0a10">
     <link rel="icon" type="image/png" href="skullboard_icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -34,6 +36,7 @@
             <a href="/#comandos" class="nav-link">Comandos</a>
             <a href="/#como-funciona" class="nav-link">Cómo funciona</a>
             <a href="cambios" class="nav-link active">Cambios</a>
+            <a href="dashboard" class="nav-link" style="color:var(--violet-2); font-weight:700;">Panel Web</a>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
                 <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
             </button>
@@ -53,13 +56,66 @@
             <h1>Historial de Actualizaciones</h1>
             <p>Todo el registro de mejoras, nuevas funciones, parches de seguridad y optimizaciones de SkullBoard.</p>
             <div class="changelog-meta-pills">
-                <div class="pill"><span class="dot"></span> Versión actual: <b>v2.4.2</b></div>
-                <div class="pill"><b>10 Versiones</b> documentadas</div>
+                <div class="pill"><span class="dot"></span> Versión actual: <b>v2.5.0</b></div>
+                <div class="pill"><b>11 Versiones</b> documentadas</div>
                 <div class="pill">Historial desde <b>Mayo 2025</b> hasta <b>Septiembre 2026</b></div>
             </div>
         </header>
 
         <div class="timeline-container">
+
+            <!-- Release v2.5.0 (1 Septiembre 2026) -->
+            <article class="timeline-entry">
+                <div class="timeline-dot"></div>
+                <div class="timeline-card">
+                    <div class="t-header">
+                        <div>
+                            <div class="t-version-row">
+                                <span class="t-version-tag">v2.5.0</span>
+                                <span class="t-badge-latest">Última versión</span>
+                            </div>
+                            <h2 class="t-title">Panel Web /dashboard OAuth2, AutoShardedBot, Alertas por Webhook y Soporte PWA</h2>
+                        </div>
+                        <div class="t-date">1 de Septiembre, 2026</div>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill new">Nueva Funcionalidad</span>
+                            <span>Panel Web y Leaderboard Interactivo (/dashboard)</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Inicio de Sesión con Discord OAuth2:</strong> Flujo seguro de autenticación (<code>identify guilds</code>) para listar automáticamente los servidores donde el usuario es Administrador.</li>
+                            <li><strong>Ajustes del Servidor en Vivo:</strong> Configuración visual directa del canal de Starboard, control deslizante de umbral de calaveras (1 a 20 💀), prefijo de comandos (<code>sk!</code>) y umbral de auto-pin con sincronización instantánea en Supabase.</li>
+                            <li><strong>Leaderboard Web en Vivo:</strong> Visualización de los mensajes con mayor récord de calaveras directamente en el navegador con enlaces de salto a Discord.</li>
+                            <li><strong>Seguridad Bearer Token:</strong> Validación estricta en cada petición de la API para garantizar que solo administradores reales puedan alterar la configuración.</li>
+                        </ul>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill sec">Blindaje & Observabilidad</span>
+                            <span>AutoShardedBot, Webhooks y Failover de Permisos</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Migración a AutoShardedBot:</strong> Arquitectura multishard automática para soportar el crecimiento masivo a más de 1.000 servidores sin interrupciones.</li>
+                            <li><strong>Sistema de Alertas Críticas (#skullboard-alerts):</strong> Webhook de observabilidad en tiempo real para reportar automáticamente caídas de red o fallos de base de datos a los desarrolladores.</li>
+                            <li><strong>Auto-Diagnóstico y Failover de Permisos:</strong> Detección defensiva de falta de permisos (<code>SEND_MESSAGES</code> o <code>EMBED_LINKS</code>) en el canal de Starboard con notificación explicativa directa al Server Owner.</li>
+                        </ul>
+                    </div>
+
+                    <div class="change-section">
+                        <div class="change-section-head">
+                            <span class="tag-pill ui">PWA & Redes Sociales</span>
+                            <span>App Móvil y Previsualizaciones Dinámicas</span>
+                        </div>
+                        <ul class="change-list">
+                            <li><strong>Soporte PWA Completo:</strong> Archivo <code>manifest.json</code> y Service Worker (<code>sw.js</code>) para instalar SkullBoard como aplicación nativa en iOS/Android con caché offline.</li>
+                            <li><strong>Generador OpenGraph Dinámico (/api/og):</strong> Endpoint que genera una tarjeta social SVG en tiempo real con el total de servidores y mensajes destacados al compartir el enlace.</li>
+                        </ul>
+                    </div>
+                </div>
+            </article>
 
             <!-- Release v2.4.2 (1 Septiembre 2026) -->
             <article class="timeline-entry">
@@ -69,7 +125,6 @@
                         <div>
                             <div class="t-version-row">
                                 <span class="t-version-tag">v2.4.2</span>
-                                <span class="t-badge-latest">Última versión</span>
                             </div>
                             <h2 class="t-title">Spotlight Glow, Toasts Flotantes Sonner, orjson y Cachés TTL Anti-Fugas</h2>
                         </div>
@@ -449,6 +504,13 @@
                 const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
                 document.documentElement.dataset.theme = next;
                 localStorage.setItem('skb-theme', next);
+            });
+        }
+
+        // Service Worker Register
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
             });
         }
     </script>

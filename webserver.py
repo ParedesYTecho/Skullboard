@@ -88,9 +88,64 @@ def _sb_count(table: str):
 
 def _cors(resp):
     resp.headers["Access-Control-Allow-Origin"]  = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return resp
+
+def _extract_bearer(req) -> str:
+    auth = req.headers.get("Authorization", "")
+    if auth.startswith("Bearer "):
+        return auth[7:].strip()
+    return ""
+
+def _fetch_discord_user(token: str):
+    if not token:
+        return None
+    try:
+        r = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {token}"}, timeout=6)
+        return r.json() if r.status_code == 200 else None
+    except Exception:
+        return None
+
+def _fetch_discord_guilds(token: str):
+    if not token:
+        return None
+    try:
+        r = requests.get("https://discord.com/api/v10/users/@me/guilds", headers={"Authorization": f"Bearer {token}"}, timeout=8)
+        return r.json() if r.status_code == 200 else None
+    except Exception:
+        return None
+
+def _sb_select(table: str, params: dict):
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        return []
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/{table}",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+            params=params, timeout=6
+        )
+        return r.json() if r.status_code == 200 else []
+    except Exception:
+        return []
+
+def _sb_upsert(table: str, data: dict):
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        return False
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/{table}",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "resolution=merge-duplicates"
+            },
+            json=data, timeout=6
+        )
+        return r.status_code in (200, 201, 204)
+    except Exception:
+        return False
 
 def _get_real_ip() -> str:
     cf_ip = request.headers.get("CF-Connecting-IP")
@@ -160,6 +215,156 @@ def api_health():
         "timestamp": int(time.time())
     }
     resp = app.response_class(json_dumps(data), mimetype="application/json")
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+# ─── Dashboard API Endpoints (Discord OAuth2 Secured) ────────────────────────
+@app.route('/api/auth/me', methods=["GET", "OPTIONS"])
+def api_auth_me():
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    token = _extract_bearer(request)
+    user = _fetch_discord_user(token)
+    if not user:
+        return _cors(jsonify(ok=False, error="Token no válido o expirado")), 401
+    return _cors(jsonify(ok=True, user=user))
+
+@app.route('/api/auth/guilds', methods=["GET", "OPTIONS"])
+def api_auth_guilds():
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    token = _extract_bearer(request)
+    guilds = _fetch_discord_guilds(token)
+    if guilds is None:
+        return _cors(jsonify(ok=False, error="Token no válido o expirado")), 401
+
+    admin_guilds = []
+    for g in guilds:
+        perms = int(g.get("permissions", 0))
+        is_admin = bool(perms & 0x8) or g.get("owner", False)
+        if is_admin:
+            admin_guilds.append({
+                "id": str(g.get("id")),
+                "name": g.get("name"),
+                "icon": g.get("icon"),
+                "owner": g.get("owner", False),
+                "permissions": perms
+            })
+
+    if admin_guilds and SUPABASE_URL and SUPABASE_KEY:
+        gids = [g["id"] for g in admin_guilds]
+        try:
+            r = requests.get(
+                f"{SUPABASE_URL}/rest/v1/settings",
+                headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+                params={"guild_id": f"in.({','.join(gids)})"}, timeout=6
+            )
+            settings_map = {str(s["guild_id"]): s for s in (r.json() if r.status_code == 200 else [])}
+            for g in admin_guilds:
+                g["config"] = settings_map.get(g["id"])
+                g["has_bot"] = g["id"] in settings_map
+        except Exception:
+            pass
+
+    return _cors(jsonify(ok=True, guilds=admin_guilds))
+
+@app.route('/api/guild/<guild_id>/config', methods=["GET", "POST", "OPTIONS"])
+def api_guild_config(guild_id: str):
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    
+    token = _extract_bearer(request)
+    guilds = _fetch_discord_guilds(token)
+    if guilds is None:
+        return _cors(jsonify(ok=False, error="No autorizado")), 401
+    
+    matching = next((g for g in guilds if str(g.get("id")) == str(guild_id)), None)
+    if not matching or not (bool(int(matching.get("permissions", 0)) & 0x8) or matching.get("owner", False)):
+        return _cors(jsonify(ok=False, error="Permisos insuficientes en este servidor")), 403
+
+    if request.method == "GET":
+        cfg = _sb_select("settings", {"guild_id": f"eq.{guild_id}"})
+        data = cfg[0] if cfg else {"guild_id": guild_id, "skullboard_channel_id": 0, "min_skulls": 1, "prefix": "sk!"}
+        return _cors(jsonify(ok=True, config=data))
+
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        min_skulls = max(1, min(int(body.get("min_skulls", 1)), 50))
+        prefix = re.sub(r'[\r\n\s]+', '', str(body.get("prefix", "sk!")))[:5] or "sk!"
+        channel_id = int(body.get("skullboard_channel_id", 0))
+        pin_threshold = max(0, min(int(body.get("pin_threshold", 0)), 50))
+
+        payload = {
+            "guild_id": str(guild_id),
+            "min_skulls": min_skulls,
+            "prefix": prefix,
+            "skullboard_channel_id": channel_id,
+            "pin_threshold": pin_threshold
+        }
+        success = _sb_upsert("settings", payload)
+        if success:
+            return _cors(jsonify(ok=True, config=payload))
+        return _cors(jsonify(ok=False, error="Error al guardar configuración")), 500
+
+@app.route('/api/guild/<guild_id>/leaderboard', methods=["GET", "OPTIONS"])
+def api_guild_leaderboard(guild_id: str):
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+
+    token = _extract_bearer(request)
+    guilds = _fetch_discord_guilds(token)
+    if guilds is None:
+        return _cors(jsonify(ok=False, error="No autorizado")), 401
+
+    msgs = _sb_select("tracked_messages", {
+        "guild_id": f"eq.{guild_id}",
+        "order": "skull_count.desc",
+        "limit": 20
+    })
+    return _cors(jsonify(ok=True, messages=msgs))
+
+@app.route('/api/og')
+def api_og():
+    srv = _sb_count("settings") or 100
+    hl  = _sb_count("tracked_messages") or 500
+    svg = f"""<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+            <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#0b0a10"/>
+                <stop offset="50%" stop-color="#12101b"/>
+                <stop offset="100%" stop-color="#08070d"/>
+            </linearGradient>
+            <linearGradient id="violet" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#a78bfa"/>
+                <stop offset="100%" stop-color="#7c3aed"/>
+            </linearGradient>
+        </defs>
+        <rect width="1200" height="630" fill="url(#bg)"/>
+        <circle cx="950" cy="150" r="300" fill="#7c3aed" opacity="0.15"/>
+        <circle cx="200" cy="500" r="250" fill="#34d399" opacity="0.1"/>
+        <rect x="24" y="24" width="1152" height="582" rx="28" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2"/>
+        <text x="80" y="110" font-family="-apple-system, sans-serif" font-size="36" font-weight="bold" fill="#ffffff">💀 SkullBoard</text>
+        <text x="80" y="240" font-family="-apple-system, sans-serif" font-size="54" font-weight="800" fill="#ededf2">El Starboard Definitivo</text>
+        <text x="80" y="310" font-family="-apple-system, sans-serif" font-size="54" font-weight="800" fill="url(#violet)">para Servidores de Discord</text>
+        <text x="80" y="380" font-family="-apple-system, sans-serif" font-size="24" fill="#94a3b8">Rankings en vivo, Auto-Pin de récords y Panel Web OAuth2.</text>
+        <g transform="translate(80, 450)">
+            <rect width="280" height="88" rx="16" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.12)"/>
+            <text x="24" y="42" font-family="-apple-system, sans-serif" font-size="30" font-weight="bold" fill="#ffffff">{srv:,}</text>
+            <text x="24" y="68" font-family="-apple-system, sans-serif" font-size="15" fill="#94a3b8">Servidores Activos</text>
+        </g>
+        <g transform="translate(390, 450)">
+            <rect width="320" height="88" rx="16" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.12)"/>
+            <text x="24" y="42" font-family="-apple-system, sans-serif" font-size="30" font-weight="bold" fill="#34d399">{hl:,}</text>
+            <text x="24" y="68" font-family="-apple-system, sans-serif" font-size="15" fill="#94a3b8">Mensajes Destacados</text>
+        </g>
+        <g transform="translate(740, 450)">
+            <rect width="380" height="88" rx="16" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.12)"/>
+            <text x="24" y="42" font-family="-apple-system, sans-serif" font-size="30" font-weight="bold" fill="#a78bfa">v2.5.0</text>
+            <text x="24" y="68" font-family="-apple-system, sans-serif" font-size="15" fill="#94a3b8">Dashboard Web · AutoShardedBot</text>
+        </g>
+    </svg>"""
+    resp = app.response_class(svg, mimetype="image/svg+xml")
+    resp.headers["Cache-Control"] = "public, max-age=120"
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 

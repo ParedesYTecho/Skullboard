@@ -1,7 +1,7 @@
 # 🏛️ SYSTEM_CONTEXT.md — Documento Maestro de Arquitectura y Gobernanza Técnica
 
 > **ESTADO DEL DOCUMENTO:** VIVO / PRODUCCIÓN  
-> **VERSIÓN:** 2.4.2 (Spotlight Glow, Sonner Toasts, orjson y Cachés TTL Anti-Fugas)  
+> **VERSIÓN:** 2.5.0 (Dashboard Web OAuth2, AutoShardedBot, Alertas Webhook y PWA)  
 > **FECHA DE ÚLTIMA ACTUALIZACIÓN:** 1 de septiembre de 2026  
 > **PROPIETARIO TÉCNICO:** GlobalFerociouS (ID: `561225979389804544`)  
 > **APLICACIÓN / BOT ID:** `1367463352774955059`  

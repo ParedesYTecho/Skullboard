@@ -13,15 +13,16 @@
     <meta property="og:site_name" content="SkullBoard">
     <meta property="og:title" content="SkullBoard · El Starboard 💀 Definitivo para Discord">
     <meta property="og:description" content="Destaca los mejores momentos de tu servidor con el Starboard de calaveras, leaderboards históricos y privacidad estricta.">
-    <meta property="og:image" content="https://skullboard.vercel.app/skullboard_icon.png">
+    <meta property="og:image" content="https://skullboard-fqf1.onrender.com/api/og">
     <meta property="og:locale" content="es_ES">
 
     <!-- Twitter Cards -->
-    <meta name="twitter:card" content="summary">
-    <meta name="twitter:title" content="SkullBoard · Bot de Discord">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SkullBoard · El Starboard 💀 Definitivo para Discord">
     <meta name="twitter:description" content="El Starboard 💀 para tu servidor: resalta lo mejor, con rankings y estadísticas.">
-    <meta name="twitter:image" content="https://skullboard.vercel.app/skullboard_icon.png">
+    <meta name="twitter:image" content="https://skullboard-fqf1.onrender.com/api/og">
 
+    <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0b0a10">
     <link rel="icon" type="image/png" href="skullboard_icon.png">
 
@@ -70,6 +71,7 @@
             <a href="#comandos" class="nav-link">Comandos</a>
             <a href="#como-funciona" class="nav-link">Cómo funciona</a>
             <a href="cambios" class="nav-link">Cambios</a>
+            <a href="dashboard" class="nav-link" style="color:var(--violet-2); font-weight:700;">Panel Web</a>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
                 <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
             </button>
@@ -855,6 +857,13 @@
                 inputs.forEach(el => el.disabled = false);
             }
         });
+
+        // Service Worker Register
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
+            });
+        }
     </script>
 </body>
 </html>

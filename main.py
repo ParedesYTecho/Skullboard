@@ -12,6 +12,7 @@ from discord.ext import commands, tasks
 from discord import app_commands
 from supabase import acreate_client, AsyncClient
 import discord.abc
+import aiohttp
 from typing import Optional
 
 # ─── Optimización de Event Loop (uvloop en Linux/Render) ─────────────────────
@@ -60,6 +61,30 @@ supabase: Optional[AsyncClient] = None
 
 OWNER_ID    = int(os.getenv("BOT_OWNER_ID", "561225979389804544"))
 skull_emoji = '💀'
+DISCORD_ALERTS_WEBHOOK_URL = os.getenv("DISCORD_ALERTS_WEBHOOK_URL")
+
+_perm_failover_cooldown: dict[str, float] = {}
+
+async def send_system_alert(title: str, description: str, level: str = "ERROR", extra_fields: list = None):
+    """Envía un webhook de alerta a Discord para observabilidad y monitoreo en tiempo real."""
+    if not DISCORD_ALERTS_WEBHOOK_URL:
+        return
+    color = 0xef4444 if level == "ERROR" else (0xf59e0b if level == "WARNING" else 0x3b82f6)
+    embed = {
+        "title": f"🚨 [SkullBoard] {title}",
+        "description": description[:2000],
+        "color": color,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "footer": {"text": f"Nivel: {level} · Entorno: Render Production v2.5.0"}
+    }
+    if extra_fields:
+        embed["fields"] = extra_fields[:10]
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            await session.post(DISCORD_ALERTS_WEBHOOK_URL, json={"embeds": [embed]}, timeout=5.0)
+    except Exception as e:
+        logger.warning(f"No se pudo enviar alerta por webhook: {e}")
 
 # ─── Gestores de Concurrencia y Cachés en memoria ─────────────────────────────
 # ─── Gestores de Concurrencia y Cachés en memoria ─────────────────────────────
@@ -438,13 +463,13 @@ class GuildOnlyTree(app_commands.CommandTree):
             return False
         return True
 
-class SkullBot(commands.Bot):
+class SkullBot(commands.AutoShardedBot):
     async def setup_hook(self):
         global supabase
         supabase = await acreate_client(SUPABASE_URL, SUPABASE_KEY)
         logger.info("✅ Cliente Supabase (async) inicializado")
         synced = await self.tree.sync()
-        logger.info(f"✅ Slash commands sincronizados: {len(synced)}")
+        logger.info(f"✅ Slash commands sincronizados: {len(synced)} (AutoShardedBot activo)")
         await load_notify_cache()
         if not status_loop.is_running():
             status_loop.start()
@@ -802,7 +827,29 @@ async def _check(msg: discord.Message):
             if count < cfg["min_skulls"]:
                 return
 
-            sent = await dest_chan.send(content=texto, embed=embed)
+            try:
+                sent = await dest_chan.send(content=texto, embed=embed)
+            except discord.Forbidden:
+                now = time.time()
+                if now - _perm_failover_cooldown.get(gid, 0) > 3600:
+                    _perm_failover_cooldown[gid] = now
+                    logger.warning(f"⚠️ [Perm Failover] Sin permisos para enviar en canal {cfg['skullboard_channel_id']} ({msg.guild.name})")
+                    if msg.guild.owner:
+                        try:
+                            owner_embed = discord.Embed(
+                                title="⚠️ [SkullBoard] Faltan permisos en tu canal de Starboard",
+                                description=(
+                                    f"Hola, SkullBoard intentó publicar un mensaje destacado en tu canal configurado en **{msg.guild.name}**, "
+                                    f"pero el bot carece de los permisos **Enviar Mensajes** o **Insertar Enlaces** (`EMBED_LINKS`) en dicho canal.\n\n"
+                                    f"👉 Por favor, otorga los permisos necesarios al rol de SkullBoard en ese canal para que el Starboard funcione correctamente."
+                                ),
+                                color=0xf59e0b
+                            )
+                            owner_embed.set_footer(text="Auto-Diagnóstico Defensivo · SkullBoard v2.5.0")
+                            await msg.guild.owner.send(embed=owner_embed)
+                        except Exception:
+                            pass
+                return
             await set_tracked_message(mid, sent.id, count, msg.author.id, gid)
             _guild_record_cache.pop(gid, None)
 
