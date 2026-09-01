@@ -280,21 +280,22 @@ def api_auth_guilds():
     if guilds is None:
         return _cors(jsonify(ok=False, error="Token no válido o expirado")), 401
 
-    admin_guilds = []
+    user_guilds = []
     for g in guilds:
         perms = int(g.get("permissions", 0))
         is_owner = g.get("owner", False)
-        if _is_guild_authorized(perms, is_owner):
-            admin_guilds.append({
-                "id": str(g.get("id")),
-                "name": g.get("name"),
-                "icon": g.get("icon"),
-                "owner": is_owner,
-                "permissions": perms
-            })
+        is_admin = _is_guild_authorized(perms, is_owner)
+        user_guilds.append({
+            "id": str(g.get("id")),
+            "name": g.get("name"),
+            "icon": g.get("icon"),
+            "owner": is_owner,
+            "permissions": perms,
+            "is_admin": is_admin
+        })
 
-    if admin_guilds and SUPABASE_URL and SUPABASE_KEY:
-        gids = [g["id"] for g in admin_guilds]
+    if user_guilds and SUPABASE_URL and SUPABASE_KEY:
+        gids = [g["id"] for g in user_guilds]
         try:
             r = requests.get(
                 f"{SUPABASE_URL}/rest/v1/settings",
@@ -302,13 +303,16 @@ def api_auth_guilds():
                 params={"guild_id": f"in.({','.join(gids)})"}, timeout=6
             )
             settings_map = {str(s["guild_id"]): s for s in (r.json() if r.status_code == 200 else [])}
-            for g in admin_guilds:
+            for g in user_guilds:
                 g["config"] = settings_map.get(g["id"])
                 g["has_bot"] = g["id"] in settings_map
         except Exception:
             pass
 
-    return _cors(jsonify(ok=True, guilds=admin_guilds))
+    # Servidores con el bot instalado primero, luego por permisos de admin y alfabético
+    user_guilds.sort(key=lambda x: (not x.get("has_bot", False), not x.get("is_admin", False), x.get("name", "").lower()))
+
+    return _cors(jsonify(ok=True, guilds=user_guilds))
 
 @app.route('/api/guild/<guild_id>/channels', methods=["GET", "OPTIONS"])
 def api_guild_channels(guild_id: str):
@@ -421,9 +425,36 @@ def api_guild_leaderboard(guild_id: str):
     msgs = _sb_select("tracked_messages", {
         "guild_id": f"eq.{guild_id}",
         "order": "skull_count.desc",
-        "limit": 20
+        "limit": 50
     })
     return _cors(jsonify(ok=True, messages=msgs))
+
+@app.route('/api/guild/<guild_id>/my-messages', methods=["GET", "OPTIONS"])
+def api_guild_my_messages(guild_id: str):
+    """Devuelve los mensajes destacados de SkullBoard creados por el usuario en este servidor."""
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+
+    token = _extract_bearer(request)
+    user = _fetch_discord_user(token)
+    if not user:
+        return _cors(jsonify(ok=False, error="No autorizado")), 401
+
+    user_id = str(user.get("id"))
+    msgs = _sb_select("tracked_messages", {
+        "guild_id": f"eq.{guild_id}",
+        "author_id": f"eq.{user_id}",
+        "order": "skull_count.desc",
+        "limit": 50
+    })
+
+    total_skulls = sum(int(m.get("skull_count", 0)) for m in (msgs or []))
+    return _cors(jsonify(
+        ok=True,
+        total_skulls=total_skulls,
+        total_messages=len(msgs) if msgs else 0,
+        messages=msgs or []
+    ))
 
 @app.route('/api/og')
 def api_og():

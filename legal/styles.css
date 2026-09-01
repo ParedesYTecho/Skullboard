@@ -2122,6 +2122,109 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .lb-item:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-strong);
+}
+
+/* ====== Guild Switcher & Metric Cards (Werewolf / Modern UI) ====== */
+.guild-switcher-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 14px 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    margin-bottom: 24px;
+    backdrop-filter: blur(12px);
+}
+
+.guild-picker-control {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px 14px 6px 8px;
+    transition: border-color .2s ease;
+}
+
+.guild-picker-control:hover {
+    border-color: var(--violet-2);
+}
+
+.guild-picker-select {
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-weight: 700;
+    font-size: 0.95rem;
+    font-family: inherit;
+    outline: none;
+    cursor: pointer;
+    max-width: 240px;
+}
+
+.guild-picker-select option {
+    background: var(--bg);
+    color: var(--ink);
+}
+
+.stat-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.stat-metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    transition: transform .2s ease, border-color .2s ease;
+}
+
+.stat-metric-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--border-strong);
+}
+
+.stat-metric-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: grid;
+    place-items: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+}
+
+.stat-metric-val {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--ink);
+    line-height: 1.1;
+}
+
+.stat-metric-label {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    font-weight: 500;
+    margin-top: 2px;
+}
+
+.lb-item:hover {
     border-color: var(--border-strong);
     transform: translateX(3px);
 }

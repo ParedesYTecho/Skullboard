@@ -54,208 +54,137 @@
     </nav>
 
     <div class="container" style="padding-top:20px;">
-        <!-- CABECERA PRINCIPAL -->
-        <header style="text-align:center; margin-bottom:32px;">
-            <h1 style="font-size:clamp(1.9rem, 4vw, 2.7rem); font-weight:800; letter-spacing:-1px; margin-bottom:8px;">Panel & Leaderboard</h1>
-            <p style="color:var(--ink-soft); font-size:1.02rem; max-width:600px; margin:0 auto 20px;">Explora los mensajes más votados, prueba el simulador interactivo o personaliza tus servidores.</p>
-            
-            <!-- Pestañas Principales (Públicas y sin barreras) -->
-            <div class="segmented-tabs" style="margin-top:12px;">
-                <button id="hub-tab-leaderboard" class="segmented-tab active" type="button">
-                    <svg class="icon" style="width:16px;height:16px;"><use href="#i-crown"/></svg> Leaderboard Global
-                </button>
-                <button id="hub-tab-simulator" class="segmented-tab" type="button">
-                    <svg class="icon" style="width:16px;height:16px;"><use href="#i-gear"/></svg> Simulador de Starboard
-                </button>
-                <button id="hub-tab-manage" class="segmented-tab" type="button">
-                    <svg class="icon" style="width:16px;height:16px;"><use href="#i-discord"/></svg> Mis Servidores
-                </button>
-            </div>
-        </header>
+        <!-- ESTADO CARGANDO / VERIFICANDO -->
+        <div id="view-loading" style="text-align:center; padding:90px 20px;">
+            <div class="emblem" style="animation: pulse 1.5s infinite ease-in-out;">💀</div>
+            <p style="color:var(--ink-soft); font-weight:600; margin-top:16px;">Conectando con Discord…</p>
+        </div>
 
-        <!-- SECCIÓN 1: LEADERBOARD GLOBAL PÚBLICO -->
-        <section id="section-leaderboard">
-            <div class="bento-card" style="padding:28px; border-radius:20px;">
-                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:14px; margin-bottom:20px;">
-                    <div>
-                        <h2 style="font-size:1.25rem; font-weight:700; margin-bottom:4px;">🏆 Mensajes Más Destacados</h2>
-                        <p style="color:var(--ink-soft); font-size:0.9rem;">Récords históricos de calaveras conseguidas en el ecosistema de SkullBoard.</p>
+        <!-- VISTA PRINCIPAL DEL SERVIDOR -->
+        <main id="view-dashboard" style="display:none;">
+            <!-- BARRA CONTEXTUAL DE SERVIDOR (ESTILO WEREWOLF) -->
+            <div class="guild-switcher-bar">
+                <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <div class="guild-picker-control">
+                        <img id="current-guild-icon" src="skullboard_icon.png" alt="Servidor" style="width:28px; height:28px; border-radius:8px; object-fit:cover;">
+                        <select id="guild-switcher-select" class="guild-picker-select" aria-label="Seleccionar servidor">
+                            <!-- Opciones inyectadas dinámicamente -->
+                        </select>
                     </div>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input type="text" id="lb-search-guild" class="form-control-input" placeholder="Buscar por ID de servidor…" style="width:220px; padding:8px 12px; font-size:0.85rem;">
-                        <button id="btn-search-guild-lb" class="btn btn-ghost btn-sm" type="button">Buscar</button>
-                    </div>
+                    <div id="current-guild-badge"></div>
                 </div>
 
-                <div id="global-lb-list" style="display:flex; flex-direction:column; gap:12px;">
-                    <div style="text-align:center; padding:30px; color:var(--ink-soft);">Cargando mejores mensajes…</div>
+                <!-- Pestañas del Servidor -->
+                <div class="segmented-tabs" style="margin:0;">
+                    <button id="tab-btn-leaderboard" class="segmented-tab active" type="button">
+                        <svg class="icon" style="width:16px;height:16px;"><use href="#i-crown"/></svg> 👑 Leaderboard
+                    </button>
+                    <button id="tab-btn-my-messages" class="segmented-tab" type="button">
+                        <svg class="icon" style="width:16px;height:16px;"><use href="#i-skull"/></svg> 💀 Mis Mensajes
+                    </button>
+                    <button id="tab-btn-config" class="segmented-tab" type="button" style="display:none;">
+                        <svg class="icon" style="width:16px;height:16px;"><use href="#i-gear"/></svg> ⚙️ Ajustes
+                    </button>
                 </div>
             </div>
-        </section>
 
-        <!-- SECCIÓN 2: SIMULADOR INTERACTIVO DE STARBOARD -->
-        <section id="section-simulator" style="display:none;">
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:24px;">
-                <!-- Controles del Simulador -->
+            <!-- PESTAÑA 1: 👑 LEADERBOARD DEL SERVIDOR -->
+            <section id="panel-leaderboard">
                 <div class="bento-card" style="padding:28px; border-radius:20px;">
-                    <h3 style="margin-bottom:6px;">🎛️ Controles del Starboard</h3>
-                    <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:20px;">Prueba en tiempo real cómo reacciona SkullBoard ante diferentes umbrales.</p>
-
-                    <div style="display:flex; flex-direction:column; gap:18px;">
-                        <div>
-                            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                                <label style="font-weight:600; font-size:0.9rem;">Calaveras recibidas:</label>
-                                <span id="sim-skulls-num" style="font-weight:800; color:var(--violet-2); font-size:1.1rem;">5 💀</span>
-                            </div>
-                            <input type="range" id="sim-skulls" min="1" max="20" value="5">
-                        </div>
-
-                        <div>
-                            <div style="display:flex; justify-content:space-between; margin-bottom:8px;">
-                                <label style="font-weight:600; font-size:0.9rem;">Umbral mínimo configurado:</label>
-                                <span id="sim-threshold-num" style="font-weight:700;">3 💀</span>
-                            </div>
-                            <input type="range" id="sim-threshold" min="1" max="15" value="3">
-                        </div>
-
-                        <div>
-                            <label style="display:block; font-weight:600; font-size:0.9rem; margin-bottom:6px;">Canal de Starboard:</label>
-                            <input type="text" id="sim-channel" class="form-control-input" value="# ⭐・skullboard">
-                        </div>
-
-                        <div>
-                            <label style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:0.9rem; cursor:pointer;">
-                                <input type="checkbox" id="sim-autopin" checked style="width:16px; height:16px;">
-                                Auto-Pin al superar 10 calaveras
-                            </label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Previsualización del Embed de Discord -->
-                <div class="bento-card" style="padding:28px; border-radius:20px; background:var(--surface);">
-                    <h3 style="margin-bottom:6px;">💬 Previsualización en Discord</h3>
-                    <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:20px;">Así es como se publica el mensaje destacado en el canal de Starboard.</p>
-
-                    <!-- Mensaje Discord Mockup -->
-                    <div style="background:#313338; color:#dbdee1; border-radius:10px; padding:16px; font-family:'Inter', sans-serif; font-size:0.9rem; border-left:4px solid #f59e0b;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                            <div style="display:flex; align-items:center; gap:10px;">
-                                <span style="background:#5865f2; color:#fff; width:34px; height:34px; border-radius:50%; display:grid; place-items:center; font-weight:700; font-size:0.85rem;">💀</span>
-                                <div>
-                                    <span style="font-weight:700; color:#fff;">SkullBoard</span>
-                                    <span style="background:#5865f2; color:#fff; font-size:0.65rem; padding:1px 4px; border-radius:4px; font-weight:700; margin-left:4px;">BOT</span>
-                                </div>
-                            </div>
-                            <span id="sim-preview-badge" style="font-weight:800; color:#fbbf24; font-size:0.95rem;">5 💀 # ⭐・skullboard</span>
-                        </div>
-
-                        <div style="margin:10px 0; color:#f2f3f5; line-height:1.4;">
-                            «Este es un ejemplo de mensaje destacado en el servidor. Cuando la comunidad reacciona con calaveras, SkullBoard lo inmortaliza aquí.»
-                        </div>
-
-                        <div style="margin-top:12px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08); display:flex; justify-content:space-between; align-items:center; font-size:0.8rem; color:#949ba4;">
-                            <span>ID: 1367463352774955059 · Autor: Alex#0001</span>
-                            <span style="color:#00a8fc;">Ir al mensaje ↗</span>
-                        </div>
-                    </div>
-
-                    <div id="sim-status-banner" style="margin-top:16px; padding:10px 14px; border-radius:10px; background:rgba(5,150,105,0.1); border:1px solid rgba(5,150,105,0.2); color:var(--good); font-size:0.85rem; font-weight:600;">
-                        ✓ Publicado en Starboard (5 💀 ≥ 3 💀)
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- SECCIÓN 3: MIS SERVIDORES (GESTIÓN) -->
-        <section id="section-manage" style="display:none;">
-            <!-- Caso No Autenticado -->
-            <div id="manage-unauth-box" class="bento-card" style="text-align:center; padding:50px 24px; border-radius:20px;">
-                <div class="emblem" style="margin:0 auto 16px;">⚙️</div>
-                <h2 style="font-size:1.4rem; font-weight:700; margin-bottom:8px;">Gestiona tus Servidores</h2>
-                <p style="color:var(--ink-soft); max-width:500px; margin:0 auto 24px; font-size:0.95rem;">Inicia sesión con Discord para configurar el canal de Starboard, ajustar umbrales y prefijos de tus servidores.</p>
-                <button id="btn-login-manage" class="btn btn-primary" type="button">
-                    <svg><use href="#i-discord"/></svg> Iniciar Sesión con Discord
-                </button>
-            </div>
-
-            <!-- Caso Autenticado: Grid de Servidores -->
-            <div id="manage-auth-view" style="display:none;">
-                <!-- Lista de Servidores -->
-                <div id="manage-guilds-list-view">
                     <div style="margin-bottom:20px;">
-                        <h2 style="font-size:1.3rem; font-weight:700; margin-bottom:4px;">Tus Servidores Administrados</h2>
-                        <p style="color:var(--ink-soft); font-size:0.9rem;">Selecciona un servidor para editar sus parámetros.</p>
+                        <h2 style="font-size:1.3rem; font-weight:800; margin-bottom:4px; display:flex; align-items:center; gap:8px;">
+                            <span>👑</span> Leaderboard del Servidor
+                        </h2>
+                        <p style="color:var(--ink-soft); font-size:0.9rem;">Los mensajes con mayor récord de calaveras registrados en este servidor.</p>
                     </div>
-                    <div id="guilds-grid" class="cmd-grid" style="grid-template-columns:repeat(auto-fill, minmax(280px, 1fr));">
-                        <!-- Inyectado dinámicamente -->
+
+                    <div id="guild-lb-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <div style="text-align:center; padding:30px; color:var(--ink-soft);">Cargando mejores mensajes…</div>
                     </div>
                 </div>
+            </section>
 
-                <!-- Editor de Servidor Seleccionado -->
-                <div id="manage-guild-editor" style="display:none;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:12px;">
-                        <button id="btn-back-to-guilds" class="btn btn-ghost btn-sm" type="button">
-                            <svg><use href="#i-arrow-left"/></svg> Volver a la lista
-                        </button>
-                        <div class="pill" style="margin:0;">
-                            <span id="editor-guild-name">Servidor</span>
+            <!-- PESTAÑA 2: 💀 MIS MENSAJES EN ESTE SERVIDOR -->
+            <section id="panel-my-messages" style="display:none;">
+                <div class="stat-grid-2">
+                    <div class="stat-metric-card">
+                        <div class="stat-metric-icon">💀</div>
+                        <div>
+                            <div id="my-total-skulls" class="stat-metric-val">0</div>
+                            <div class="stat-metric-label">Tus Calaveras Ganadas</div>
                         </div>
                     </div>
-
-                    <div class="bento-card" style="padding:28px; border-radius:20px;">
-                        <h3 style="margin-bottom:4px;">Ajustes del Starboard</h3>
-                        <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:22px;">Configura cómo opera SkullBoard en este servidor.</p>
-
-                        <form id="guild-editor-form" style="display:flex; flex-direction:column; gap:20px;">
-                            <div>
-                                <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Canal de Starboard:</label>
-                                <select id="cfg-channel-select" class="form-control-input" style="margin-bottom:8px;">
-                                    <option value="">Cargando canales del servidor…</option>
-                                </select>
-                                <input type="text" id="cfg-channel" class="form-control-input" placeholder="O pega directamente la ID del canal">
-                            </div>
-
-                            <div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <label style="font-weight:600; font-size:0.9rem;">Umbral de Calaveras para destacar:</label>
-                                    <span id="cfg-skulls-val" style="font-weight:800; color:var(--violet-2); font-size:1.1rem;">1 💀</span>
-                                </div>
-                                <input type="range" id="cfg-skulls" min="1" max="20" value="1">
-                            </div>
-
-                            <div>
-                                <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Prefijo de comandos:</label>
-                                <input type="text" id="cfg-prefix" class="form-control-input" style="width:140px;" value="sk!" maxlength="5">
-                            </div>
-
-                            <div>
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                    <label style="font-weight:600; font-size:0.9rem;">Umbral de Auto-Pin (0 = Desactivado):</label>
-                                    <span id="cfg-pin-val" style="font-weight:700;">Desactivado</span>
-                                </div>
-                                <input type="range" id="cfg-pin" min="0" max="25" value="0">
-                            </div>
-
-                            <div style="margin-top:10px; display:flex; align-items:center; gap:16px;">
-                                <button type="submit" id="btn-save-cfg" class="btn btn-primary">
-                                    <svg><use href="#i-check"/></svg> Guardar Cambios
-                                </button>
-                                <span id="cfg-save-status" style="font-size:0.88rem; font-weight:600;"></span>
-                            </div>
-                        </form>
+                    <div class="stat-metric-card">
+                        <div class="stat-metric-icon">⭐</div>
+                        <div>
+                            <div id="my-total-messages" class="stat-metric-val">0</div>
+                            <div class="stat-metric-label">Mensajes en Starboard</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </section>
+
+                <div class="bento-card" style="padding:28px; border-radius:20px;">
+                    <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:4px;">Tus Mensajes Destacados</h3>
+                    <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:20px;">Lista de tus publicaciones que alcanzaron el umbral de Starboard en este servidor.</p>
+
+                    <div id="my-messages-list" style="display:flex; flex-direction:column; gap:12px;">
+                        <div style="text-align:center; padding:24px; color:var(--ink-soft);">Cargando tus mensajes…</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PESTAÑA 3: ⚙️ AJUSTES DEL SERVIDOR (SOLO ADMINS) -->
+            <section id="panel-config" style="display:none;">
+                <div class="bento-card" style="padding:28px; border-radius:20px;">
+                    <div style="margin-bottom:22px;">
+                        <h3 style="font-size:1.25rem; font-weight:800; margin-bottom:4px;">⚙️ Configuración del Servidor</h3>
+                        <p style="color:var(--ink-soft); font-size:0.9rem;">Personaliza cómo opera SkullBoard en este servidor. Solo visible para Administradores.</p>
+                    </div>
+
+                    <form id="guild-config-form" style="display:flex; flex-direction:column; gap:20px;">
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Canal de Starboard:</label>
+                            <select id="cfg-channel-select" class="form-control-input" style="margin-bottom:8px;">
+                                <option value="">Cargando canales…</option>
+                            </select>
+                            <input type="text" id="cfg-channel" class="form-control-input" placeholder="O escribe la ID numérica del canal">
+                        </div>
+
+                        <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <label style="font-weight:600; font-size:0.9rem;">Umbral de Calaveras para destacar:</label>
+                                <span id="cfg-skulls-val" style="font-weight:800; color:var(--violet-2); font-size:1.1rem;">1 💀</span>
+                            </div>
+                            <input type="range" id="cfg-skulls" min="1" max="20" value="1">
+                        </div>
+
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Prefijo de comandos:</label>
+                            <input type="text" id="cfg-prefix" class="form-control-input" style="width:140px;" value="sk!" maxlength="5">
+                        </div>
+
+                        <div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                                <label style="font-weight:600; font-size:0.9rem;">Umbral de Auto-Pin (0 = Desactivado):</label>
+                                <span id="cfg-pin-val" style="font-weight:700;">Desactivado</span>
+                            </div>
+                            <input type="range" id="cfg-pin" min="0" max="25" value="0">
+                        </div>
+
+                        <div style="margin-top:10px; display:flex; align-items:center; gap:16px;">
+                            <button type="submit" id="btn-save-cfg" class="btn btn-primary">
+                                <svg><use href="#i-check"/></svg> Guardar Cambios
+                            </button>
+                            <span id="cfg-save-status" style="font-size:0.88rem; font-weight:600;"></span>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
 
         <!-- Footer -->
         <footer style="margin-top:60px; padding:30px 0; border-top:1px solid var(--border); text-align:center; color:var(--ink-dim); font-size:0.85rem;">
-            SkullBoard v2.5.0 · <a href="/" style="color:var(--ink);">Inicio</a> · <a href="cambios" style="color:var(--ink);">Historial de Cambios</a>
-        </footer>
-    </div>
-
-    <!-- Scripts -->
+            SkullBoard v2.5.0 · <a href="/" style="color:var(--ink);">Inicio</a> · <a href="cambios" style="color:var    <!-- Scripts -->
     <script>
         const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
             ? 'http://127.0.0.1:8080'
@@ -284,149 +213,20 @@
             }, 2800);
         }
 
-        // Theme Toggle
+        // Toggle claro/oscuro (silencioso sin toast)
         document.getElementById('theme-toggle').addEventListener('click', () => {
             const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
             document.documentElement.dataset.theme = next;
             localStorage.setItem('skb-theme', next);
-            showToast(next === 'dark' ? 'Modo Oscuro activado' : 'Modo Claro activado', next === 'dark' ? '🌙' : '☀️');
         });
 
-        // Tabs Hub Switcher
-        const tabLb = document.getElementById('hub-tab-leaderboard');
-        const tabSim = document.getElementById('hub-tab-simulator');
-        const tabManage = document.getElementById('hub-tab-manage');
-        const secLb = document.getElementById('section-leaderboard');
-        const secSim = document.getElementById('section-simulator');
-        const secManage = document.getElementById('section-manage');
-
-        function switchHubTab(activeTab, activeSec) {
-            [tabLb, tabSim, tabManage].forEach(t => t.classList.remove('active'));
-            [secLb, secSim, secManage].forEach(s => s.style.display = 'none');
-            activeTab.classList.add('active');
-            activeSec.style.display = 'block';
+        // Redirección directa a Discord OAuth2
+        function triggerDiscordAuth() {
+            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds&prompt=consent`;
+            window.location.href = authUrl;
         }
 
-        tabLb.addEventListener('click', () => switchHubTab(tabLb, secLb));
-        tabSim.addEventListener('click', () => switchHubTab(tabSim, secSim));
-        tabManage.addEventListener('click', () => switchHubTab(tabManage, secManage));
-
-        // 1. CARGA DEL LEADERBOARD GLOBAL PÚBLICO
-        async function loadGlobalLeaderboard() {
-            const list = document.getElementById('global-lb-list');
-            try {
-                const res = await fetch(`${API_BASE}/api/leaderboard/global`);
-                const data = await res.json();
-                if (data.ok && data.messages && data.messages.length > 0) {
-                    list.innerHTML = '';
-                    const medals = ['🥇', '🥈', '🥉'];
-                    data.messages.forEach((m, idx) => {
-                        const row = document.createElement('div');
-                        row.className = 'lb-item';
-                        const medal = medals[idx] || `#${idx + 1}`;
-                        row.innerHTML = `
-                            <div style="display:flex; align-items:center; gap:14px;">
-                                <span style="font-weight:800; font-size:1.1rem; width:28px; text-align:center;">${medal}</span>
-                                <div>
-                                    <div style="font-weight:600; font-size:0.92rem;">ID: <code>${m.message_id}</code></div>
-                                    <small style="color:var(--ink-dim);">Servidor: ${m.guild_id} · Autor: ${m.author_id}</small>
-                                </div>
-                            </div>
-                            <div style="font-weight:800; color:var(--good); font-size:1.1rem; display:flex; align-items:center; gap:6px;">
-                                ${m.skull_count} 💀
-                            </div>
-                        `;
-                        list.appendChild(row);
-                    });
-                } else {
-                    list.innerHTML = '<div style="text-align:center; padding:30px; color:var(--ink-soft);">Aún no hay mensajes en el Leaderboard global. ¡Reacciona con 💀 en tus servidores para ver los récords aquí!</div>';
-                }
-            } catch (e) {
-                list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--ink-dim);">No se pudo conectar con el servicio de Leaderboard en este momento.</div>';
-            }
-        }
-
-        // Búsqueda por ID de Servidor
-        document.getElementById('btn-search-guild-lb').addEventListener('click', async () => {
-            const gid = document.getElementById('lb-search-guild').value.trim();
-            if (!gid) {
-                loadGlobalLeaderboard();
-                return;
-            }
-            const list = document.getElementById('global-lb-list');
-            list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--ink-dim);">Buscando mensajes del servidor…</div>';
-            try {
-                const res = await fetch(`${API_BASE}/api/guild/${gid}/leaderboard/public`);
-                const data = await res.json();
-                if (data.ok && data.messages && data.messages.length > 0) {
-                    list.innerHTML = '';
-                    const medals = ['🥇', '🥈', '🥉'];
-                    data.messages.forEach((m, idx) => {
-                        const row = document.createElement('div');
-                        row.className = 'lb-item';
-                        row.innerHTML = `
-                            <div style="display:flex; align-items:center; gap:14px;">
-                                <span style="font-weight:800; font-size:1.1rem; width:28px;">${medals[idx] || '#' + (idx + 1)}</span>
-                                <div>
-                                    <div style="font-weight:600; font-size:0.92rem;">ID: <code>${m.message_id}</code></div>
-                                    <small style="color:var(--ink-dim);">Autor: ${m.author_id}</small>
-                                </div>
-                            </div>
-                            <div style="font-weight:800; color:var(--good); font-size:1.1rem;">${m.skull_count} 💀</div>
-                        `;
-                        list.appendChild(row);
-                    });
-                } else {
-                    list.innerHTML = `<div style="text-align:center; padding:24px; color:var(--ink-soft);">No se encontraron mensajes destacados para el servidor <code>${gid}</code>.</div>`;
-                }
-            } catch (e) {
-                list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al buscar el servidor.</div>';
-            }
-        });
-
-        // 2. SIMULADOR INTERACTIVO
-        const simSkulls = document.getElementById('sim-skulls');
-        const simThreshold = document.getElementById('sim-threshold');
-        const simChannel = document.getElementById('sim-channel');
-        const simAutopin = document.getElementById('sim-autopin');
-        const simSkullsNum = document.getElementById('sim-skulls-num');
-        const simThresholdNum = document.getElementById('sim-threshold-num');
-        const simPreviewBadge = document.getElementById('sim-preview-badge');
-        const simStatusBanner = document.getElementById('sim-status-banner');
-
-        function updateSimulator() {
-            const skulls = parseInt(simSkulls.value);
-            const thresh = parseInt(simThreshold.value);
-            const chan = simChannel.value || '# ⭐・skullboard';
-            const autopin = simAutopin.checked;
-
-            simSkullsNum.textContent = `${skulls} 💀`;
-            simThresholdNum.textContent = `${thresh} 💀`;
-            simPreviewBadge.textContent = `${skulls} 💀 ${chan}`;
-
-            if (skulls >= thresh) {
-                const isPinned = autopin && skulls >= 10;
-                simStatusBanner.style.display = 'block';
-                simStatusBanner.style.background = 'rgba(5,150,105,0.1)';
-                simStatusBanner.style.borderColor = 'rgba(5,150,105,0.2)';
-                simStatusBanner.style.color = 'var(--good)';
-                simStatusBanner.textContent = isPinned 
-                    ? `✓ Publicado y Fijado automáticamente en ${chan} (${skulls} 💀 ≥ 10 Auto-Pin)`
-                    : `✓ Publicado en ${chan} (${skulls} 💀 ≥ ${thresh} 💀)`;
-            } else {
-                simStatusBanner.style.display = 'block';
-                simStatusBanner.style.background = 'rgba(239,68,68,0.1)';
-                simStatusBanner.style.borderColor = 'rgba(239,68,68,0.2)';
-                simStatusBanner.style.color = 'var(--bad)';
-                simStatusBanner.textContent = `✕ No publicado aún: Faltan ${thresh - skulls} calaveras para alcanzar el umbral (${skulls}/${thresh} 💀)`;
-            }
-        }
-
-        [simSkulls, simThreshold, simChannel, simAutopin].forEach(el => {
-            el.addEventListener('input', updateSimulator);
-        });
-
-        // 3. AUTENTICACIÓN Y GESTIÓN DE SERVIDORES
+        // Intercambio seguro de código OAuth2
         async function getOrExchangeAuthToken() {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
@@ -447,131 +247,326 @@
             return sessionStorage.getItem('skb_auth_token');
         }
 
-        function triggerLogin() {
-            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds&prompt=consent`;
-            window.location.href = authUrl;
+        let userGuilds = [];
+        let activeGuild = null;
+        let authToken = null;
+
+        // Pestañas
+        const tabBtnLb = document.getElementById('tab-btn-leaderboard');
+        const tabBtnMy = document.getElementById('tab-btn-my-messages');
+        const tabBtnCfg = document.getElementById('tab-btn-config');
+        const panelLb = document.getElementById('panel-leaderboard');
+        const panelMy = document.getElementById('panel-my-messages');
+        const panelCfg = document.getElementById('panel-config');
+
+        function switchServerTab(activeTabBtn, activePanel) {
+            [tabBtnLb, tabBtnMy, tabBtnCfg].forEach(b => b.classList.remove('active'));
+            [panelLb, panelMy, panelCfg].forEach(p => p.style.display = 'none');
+            activeTabBtn.classList.add('active');
+            activePanel.style.display = 'block';
         }
 
-        document.getElementById('btn-login-manage')?.addEventListener('click', triggerLogin);
+        tabBtnLb.addEventListener('click', () => switchServerTab(tabBtnLb, panelLb));
+        tabBtnMy.addEventListener('click', () => {
+            switchServerTab(tabBtnMy, panelMy);
+            if (activeGuild) loadMyMessages(activeGuild.id);
+        });
+        tabBtnCfg.addEventListener('click', () => {
+            switchServerTab(tabBtnCfg, panelCfg);
+            if (activeGuild) loadGuildConfig(activeGuild.id);
+        });
 
-        async function initAuthManagement() {
-            const token = await getOrExchangeAuthToken();
-            if (!token) return;
-
+        // 1. CARGA DEL LEADERBOARD DEL SERVIDOR
+        async function loadGuildLeaderboard(guildId) {
+            const list = document.getElementById('guild-lb-list');
+            list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--ink-soft);">Cargando mejores mensajes…</div>';
             try {
-                const userRes = await fetch(`${API_BASE}/api/auth/me`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const userData = await userRes.json();
-                if (!userRes.ok || !userData.ok) throw new Error('Token inválido');
-
-                document.getElementById('manage-unauth-box').style.display = 'none';
-                document.getElementById('manage-auth-view').style.display = 'block';
-                switchHubTab(tabManage, secManage);
-
-                const guildsRes = await fetch(`${API_BASE}/api/auth/guilds`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const guildsData = await guildsRes.json();
-                const container = document.getElementById('guilds-grid');
-                container.innerHTML = '';
-
-                if (!guildsData.guilds || guildsData.guilds.length === 0) {
-                    container.innerHTML = '<div style="grid-column:1/-1; padding:32px; text-align:center; color:var(--ink-soft);">No administras ningún servidor de Discord actualmente.</div>';
-                    return;
-                }
-
-                guildsData.guilds.forEach(g => {
-                    const card = document.createElement('div');
-                    card.className = 'guild-card';
-                    const iconUrl = g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png` : 'skullboard_icon.png';
-                    const hasBot = g.has_bot;
-                    const statusBadge = hasBot ? '<span class="tag-pill new" style="font-size:0.75rem;">✓ Conectado</span>' : '<span class="tag-pill" style="font-size:0.75rem; color:var(--ink-dim);">No instalado</span>';
-                    const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${g.id}&disable_guild_select=true`;
-
-                    card.innerHTML = `
-                        <div style="display:flex; align-items:center; gap:14px; margin-bottom:16px;">
-                            <img src="${iconUrl}" alt="${g.name}" style="width:48px; height:48px; border-radius:14px; border:1px solid var(--border); object-fit:cover; flex-shrink:0;">
-                            <div style="flex:1; overflow:hidden;">
-                                <h3 style="font-size:1.02rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px;">${g.name}</h3>
-                                <div>${statusBadge}</div>
+                const res = await fetch(`${API_BASE}/api/guild/${guildId}/leaderboard/public`);
+                const data = await res.json();
+                if (data.ok && data.messages && data.messages.length > 0) {
+                    list.innerHTML = '';
+                    const medals = ['🥇', '🥈', '🥉'];
+                    data.messages.forEach((m, idx) => {
+                        const row = document.createElement('div');
+                        row.className = 'lb-item';
+                        const medal = medals[idx] || `#${idx + 1}`;
+                        row.innerHTML = `
+                            <div style="display:flex; align-items:center; gap:14px;">
+                                <span style="font-weight:800; font-size:1.1rem; width:28px; text-align:center;">${medal}</span>
+                                <div>
+                                    <div style="font-weight:600; font-size:0.92rem;">Mensaje <code>${m.message_id}</code></div>
+                                    <small style="color:var(--ink-dim);">Autor: ${m.author_id}</small>
+                                </div>
                             </div>
-                        </div>
-                        <div style="margin-top:auto; padding-top:8px;">
-                            ${hasBot ? `<button class="btn btn-primary btn-sm btn-manage-guild" style="width:100%; justify-content:center;" data-id="${g.id}" data-name="${g.name}">⚙️ Gestionar</button>` : `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost btn-sm" style="width:100%; justify-content:center;">+ Invitar Bot</a>`}
-                        </div>
-                    `;
-                    container.appendChild(card);
-                });
-
-                document.querySelectorAll('.btn-manage-guild').forEach(b => {
-                    b.addEventListener('click', () => openManageGuild(b.dataset.id, b.dataset.name, token));
-                });
+                            <div style="font-weight:800; color:var(--good); font-size:1.1rem; display:flex; align-items:center; gap:6px;">
+                                ${m.skull_count} 💀
+                            </div>
+                        `;
+                        list.appendChild(row);
+                    });
+                } else {
+                    list.innerHTML = '<div style="text-align:center; padding:30px; color:var(--ink-soft);">Aún no hay mensajes destacados registrados en este servidor. ¡Reacciona con 💀 en Discord para inaugurar el podio!</div>';
+                }
             } catch (e) {
-                sessionStorage.removeItem('skb_auth_token');
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar el Leaderboard.</div>';
             }
         }
 
-        async function openManageGuild(guildId, guildName, token) {
-            document.getElementById('editor-guild-name').textContent = guildName;
-            document.getElementById('manage-guilds-list-view').style.display = 'none';
-            document.getElementById('manage-guild-editor').style.display = 'block';
+        // 2. CARGA DE MIS MENSAJES EN EL SERVIDOR
+        async function loadMyMessages(guildId) {
+            const list = document.getElementById('my-messages-list');
+            list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--ink-soft);">Cargando tus estadísticas…</div>';
+            try {
+                const res = await fetch(`${API_BASE}/api/guild/${guildId}/my-messages`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    document.getElementById('my-total-skulls').textContent = data.total_skulls || 0;
+                    document.getElementById('my-total-messages').textContent = data.total_messages || 0;
 
+                    if (data.messages && data.messages.length > 0) {
+                        list.innerHTML = '';
+                        data.messages.forEach(m => {
+                            const row = document.createElement('div');
+                            row.className = 'lb-item';
+                            row.innerHTML = `
+                                <div style="display:flex; align-items:center; gap:14px;">
+                                    <span style="font-size:1.2rem;">⭐</span>
+                                    <div>
+                                        <div style="font-weight:600; font-size:0.92rem;">Mensaje <code>${m.message_id}</code></div>
+                                        <small style="color:var(--ink-dim);">Canal: ${m.channel_id || 'Desconocido'}</small>
+                                    </div>
+                                </div>
+                                <div style="font-weight:800; color:var(--violet-2); font-size:1.1rem;">
+                                    ${m.skull_count} 💀
+                                </div>
+                            `;
+                            list.appendChild(row);
+                        });
+                    } else {
+                        list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--ink-soft);">Todavía no tienes mensajes destacados en este servidor.</div>';
+                    }
+                }
+            } catch (e) {
+                list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar tus mensajes.</div>';
+            }
+        }
+
+        // 3. CARGA DE CONFIGURACIÓN (SOLO ADMINS)
+        async function loadGuildConfig(guildId) {
             const selectChan = document.getElementById('cfg-channel-select');
+            selectChan.innerHTML = '<option value="">Cargando canales…</option>';
             try {
-                const chanRes = await fetch(`${API_BASE}/api/guild/${guildId}/channels`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const chanRes = await fetch(`${API_BASE}/api/guild/${guildId}/channels`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
                 const chanData = await chanRes.json();
-                selectChan.innerHTML = chanData.ok ? '<option value="">-- Selecciona un canal --</option>' + chanData.channels.map(c => `<option value="${c.id}"># ${c.name}</option>`).join('') : '<option value="">(Error al cargar canales)</option>';
-            } catch (e) { selectChan.innerHTML = '<option value="">(Error al cargar canales)</option>'; }
+                if (chanData.ok && chanData.channels && chanData.channels.length > 0) {
+                    selectChan.innerHTML = '<option value="">-- Selecciona un canal de texto --</option>';
+                    chanData.channels.forEach(c => {
+                        const opt = document.createElement('option');
+                        opt.value = c.id;
+                        opt.textContent = `# ${c.name}`;
+                        selectChan.appendChild(opt);
+                    });
+                } else {
+                    selectChan.innerHTML = '<option value="">(Canales no disponibles)</option>';
+                }
+            } catch (e) {
+                selectChan.innerHTML = '<option value="">(Error al cargar canales)</option>';
+            }
 
             try {
-                const res = await fetch(`${API_BASE}/api/guild/${guildId}/config`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const res = await fetch(`${API_BASE}/api/guild/${guildId}/config`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
                 const data = await res.json();
                 if (data.ok && data.config) {
                     const cfg = data.config;
-                    document.getElementById('cfg-channel').value = cfg.skullboard_channel_id || '';
+                    const chanId = cfg.skullboard_channel_id ? String(cfg.skullboard_channel_id) : '';
+                    document.getElementById('cfg-channel').value = chanId;
+                    if (chanId && selectChan.querySelector(`option[value="${chanId}"]`)) {
+                        selectChan.value = chanId;
+                    }
                     document.getElementById('cfg-skulls').value = cfg.min_skulls || 1;
                     document.getElementById('cfg-skulls-val').textContent = `${cfg.min_skulls || 1} 💀`;
                     document.getElementById('cfg-prefix').value = cfg.prefix || 'sk!';
                     document.getElementById('cfg-pin').value = cfg.pin_threshold || 0;
                     document.getElementById('cfg-pin-val').textContent = (cfg.pin_threshold > 0) ? `${cfg.pin_threshold} 💀` : 'Desactivado';
                 }
-            } catch (e) { showToast('Error cargando configuración', '✕'); }
+            } catch (e) {
+                showToast('Error cargando ajustes', '✕');
+            }
         }
 
-        document.getElementById('btn-back-to-guilds').addEventListener('click', () => {
-            document.getElementById('manage-guild-editor').style.display = 'none';
-            document.getElementById('manage-guilds-list-view').style.display = 'block';
+        // Selección de Servidor
+        function selectGuild(guild) {
+            activeGuild = guild;
+            const iconImg = document.getElementById('current-guild-icon');
+            iconImg.src = guild.icon
+                ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`
+                : 'skullboard_icon.png';
+
+            const badge = document.getElementById('current-guild-badge');
+            if (guild.has_bot) {
+                badge.innerHTML = '<span class="tag-pill new" style="font-size:0.75rem;">✓ Conectado</span>';
+            } else {
+                const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${guild.id}&disable_guild_select=true`;
+                badge.innerHTML = `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 10px; font-size:0.75rem;">+ Invitar Bot</a>`;
+            }
+
+            // Mostrar u ocultar pestaña de ajustes según permisos de admin
+            if (guild.is_admin) {
+                tabBtnCfg.style.display = 'inline-flex';
+            } else {
+                tabBtnCfg.style.display = 'none';
+                if (tabBtnCfg.classList.contains('active')) {
+                    switchServerTab(tabBtnLb, panelLb);
+                }
+            }
+
+            // Cargar contenido de la pestaña activa
+            if (tabBtnLb.classList.contains('active')) {
+                loadGuildLeaderboard(guild.id);
+            } else if (tabBtnMy.classList.contains('active')) {
+                loadMyMessages(guild.id);
+            } else if (tabBtnCfg.classList.contains('active')) {
+                loadGuildConfig(guild.id);
+            }
+        }
+
+        // Sliders de Configuración
+        document.getElementById('cfg-skulls').addEventListener('input', (e) => {
+            document.getElementById('cfg-skulls-val').textContent = `${e.target.value} 💀`;
+        });
+        document.getElementById('cfg-pin').addEventListener('input', (e) => {
+            document.getElementById('cfg-pin-val').textContent = e.target.value > 0 ? `${e.target.value} 💀` : 'Desactivado';
+        });
+        document.getElementById('cfg-channel-select').addEventListener('change', (e) => {
+            if (e.target.value) document.getElementById('cfg-channel').value = e.target.value;
         });
 
-        document.getElementById('cfg-skulls').addEventListener('input', (e) => document.getElementById('cfg-skulls-val').textContent = `${e.target.value} 💀`);
-        document.getElementById('cfg-pin').addEventListener('input', (e) => document.getElementById('cfg-pin-val').textContent = e.target.value > 0 ? `${e.target.value} 💀` : 'Desactivado');
-        document.getElementById('cfg-channel-select').addEventListener('change', (e) => { if (e.target.value) document.getElementById('cfg-channel').value = e.target.value; });
-
-        document.getElementById('guild-editor-form').addEventListener('submit', async (e) => {
+        // Guardar Cambios
+        document.getElementById('guild-config-form').addEventListener('submit', async (e) => {
             e.preventDefault();
+            if (!activeGuild) return;
             const btn = document.getElementById('btn-save-cfg');
+            const status = document.getElementById('cfg-save-status');
             btn.disabled = true;
+            status.textContent = 'Guardando…';
+
+            const payload = {
+                skullboard_channel_id: document.getElementById('cfg-channel').value.trim(),
+                min_skulls: parseInt(document.getElementById('cfg-skulls').value),
+                prefix: document.getElementById('cfg-prefix').value.trim(),
+                pin_threshold: parseInt(document.getElementById('cfg-pin').value)
+            };
+
             try {
-                const res = await fetch(`${API_BASE}/api/guild/${currentGuildId}/config`, {
+                const res = await fetch(`${API_BASE}/api/guild/${activeGuild.id}/config`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionStorage.getItem('skb_auth_token')}` },
-                    body: JSON.stringify({
-                        skullboard_channel_id: document.getElementById('cfg-channel').value,
-                        min_skulls: parseInt(document.getElementById('cfg-skulls').value),
-                        prefix: document.getElementById('cfg-prefix').value,
-                        pin_threshold: parseInt(document.getElementById('cfg-pin').value)
-                    })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: JSON.stringify(payload)
                 });
-                if (res.ok) { showToast('Guardado', '✅'); } else { showToast('Error', '✕'); }
-            } catch (err) { showToast('Error', '✕'); }
-            btn.disabled = false;
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    showToast('¡Ajustes guardados!', '✅');
+                    status.textContent = '✅ Guardado';
+                    setTimeout(() => status.textContent = '', 2500);
+                } else {
+                    showToast(data.error || 'Error al guardar', '❌');
+                    status.textContent = '❌ Error';
+                }
+            } catch (err) {
+                showToast('Error de red', '❌');
+                status.textContent = '❌ Error';
+            } finally {
+                btn.disabled = false;
+            }
         });
 
-        loadGlobalLeaderboard();
-        updateSimulator();
-        initAuthManagement();
+        // INICIALIZACIÓN
+        async function init() {
+            authToken = await getOrExchangeAuthToken();
+            if (!authToken) {
+                triggerDiscordAuth();
+                return;
+            }
 
+            try {
+                const userRes = await fetch(`${API_BASE}/api/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const userData = await userRes.json();
+                if (!userRes.ok || !userData.ok) throw new Error('Token expirado');
+
+                const user = userData.user;
+                const slot = document.getElementById('auth-nav-slot');
+                const avatarUrl = user.avatar
+                    ? `https://cdn.discordapp.com/avatars/${user.id}/${user.avatar}.png`
+                    : 'skullboard_icon.png';
+                slot.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <img src="${avatarUrl}" alt="${user.username}" style="width:28px; height:28px; border-radius:50%; border:1px solid var(--border);">
+                        <span style="font-size:0.85rem; font-weight:600;">${user.username}</span>
+                        <button id="btn-logout" class="btn btn-ghost btn-sm" style="padding:4px 8px; font-size:0.75rem;">Salir</button>
+                    </div>
+                `;
+                document.getElementById('btn-logout').addEventListener('click', () => {
+                    sessionStorage.removeItem('skb_auth_token');
+                    window.location.reload();
+                });
+
+                const guildsRes = await fetch(`${API_BASE}/api/auth/guilds`, {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                const guildsData = await guildsRes.json();
+                userGuilds = guildsData.guilds || [];
+
+                if (userGuilds.length === 0) {
+                    document.getElementById('view-loading').innerHTML = `
+                        <div class="emblem">💀</div>
+                        <h2 style="margin-top:16px;">No se encontraron servidores</h2>
+                        <p style="color:var(--ink-soft); max-width:400px; margin:8px auto 20px;">No formas parte de ningún servidor de Discord en esta cuenta.</p>
+                        <a href="/" class="btn btn-ghost btn-sm">Volver al inicio</a>
+                    `;
+                    return;
+                }
+
+                // Poblar Dropdown de Servidores
+                const guildSelect = document.getElementById('guild-switcher-select');
+                guildSelect.innerHTML = '';
+                userGuilds.forEach((g) => {
+                    const opt = document.createElement('option');
+                    opt.value = g.id;
+                    opt.textContent = `${g.has_bot ? '✓ ' : ''}${g.name}${g.is_admin ? ' (Admin)' : ''}`;
+                    guildSelect.appendChild(opt);
+                });
+
+                guildSelect.addEventListener('change', (e) => {
+                    const found = userGuilds.find(g => g.id === e.target.value);
+                    if (found) selectGuild(found);
+                });
+
+                // Seleccionar primer servidor
+                document.getElementById('view-loading').style.display = 'none';
+                document.getElementById('view-dashboard').style.display = 'block';
+                selectGuild(userGuilds[0]);
+
+            } catch (err) {
+                console.error(err);
+                sessionStorage.removeItem('skb_auth_token');
+                triggerDiscordAuth();
+            }
+        }
+
+        init();
+
+        // PWA Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/sw.js').catch(() => {});

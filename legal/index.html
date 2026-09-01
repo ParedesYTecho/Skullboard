@@ -731,7 +731,6 @@
             const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
             document.documentElement.dataset.theme = next;
             localStorage.setItem('skb-theme', next);
-            showToast(next === 'dark' ? 'Modo Oscuro activado' : 'Modo Claro activado', next === 'dark' ? '🌙' : '☀️');
         });
 
         // Scroll Reveal Animations (IntersectionObserver)
