@@ -110,7 +110,7 @@ def _sb_count(table: str):
                      "Prefer": "count=exact", "Range": "0-0"},
             params={"select": "guild_id"}, timeout=6,
         )
-        if r.status_code >= 500:
+        if r.status_code == 429 or r.status_code >= 500:
             r.raise_for_status()
         total = r.headers.get("Content-Range", "").split("/")[-1]
         return int(total) if total.isdigit() else None
@@ -167,7 +167,7 @@ def _sb_select(table: str, params: dict):
             headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
             params=params, timeout=6
         )
-        if r.status_code >= 500:
+        if r.status_code == 429 or r.status_code >= 500:
             r.raise_for_status()
         return r.json() if r.status_code == 200 else []
     except (requests.RequestException, TimeoutError) as e:
@@ -190,7 +190,7 @@ def _sb_upsert(table: str, data: dict):
             },
             json=data, timeout=6
         )
-        if r.status_code >= 500:
+        if r.status_code == 429 or r.status_code >= 500:
             r.raise_for_status()
         return r.status_code in (200, 201, 204)
     except (requests.RequestException, TimeoutError) as e:
@@ -212,7 +212,7 @@ def _sb_rpc(function_name: str, payload: dict):
             },
             json=payload, timeout=6
         )
-        if r.status_code >= 500:
+        if r.status_code == 429 or r.status_code >= 500:
             r.raise_for_status()
         return r.json() if r.status_code == 200 else []
     except (requests.RequestException, TimeoutError) as e:
@@ -416,7 +416,12 @@ def api_guild_channels(guild_id: str):
         except Exception:
             pass
             
-    return _cors(jsonify(ok=True, channels=channels))
+_cache_invalidator = None
+
+def set_cache_invalidator(fn):
+    """Permite registrar un callback para invalidar las cachés de memoria del bot."""
+    global _cache_invalidator
+    _cache_invalidator = fn
 
 @app.route('/api/guild/<guild_id>/config', methods=["GET", "POST", "OPTIONS"])
 def api_guild_config(guild_id: str):
@@ -440,8 +445,8 @@ def api_guild_config(guild_id: str):
     if request.method == "POST":
         body = request.get_json(silent=True) or {}
         min_skulls = max(1, min(int(body.get("min_skulls", 1)), 50))
-        prefix = re.sub(r'[\r\n\s]+', '', str(body.get("prefix", "sk!")))[:5] or "sk!"
-        channel_id = int(body.get("skullboard_channel_id", 0))
+        prefix = re.sub(r'[\r\n\s]+', '', str(body.get("prefix", "sk!")))[:10] or "sk!"
+        channel_id = int(body.get("skullboard_channel_id") or 0)
         pin_threshold = max(0, min(int(body.get("pin_threshold", 0)), 50))
 
         payload = {
@@ -453,6 +458,11 @@ def api_guild_config(guild_id: str):
         }
         success = _sb_upsert("settings", payload)
         if success:
+            if _cache_invalidator:
+                try:
+                    _cache_invalidator(guild_id)
+                except Exception:
+                    pass
             return _cors(jsonify(ok=True, config=payload))
         return _cors(jsonify(ok=False, error="Error al guardar configuración")), 500
 

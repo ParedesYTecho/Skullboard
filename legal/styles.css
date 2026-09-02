@@ -2311,4 +2311,19 @@ input[type="range"]::-moz-range-thumb {
     }
 }
 
+@media (max-width: 420px) {
+    .segmented-tabs {
+        width: 100%;
+        display: flex;
+        justify-content: space-between;
+    }
+    .segmented-tab {
+        flex: 1;
+        justify-content: center;
+        padding: 6px 8px;
+        font-size: 0.78rem;
+        gap: 4px;
+    }
+}
+
 

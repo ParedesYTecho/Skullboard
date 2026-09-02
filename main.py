@@ -88,13 +88,18 @@ async def send_system_alert(title: str, description: str, level: str = "ERROR", 
         logger.warning(f"No se pudo enviar alerta por webhook: {e}")
 
 # ─── Gestores de Concurrencia y Cachés en memoria ─────────────────────────────
-# ─── Gestores de Concurrencia y Cachés en memoria ─────────────────────────────
 class KeyedAsyncLock:
     """Gestor de locks por clave seguro contra cancelaciones y con desalojo automático."""
     def __init__(self):
         self._locks: dict[str, asyncio.Lock] = {}
         self._counts: dict[str, int] = {}
         self._guard = asyncio.Lock()
+
+    def is_locked(self, key: str) -> bool:
+        """Indica si el lock asociado a la clave está actualmente adquirido."""
+        k = str(key)
+        lock = self._locks.get(k)
+        return lock is not None and lock.locked()
 
     async def acquire(self, key: str):
         return _KeyedLockContext(self, str(key))
@@ -308,11 +313,20 @@ async def update_guild_config(guild_id, updates: dict):
     gid = str(guild_id)
     try:
         await db_update("settings", updates, "guild_id", gid)
-        _guild_config_cache.pop(gid, None)  # Invalidate config cache
-        _prefix_cache.pop(gid, None)        # Invalidate prefix cache
+        invalidate_guild_cache(gid)
     except Exception as e:
         logger.error(f"Error al actualizar configuración de guild {gid}: {e}")
         raise
+
+def invalidate_guild_cache(guild_id: str):
+    """Purga las cachés en RAM de configuración de un servidor (thread-safe)."""
+    gid = str(guild_id)
+    _guild_config_cache.pop(gid, None)
+    _prefix_cache.pop(gid, None)
+    _guild_record_cache.pop(gid, None)
+    _ignored_channels_cache.pop(gid, None)
+
+webserver.set_cache_invalidator(invalidate_guild_cache)
 
 # ─── Tracked messages ─────────────────────────────────────────────────────────
 async def get_tracked_message(message_id: str) -> Optional[int]:
@@ -563,13 +577,20 @@ async def resolve_display_name(guild: discord.Guild, user_id) -> str:
     return _sanitize_name(raw) if raw else "Usuario desconocido"
 
 async def _is_admin_or_deny(interaction: discord.Interaction) -> bool:
-    """True si el usuario es administrador. Si no, responde con el aviso de
+    """True si el usuario es administrador o dueño del servidor. Si no, responde con el aviso de
     permisos (efímero) y devuelve False. Uso: `if not await _is_admin_or_deny(i): return`."""
-    if interaction.user.guild_permissions.administrator:
+    is_owner = bool(interaction.guild and interaction.user.id == interaction.guild.owner_id)
+    perms = getattr(interaction.user, "guild_permissions", None) or interaction.permissions
+    is_admin = getattr(perms, "administrator", False) if perms else False
+
+    if is_owner or is_admin:
         return True
     embed = discord.Embed(title="❌ Sin permisos", description="Necesitas permisos de **Administrador**.", color=0xed4245)
     try:
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        else:
+            await interaction.followup.send(embed=embed, ephemeral=True)
     except Exception:
         pass
     return False
@@ -1715,6 +1736,8 @@ async def resync_cmd(ctx):
             color=0xed4245
         ))
     gid  = str(ctx.guild.id)
+    if _resync_locks.is_locked(gid):
+        return await ctx.send(embed=_resync_busy_embed())
     async with await _resync_locks.acquire(gid):
         status = await ctx.send(embed=discord.Embed(
             title="🔄 Resincronizando el skullboard",
@@ -2353,6 +2376,8 @@ async def resync_slash(interaction: discord.Interaction):
             color=0xed4245
         ), ephemeral=True)
     gid = str(interaction.guild.id)
+    if _resync_locks.is_locked(gid):
+        return await interaction.response.send_message(embed=_resync_busy_embed(), ephemeral=True)
     async with await _resync_locks.acquire(gid):
         await interaction.response.defer()
         status = await interaction.followup.send(embed=discord.Embed(
@@ -2413,7 +2438,12 @@ async def reset_slash(interaction: discord.Interaction):
             await btn_interaction.response.edit_message(embed=embed, view=None)
 
         async def on_timeout(self):
-            pass
+            for child in self.children:
+                child.disabled = True
+            try:
+                await interaction.edit_original_response(view=self)
+            except Exception:
+                pass
 
     embed_warn = discord.Embed(
         title="⚠️ ¿Estás seguro?",
