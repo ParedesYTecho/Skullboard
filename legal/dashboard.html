@@ -40,7 +40,7 @@
     </svg>
 
     <nav class="nav" id="top">
-        <a class="brand" href="/" aria-label="SkullBoard Inicio"><span class="mark">💀</span> SkullBoard</a>
+        <a class="brand" href="/" aria-label="SkullBoard Inicio"><span class="mark"><img src="skullboard_icon.png" alt="SkullBoard" class="brand-avatar"></span> SkullBoard</a>
         <div class="nav-links">
             <a href="/" class="nav-link">Inicio</a>
             <a href="/cambios" class="nav-link">Cambios</a>
@@ -161,39 +161,58 @@
                         <p style="color:var(--ink-soft); font-size:0.9rem;">Personaliza cómo opera SkullBoard en este servidor. Solo visible para Administradores.</p>
                     </div>
 
-                    <form id="guild-config-form" style="display:flex; flex-direction:column; gap:20px;">
+                    <form id="guild-config-form" style="display:flex; flex-direction:column; gap:24px;">
                         <div>
-                            <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Canal de Skullboard:</label>
-                            <select id="cfg-channel-select" class="form-control-input" style="margin-bottom:8px;">
-                                <option value="">Cargando canales…</option>
-                            </select>
-                            <input type="text" id="cfg-channel" class="form-control-input" placeholder="O escribe la ID numérica del canal">
+                            <label style="display:block; font-weight:600; margin-bottom:6px; font-size:0.92rem;">Canal de Skullboard:</label>
+                            <p style="color:var(--ink-soft); font-size:0.82rem; margin-bottom:10px;">El canal de Discord donde SkullBoard publicará los mensajes con récords de calaveras.</p>
+                            
+                            <div class="custom-channel-combobox" id="custom-channel-combobox">
+                                <input type="hidden" id="cfg-channel" name="skullboard_channel_id" value="">
+                                <select id="cfg-channel-select" style="display:none;"></select>
+
+                                <button type="button" class="channel-combobox-trigger" id="channel-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
+                                        <span class="channel-trigger-icon">#</span>
+                                        <span class="channel-trigger-text" id="channel-trigger-text">Selecciona o busca un canal…</span>
+                                    </div>
+                                    <svg class="channel-trigger-chevron" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="m6 9 6 6 6-6"/></svg>
+                                </button>
+
+                                <div class="channel-combobox-dropdown" id="channel-dropdown" style="display:none;">
+                                    <div class="channel-search-header">
+                                        <svg class="channel-search-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="m21 21-4.35-4.35" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                                        <input type="text" id="channel-search-input" class="channel-search-input" placeholder="Escribe para buscar canal o ID…" autocomplete="off">
+                                    </div>
+                                    <div class="channel-options-container" id="channel-options-container" role="listbox">
+                                        <div class="channel-option-loading">Cargando canales…</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                <label style="font-weight:600; font-size:0.9rem;">Umbral de Calaveras para destacar:</label>
-                                <span id="cfg-skulls-val" style="font-weight:800; color:var(--violet-2); font-size:1.1rem;">1 💀</span>
-                            </div>
-                            <div class="cfg-num-row">
-                                <input type="range" id="cfg-skulls" min="1" max="50" value="1" style="flex:1;">
-                                <input type="number" id="cfg-skulls-num" min="1" max="50" value="1" class="cfg-number-input" title="Escribe el número">
+                            <label for="cfg-skulls" style="display:block; font-weight:600; margin-bottom:4px; font-size:0.92rem;">Umbral de Calaveras para destacar:</label>
+                            <p style="color:var(--ink-soft); font-size:0.82rem; margin-bottom:10px;">Número mínimo de reacciones 💀 para enviar el mensaje al tablón (1 a 50).</p>
+                            <div class="cfg-text-input-wrap">
+                                <input type="number" id="cfg-skulls" min="1" max="50" value="1" class="cfg-number-input" placeholder="1">
+                                <input type="hidden" id="cfg-skulls-num" value="1">
+                                <span class="cfg-input-suffix">💀 calaveras</span>
                             </div>
                         </div>
 
                         <div>
-                            <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Prefijo de comandos:</label>
-                            <input type="text" id="cfg-prefix" class="form-control-input" style="width:140px;" value="sk!" maxlength="5">
+                            <label for="cfg-prefix" style="display:block; font-weight:600; margin-bottom:4px; font-size:0.92rem;">Prefijo de comandos:</label>
+                            <p style="color:var(--ink-soft); font-size:0.82rem; margin-bottom:10px;">Prefijo para comandos tradicionales de texto (ej: sk!).</p>
+                            <input type="text" id="cfg-prefix" class="form-control-input" style="width:140px; font-weight:700; font-size:1rem;" value="sk!" maxlength="5">
                         </div>
 
                         <div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                                <label style="font-weight:600; font-size:0.9rem;">Umbral de Auto-Pin (0 = Desactivado):</label>
-                                <span id="cfg-pin-val" style="font-weight:700;">Desactivado</span>
-                            </div>
-                            <div class="cfg-num-row">
-                                <input type="range" id="cfg-pin" min="0" max="50" value="0" style="flex:1;">
-                                <input type="number" id="cfg-pin-num" min="0" max="50" value="0" class="cfg-number-input" title="Escribe el número">
+                            <label for="cfg-pin" style="display:block; font-weight:600; margin-bottom:4px; font-size:0.92rem;">Umbral de Auto-Pin:</label>
+                            <p style="color:var(--ink-soft); font-size:0.82rem; margin-bottom:10px;">Fija automáticamente el mensaje en el canal al alcanzar este número de calaveras (0 = desactivado).</p>
+                            <div class="cfg-text-input-wrap">
+                                <input type="number" id="cfg-pin" min="0" max="50" value="0" class="cfg-number-input" placeholder="0">
+                                <input type="hidden" id="cfg-pin-num" value="0">
+                                <span class="cfg-input-suffix">💀 para fijar</span>
                             </div>
                         </div>
 
@@ -214,7 +233,7 @@
                 <!-- Columna 1: Marca & Eslogan -->
                 <div class="footer-brand-col">
                     <a href="/" class="footer-brand-header">
-                        <span class="f-brand-mark">💀</span> SkullBoard
+                        <span class="f-brand-mark"><img src="skullboard_icon.png" alt="SkullBoard" class="brand-avatar"></span> SkullBoard
                     </a>
                     <p class="footer-slogan">
                         A Discord Skullboard Bot — Done Right.<br>
@@ -560,29 +579,112 @@
             }
         }
 
+        let currentGuildChannels = [];
+
+        function renderChannelOptions(channelsToRender, query = '') {
+            const container = document.getElementById('channel-options-container');
+            if (!container) return;
+            container.innerHTML = '';
+            const selectedId = document.getElementById('cfg-channel').value;
+
+            if (channelsToRender.length === 0) {
+                if (query.trim()) {
+                    const manualRow = document.createElement('div');
+                    manualRow.className = 'channel-option';
+                    manualRow.innerHTML = `<span class="channel-opt-hash">#</span> <span class="channel-opt-name">Usar ID manual: <strong>${escapeHtml(query.trim())}</strong></span>`;
+                    manualRow.addEventListener('click', () => {
+                        setChannelSelected(query.trim(), query.trim());
+                        closeChannelDropdown();
+                    });
+                    container.appendChild(manualRow);
+                    return;
+                }
+                container.innerHTML = '<div class="channel-option-empty">No se encontraron canales</div>';
+                return;
+            }
+
+            channelsToRender.forEach(c => {
+                const item = document.createElement('div');
+                item.className = 'channel-option' + (String(c.id) === String(selectedId) ? ' selected' : '');
+                item.dataset.id = c.id;
+                item.innerHTML = `
+                    <span class="channel-opt-hash">#</span>
+                    <span class="channel-opt-name">${c.name}</span>
+                    ${String(c.id) === String(selectedId) ? '<span class="channel-opt-check">✓</span>' : ''}
+                `;
+                item.addEventListener('click', () => {
+                    setChannelSelected(c.id, c.name);
+                    closeChannelDropdown();
+                });
+                container.appendChild(item);
+            });
+        }
+
+        function setChannelSelected(chanId, chanName = null) {
+            const input = document.getElementById('cfg-channel');
+            if (input) input.value = chanId || '';
+            const triggerText = document.getElementById('channel-trigger-text');
+            if (!triggerText) return;
+            if (!chanId) {
+                triggerText.textContent = 'Selecciona o busca un canal…';
+                return;
+            }
+            if (chanName) {
+                triggerText.textContent = `# ${chanName}`;
+            } else {
+                const found = currentGuildChannels.find(c => String(c.id) === String(chanId));
+                if (found) {
+                    triggerText.textContent = `# ${found.name}`;
+                } else {
+                    triggerText.textContent = `# ${chanId}`;
+                }
+            }
+        }
+
+        function openChannelDropdown() {
+            const dd = document.getElementById('channel-dropdown');
+            const trigger = document.getElementById('channel-trigger');
+            if (!dd || !trigger) return;
+            dd.style.display = 'block';
+            trigger.setAttribute('aria-expanded', 'true');
+            trigger.classList.add('active');
+            const searchInput = document.getElementById('channel-search-input');
+            if (searchInput) {
+                searchInput.value = '';
+                searchInput.focus();
+            }
+            renderChannelOptions(currentGuildChannels);
+        }
+
+        function closeChannelDropdown() {
+            const dd = document.getElementById('channel-dropdown');
+            const trigger = document.getElementById('channel-trigger');
+            if (dd) dd.style.display = 'none';
+            if (trigger) {
+                trigger.setAttribute('aria-expanded', 'false');
+                trigger.classList.remove('active');
+            }
+        }
+
         // 3. CARGA DE CONFIGURACIÓN (SOLO ADMINS)
         async function loadGuildConfig(guildId) {
             hideFooter();
-            const selectChan = document.getElementById('cfg-channel-select');
-            selectChan.innerHTML = '<option value="">Cargando canales…</option>';
+            const container = document.getElementById('channel-options-container');
+            if (container) container.innerHTML = '<div class="channel-option-loading">Cargando canales…</div>';
+
             try {
                 const chanRes = await fetch(`${API_BASE}/api/guild/${guildId}/channels`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
                 const chanData = await chanRes.json();
                 if (chanData.ok && chanData.channels && chanData.channels.length > 0) {
-                    selectChan.innerHTML = '<option value="">-- Selecciona un canal de texto --</option>';
-                    chanData.channels.forEach(c => {
-                        const opt = document.createElement('option');
-                        opt.value = c.id;
-                        opt.textContent = `# ${c.name}`;
-                        selectChan.appendChild(opt);
-                    });
+                    currentGuildChannels = chanData.channels;
+                    renderChannelOptions(currentGuildChannels);
                 } else {
-                    selectChan.innerHTML = '<option value="">(Canales no disponibles)</option>';
+                    if (container) container.innerHTML = '<div class="channel-option-empty">(Canales no disponibles)</div>';
                 }
             } catch (e) {
-                selectChan.innerHTML = '<option value="">(Error al cargar canales)</option>';
+                if (container) container.innerHTML = '<div class="channel-option-empty">(Error al cargar canales)</div>';
             }
 
             try {
@@ -593,15 +695,12 @@
                 if (data.ok && data.config) {
                     const cfg = data.config;
                     const chanId = cfg.skullboard_channel_id ? String(cfg.skullboard_channel_id) : '';
-                    document.getElementById('cfg-channel').value = chanId;
-                    if (chanId && selectChan.querySelector(`option[value="${chanId}"]`)) {
-                        selectChan.value = chanId;
-                    }
+                    setChannelSelected(chanId);
+
                     const skullsVal = cfg.min_skulls || 1;
                     document.getElementById('cfg-skulls').value = skullsVal;
                     const skullsNum = document.getElementById('cfg-skulls-num');
                     if (skullsNum) skullsNum.value = skullsVal;
-                    document.getElementById('cfg-skulls-val').textContent = `${skullsVal} 💀`;
 
                     document.getElementById('cfg-prefix').value = cfg.prefix || 'sk!';
 
@@ -609,7 +708,6 @@
                     document.getElementById('cfg-pin').value = pinVal;
                     const pinNum = document.getElementById('cfg-pin-num');
                     if (pinNum) pinNum.value = pinVal;
-                    document.getElementById('cfg-pin-val').textContent = (pinVal > 0) ? `${pinVal} 💀` : 'Desactivado';
                 }
             } catch (e) {
                 showToast('Error cargando ajustes', '✕');
@@ -766,17 +864,6 @@
                 loadGuildConfig(guild.id);
             }
         }
-
-        // Sliders de Configuración
-        document.getElementById('cfg-skulls').addEventListener('input', (e) => {
-            document.getElementById('cfg-skulls-val').textContent = `${e.target.value} 💀`;
-        });
-        document.getElementById('cfg-pin').addEventListener('input', (e) => {
-            document.getElementById('cfg-pin-val').textContent = e.target.value > 0 ? `${e.target.value} 💀` : 'Desactivado';
-        });
-        document.getElementById('cfg-channel-select').addEventListener('change', (e) => {
-            if (e.target.value) document.getElementById('cfg-channel').value = e.target.value;
-        });
 
         // Guardar Cambios
         document.getElementById('guild-config-form').addEventListener('submit', async (e) => {
@@ -963,53 +1050,107 @@
             window.open(webUrl, '_blank', 'noopener,noreferrer');
         }
 
-        // Sincronización bidireccional de sliders e inputs numéricos
-        const skullsRange = document.getElementById('cfg-skulls');
-        const skullsNum = document.getElementById('cfg-skulls-num');
-        const skullsVal = document.getElementById('cfg-skulls-val');
-        if (skullsRange && skullsNum) {
-            skullsRange.addEventListener('input', (e) => {
-                skullsNum.value = e.target.value;
-                skullsVal.textContent = `${e.target.value} 💀`;
+        // Listeners para inputs numéricos directos (sin sliders ni flechas)
+        const skullsInput = document.getElementById('cfg-skulls');
+        const skullsHidden = document.getElementById('cfg-skulls-num');
+        if (skullsInput) {
+            skullsInput.addEventListener('input', (e) => {
+                let v = parseInt(e.target.value);
+                if (isNaN(v)) return;
+                if (v > 50) e.target.value = 50;
+                if (skullsHidden) skullsHidden.value = e.target.value;
             });
-            skullsNum.addEventListener('input', (e) => {
+            skullsInput.addEventListener('blur', (e) => {
                 let v = parseInt(e.target.value) || 1;
                 if (v < 1) v = 1;
                 if (v > 50) v = 50;
-                skullsRange.value = v;
-                skullsVal.textContent = `${v} 💀`;
+                e.target.value = v;
+                if (skullsHidden) skullsHidden.value = v;
             });
         }
 
-        const pinRange = document.getElementById('cfg-pin');
-        const pinNum = document.getElementById('cfg-pin-num');
-        const pinVal = document.getElementById('cfg-pin-val');
-        if (pinRange && pinNum) {
-            pinRange.addEventListener('input', (e) => {
-                pinNum.value = e.target.value;
-                pinVal.textContent = (e.target.value > 0) ? `${e.target.value} 💀` : 'Desactivado';
+        const pinInput = document.getElementById('cfg-pin');
+        const pinHidden = document.getElementById('cfg-pin-num');
+        if (pinInput) {
+            pinInput.addEventListener('input', (e) => {
+                let v = parseInt(e.target.value);
+                if (isNaN(v)) return;
+                if (v > 50) e.target.value = 50;
+                if (pinHidden) pinHidden.value = e.target.value;
             });
-            pinNum.addEventListener('input', (e) => {
+            pinInput.addEventListener('blur', (e) => {
                 let v = parseInt(e.target.value);
                 if (isNaN(v) || v < 0) v = 0;
                 if (v > 50) v = 50;
-                pinRange.value = v;
-                pinVal.textContent = (v > 0) ? `${v} 💀` : 'Desactivado';
+                e.target.value = v;
+                if (pinHidden) pinHidden.value = v;
+            });
+        }
+
+        // Combobox de selección y búsqueda de canales
+        const channelTrigger = document.getElementById('channel-trigger');
+        if (channelTrigger) {
+            channelTrigger.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const dd = document.getElementById('channel-dropdown');
+                if (dd && dd.style.display === 'block') {
+                    closeChannelDropdown();
+                } else {
+                    openChannelDropdown();
+                }
+            });
+        }
+
+        const channelDropdown = document.getElementById('channel-dropdown');
+        if (channelDropdown) {
+            channelDropdown.addEventListener('click', (e) => e.stopPropagation());
+        }
+
+        document.addEventListener('click', () => closeChannelDropdown());
+
+        const channelSearchInput = document.getElementById('channel-search-input');
+        if (channelSearchInput) {
+            channelSearchInput.addEventListener('input', (e) => {
+                const q = e.target.value.toLowerCase().trim();
+                if (!q) {
+                    renderChannelOptions(currentGuildChannels);
+                    return;
+                }
+                const filtered = currentGuildChannels.filter(c => 
+                    c.name.toLowerCase().includes(q) || String(c.id).includes(q)
+                );
+                renderChannelOptions(filtered, q);
             });
         }
 
         // Smart Sticky Navbar (Hide on scroll down, reveal on scroll up - Sapphire Style)
         let lastScrollY = window.scrollY;
+        let scrollDelta = 0;
         const mainNav = document.querySelector('.nav');
         if (mainNav) {
             window.addEventListener('scroll', () => {
                 const currentScrollY = window.scrollY;
-                if (currentScrollY > lastScrollY && currentScrollY > 60) {
+                const diff = currentScrollY - lastScrollY;
+
+                if (currentScrollY <= 30) {
+                    mainNav.classList.remove('nav-hidden');
+                    scrollDelta = 0;
+                    lastScrollY = currentScrollY;
+                    return;
+                }
+
+                if ((diff > 0 && scrollDelta < 0) || (diff < 0 && scrollDelta > 0)) {
+                    scrollDelta = 0;
+                }
+                scrollDelta += diff;
+
+                if (scrollDelta > 15) {
                     mainNav.classList.add('nav-hidden');
-                } else {
+                } else if (scrollDelta < -8) {
                     mainNav.classList.remove('nav-hidden');
                 }
-                lastScrollY = Math.max(0, currentScrollY);
+
+                lastScrollY = currentScrollY;
             }, { passive: true });
         }
 

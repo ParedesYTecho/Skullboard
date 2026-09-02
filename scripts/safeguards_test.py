@@ -387,9 +387,9 @@ class HtmlSliderAndLinkCollector(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         attr_dict = dict(attrs)
-        if tag == "input" and attr_dict.get("type") == "range":
+        if tag == "input" and attr_dict.get("type") in ("range", "number"):
             elem_id = attr_dict.get("id")
-            if elem_id:
+            if elem_id in ("cfg-skulls", "cfg-pin"):
                 self.sliders[elem_id] = {
                     "min": attr_dict.get("min"),
                     "max": attr_dict.get("max"),

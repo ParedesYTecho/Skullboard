@@ -19,7 +19,7 @@
     --bad: #fb7185;
     --admin: #b7b7c2;
     --radius: 18px;
-    --maxw: 980px;
+    --maxw: 1220px;
     --display: 'Manrope', 'Inter', sans-serif;
 }
 
@@ -3095,30 +3095,239 @@ input[type="range"]::-moz-range-thumb {
     flex-shrink: 0;
 }
 
-/* Inputs numéricos directos para umbrales */
-.cfg-num-row {
+/* ═══════════════════════════════════════════════════════════════════════════════
+   🎯 INPUTS LIMPIOS PARA UMBRALES (SOLO ESCRIBIR, SIN SLIDERS NI FLECHAS)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.cfg-text-input-wrap {
     display: flex;
     align-items: center;
-    gap: 12px;
+    position: relative;
+    max-width: 260px;
 }
 
 .cfg-number-input {
-    width: 68px;
-    padding: 6px 10px;
-    border-radius: 8px;
+    width: 100%;
+    padding: 11px 14px;
+    padding-right: 110px;
+    border-radius: 12px;
     background: var(--surface-2);
     border: 1px solid var(--border);
     color: var(--ink);
-    font-family: var(--font);
+    font-family: inherit;
     font-weight: 700;
-    font-size: 0.95rem;
-    text-align: center;
-    transition: border-color .15s ease;
+    font-size: 1.05rem;
+    transition: border-color .2s ease, box-shadow .2s ease;
 }
 
 .cfg-number-input:focus {
-    border-color: var(--violet);
+    border-color: var(--violet-2);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
     outline: none;
+}
+
+.cfg-input-suffix {
+    position: absolute;
+    right: 14px;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    font-weight: 600;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* Erradicar completamente las flechas de subir/bajar de 1 en 1 (spinners) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield !important;
+    appearance: textfield !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   🎯 SELECTOR DE CANALES BUSCABLE (ESTILO DISCORD / SAPPHIRE)
+   ═══════════════════════════════════════════════════════════════════════════════ */
+.custom-channel-combobox {
+    position: relative;
+    width: 100%;
+    max-width: 520px;
+}
+
+.channel-combobox-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--ink);
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.channel-combobox-trigger:hover,
+.channel-combobox-trigger.active {
+    border-color: var(--violet-2);
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+
+.channel-trigger-icon {
+    color: var(--ink-soft);
+    font-size: 1.15rem;
+    font-weight: 700;
+}
+
+.channel-trigger-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.channel-trigger-chevron {
+    width: 18px;
+    height: 18px;
+    color: var(--ink-soft);
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.channel-combobox-trigger.active .channel-trigger-chevron {
+    transform: rotate(180deg);
+}
+
+.channel-combobox-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    z-index: 999;
+    background: #121217;
+    border: 1px solid var(--border-strong);
+    border-radius: 14px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    animation: dropdownFadeIn 0.18s ease-out;
+}
+
+@keyframes dropdownFadeIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.channel-search-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.channel-search-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--ink-soft);
+    flex-shrink: 0;
+}
+
+.channel-search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--ink);
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+
+.channel-search-input::placeholder {
+    color: var(--ink-dim);
+}
+
+.channel-options-container {
+    max-height: 240px;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+.channel-options-container::-webkit-scrollbar {
+    width: 6px;
+}
+.channel-options-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 999px;
+}
+
+.channel-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 0.92rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.channel-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.channel-option.selected {
+    background: rgba(168, 85, 247, 0.18);
+    color: #fff;
+    font-weight: 600;
+}
+
+.channel-opt-hash {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.channel-opt-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.channel-opt-check {
+    color: var(--good);
+    font-weight: 800;
+}
+
+.channel-option-loading,
+.channel-option-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--ink-soft);
+    font-size: 0.88rem;
+}
+
+/* Avatar de marca en logo y footer */
+.brand-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: inherit;
+    object-fit: cover;
+    display: block;
 }
 
 

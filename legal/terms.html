@@ -31,7 +31,7 @@
     </svg>
 
     <nav class="nav" id="top">
-        <a class="brand" href="/" aria-label="SkullBoard Inicio"><span class="mark">💀</span> SkullBoard</a>
+        <a class="brand" href="/" aria-label="SkullBoard Inicio"><span class="mark"><img src="skullboard_icon.png" alt="SkullBoard" class="brand-avatar"></span> SkullBoard</a>
         <div class="nav-links">
             <a href="/#comandos" class="nav-link">Comandos</a>
             <a href="/cambios" class="nav-link">Cambios</a>
@@ -112,7 +112,7 @@
                 <!-- Columna 1: Marca & Eslogan -->
                 <div class="footer-brand-col">
                     <a href="/" class="footer-brand-header">
-                        <span class="f-brand-mark">💀</span> SkullBoard
+                        <span class="f-brand-mark"><img src="skullboard_icon.png" alt="SkullBoard" class="brand-avatar"></span> SkullBoard
                     </a>
                     <p class="footer-slogan">
                         A Discord Skullboard Bot — Done Right.<br>
@@ -282,16 +282,32 @@
         }
         // Smart Sticky Navbar (Hide on scroll down, reveal on scroll up - Sapphire Style)
         let lastScrollY = window.scrollY;
+        let scrollDelta = 0;
         const mainNav = document.querySelector('.nav');
         if (mainNav) {
             window.addEventListener('scroll', () => {
                 const currentScrollY = window.scrollY;
-                if (currentScrollY > lastScrollY && currentScrollY > 60) {
+                const diff = currentScrollY - lastScrollY;
+
+                if (currentScrollY <= 30) {
+                    mainNav.classList.remove('nav-hidden');
+                    scrollDelta = 0;
+                    lastScrollY = currentScrollY;
+                    return;
+                }
+
+                if ((diff > 0 && scrollDelta < 0) || (diff < 0 && scrollDelta > 0)) {
+                    scrollDelta = 0;
+                }
+                scrollDelta += diff;
+
+                if (scrollDelta > 15) {
                     mainNav.classList.add('nav-hidden');
-                } else {
+                } else if (scrollDelta < -8) {
                     mainNav.classList.remove('nav-hidden');
                 }
-                lastScrollY = Math.max(0, currentScrollY);
+
+                lastScrollY = currentScrollY;
             }, { passive: true });
         }
 
