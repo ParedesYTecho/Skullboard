@@ -70,7 +70,7 @@
         <div class="nav-links">
             <a href="#comandos" class="nav-link">Comandos</a>
             <a href="/cambios" class="nav-link">Cambios</a>
-            <a href="/dashboard" class="nav-link" style="color:var(--violet-2); font-weight:700;">Panel Web</a>
+            <a href="/dashboard" class="nav-link" style="color:var(--violet-2); font-weight:700;">Dashboard</a>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
                 <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
             </button>
@@ -460,24 +460,14 @@
             </form>
         </section>
 
-        <!-- FOOTER PROFESIONAL MULTI-COLUMNA (ESTILO SAPPHIRE / MEE6) -->
+        <!-- FOOTER PROFESIONAL MULTI-COLUMNA -->
         <footer class="site-footer-v2">
             <div class="footer-cols">
-                <!-- Columna 1: Marca & Eslogan -->
+                <!-- Columna 1: Marca -->
                 <div class="footer-brand-col">
                     <a href="/" class="footer-brand-header">
                         <span class="f-brand-mark"><img src="skullboard_icon.png" alt="SkullBoard" class="brand-avatar"></span> SkullBoard
                     </a>
-                    <p class="footer-slogan">
-                        A Discord Skullboard Bot — Done Right.<br>
-                        Destaca los mejores momentos y mensajes de tu comunidad con elegancia y alta velocidad.
-                    </p>
-                    <div style="margin-top:4px;">
-                        <button type="button" class="status-pill open-status-modal" title="Ver estado de infraestructura">
-                            <span class="status-dot"></span>
-                            <span class="status-pill-text">Sistemas Operativos</span>
-                        </button>
-                    </div>
                 </div>
 
                 <!-- Columna 2: Navegación -->
@@ -486,29 +476,17 @@
                     <ul>
                         <li><a href="/">Inicio</a></li>
                         <li><a href="/cambios">Historial de Cambios</a></li>
-                        <li><a href="/dashboard">Panel de Control</a></li>
+                        <li><a href="/dashboard">Dashboard</a></li>
                         <li><a href="#status" class="open-status-modal">Estado del Sistema</a></li>
                     </ul>
                 </div>
 
-                <!-- Columna 3: Comunidad & Recursos -->
-                <div class="footer-col">
-                    <h4>Comunidad</h4>
-                    <ul>
-                        <li><a href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">Invitar Bot</a></li>
-                        <li><a href="https://discord.gg/GvFn2ZqY8E" target="_blank" rel="noopener">Servidor de Soporte</a></li>
-                        <li><a href="https://github.com/ParedesYTecho/Skullboard" target="_blank" rel="noopener">Código en GitHub</a></li>
-                        <li><a href="#comandos">Comandos</a></li>
-                    </ul>
-                </div>
-
-                <!-- Columna 4: Legal & Confianza -->
+                <!-- Columna 3: Legal -->
                 <div class="footer-col">
                     <h4>Legal</h4>
                     <ul>
                         <li><a href="/terms">Términos de Servicio</a></li>
                         <li><a href="/privacy">Política de Privacidad</a></li>
-                        <li><a href="https://github.com/ParedesYTecho/Skullboard/blob/main/LICENSE" target="_blank" rel="noopener">Licencia MIT</a></li>
                         <li><a href="#contacto">Contacto Directo</a></li>
                     </ul>
                     <div class="footer-socials">
@@ -524,8 +502,8 @@
 
             <!-- Barra Inferior -->
             <div class="footer-bottom-bar">
-                <span>© 2024–2026 SkullBoard • No afiliado con Discord Inc.</span>
-                <span>Desarrollado por <strong>GlobalFerociouS</strong></span>
+                <span>© 2024–2026 <strong>SkullBoard</strong>. Todos los derechos reservados.</span>
+                <span>Desarrollado por <strong class="gradient-author">GlobalFerociouS</strong></span>
             </div>
         </footer>
     </div>
@@ -970,29 +948,21 @@
             });
         }
         // Smart Sticky Navbar (Hide on scroll down, reveal on scroll up - Sapphire Style)
-        let lastScrollY = window.scrollY;
-        let scrollDelta = 0;
+        let lastScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
         const mainNav = document.querySelector('.nav');
         if (mainNav) {
             window.addEventListener('scroll', () => {
-                const currentScrollY = window.scrollY;
-                const diff = currentScrollY - lastScrollY;
+                const currentScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
 
-                if (currentScrollY <= 30) {
+                if (currentScrollY <= 50) {
                     mainNav.classList.remove('nav-hidden');
-                    scrollDelta = 0;
                     lastScrollY = currentScrollY;
                     return;
                 }
 
-                if ((diff > 0 && scrollDelta < 0) || (diff < 0 && scrollDelta > 0)) {
-                    scrollDelta = 0;
-                }
-                scrollDelta += diff;
-
-                if (scrollDelta > 15) {
+                if (currentScrollY > lastScrollY && currentScrollY > 80) {
                     mainNav.classList.add('nav-hidden');
-                } else if (scrollDelta < -8) {
+                } else if (currentScrollY < lastScrollY) {
                     mainNav.classList.remove('nav-hidden');
                 }
 

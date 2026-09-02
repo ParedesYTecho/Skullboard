@@ -62,7 +62,7 @@ body::after {
     mask-image: radial-gradient(70% 60% at 50% 0%, #000 30%, transparent 80%);
 }
 
-.container { max-width: var(--maxw); margin: 0 auto; padding: 0 22px 72px; }
+.container { max-width: var(--maxw); margin: 0 auto; padding: 86px 22px 72px; }
 
 a { color: var(--violet-2); text-decoration: none; }
 a:hover { text-decoration: underline; }
@@ -83,21 +83,25 @@ svg use[href="#i-discord"] {
 
 /* ====== Nav ====== */
 .nav {
-    position: sticky; top: 14px; z-index: 100;
-    display: flex; align-items: center; justify-content: space-between;
-    gap: 16px; margin: 14px auto 0; padding: 8px 12px 8px 16px;
+    position: fixed; top: 14px; left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
     max-width: var(--maxw);
-    background: rgba(14, 14, 17, 0.78);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    z-index: 1000;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin: 0 auto; padding: 8px 12px 8px 16px;
+    background: rgba(14, 14, 17, 0.82);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border: 1px solid var(--border);
     border-radius: 999px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
-    transition: transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), background .2s, border-color .2s, box-shadow .2s;
-    will-change: transform;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32);
+    transition: top 0.32s cubic-bezier(0.16, 1, 0.3, 1), transform 0.32s cubic-bezier(0.16, 1, 0.3, 1), background .2s, border-color .2s, box-shadow .2s;
+    will-change: top, transform;
 }
 .nav.nav-hidden {
-    transform: translateY(-140%);
+    top: -90px;
+    transform: translateX(-50%);
 }
 .brand {
     display: inline-flex; align-items: center; gap: 10px;
@@ -3098,41 +3102,25 @@ input[type="range"]::-moz-range-thumb {
 /* ═══════════════════════════════════════════════════════════════════════════════
    🎯 INPUTS LIMPIOS PARA UMBRALES (SOLO ESCRIBIR, SIN SLIDERS NI FLECHAS)
    ═══════════════════════════════════════════════════════════════════════════════ */
-.cfg-text-input-wrap {
-    display: flex;
-    align-items: center;
-    position: relative;
-    max-width: 260px;
-}
-
 .cfg-number-input {
-    width: 100%;
-    padding: 11px 14px;
-    padding-right: 110px;
-    border-radius: 12px;
+    width: 120px;
+    padding: 10px 14px;
+    border-radius: 10px;
     background: var(--surface-2);
     border: 1px solid var(--border);
     color: var(--ink);
     font-family: inherit;
     font-weight: 700;
     font-size: 1.05rem;
-    transition: border-color .2s ease, box-shadow .2s ease;
+    text-align: left;
+    transition: border-color .2s ease, box-shadow .2s ease, background .2s ease;
 }
 
 .cfg-number-input:focus {
     border-color: var(--violet-2);
-    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.25);
+    background: rgba(255, 255, 255, 0.08);
     outline: none;
-}
-
-.cfg-input-suffix {
-    position: absolute;
-    right: 14px;
-    color: var(--ink-soft);
-    font-size: 0.85rem;
-    font-weight: 600;
-    pointer-events: none;
-    user-select: none;
 }
 
 /* Erradicar completamente las flechas de subir/bajar de 1 en 1 (spinners) */
@@ -3145,6 +3133,127 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
     -moz-appearance: textfield !important;
     appearance: textfield !important;
+}
+
+/* Gradiente oficial en autor del footer */
+.gradient-author {
+    background: linear-gradient(135deg, #a78bfa 0%, #ec4899 50%, #38bdf8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 800;
+}
+
+/* ====== Sapphire-style User Profile Trigger & Dropdown ====== */
+.user-menu-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+.user-profile-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    color: var(--ink);
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.user-profile-trigger:hover,
+.user-profile-trigger.active {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--border-strong);
+}
+
+.user-profile-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.user-profile-name {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-profile-chevron {
+    width: 14px;
+    height: 14px;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.user-profile-trigger.active .user-profile-chevron {
+    transform: rotate(180deg);
+}
+
+.user-profile-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 170px;
+    background: #14151b;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+    padding: 6px;
+    z-index: 1050;
+    backdrop-filter: blur(20px);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    animation: fadeInScale 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+:root[data-theme="light"] .user-profile-dropdown {
+    background: #ffffff;
+    border-color: rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+}
+
+.user-dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 12px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--ink);
+    font-size: 0.88rem;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+
+.user-dropdown-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+:root[data-theme="light"] .user-dropdown-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.user-dropdown-item.item-logout:hover {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.dropdown-item-icon {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    opacity: 0.85;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════

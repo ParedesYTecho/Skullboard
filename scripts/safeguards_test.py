@@ -652,7 +652,7 @@ class TestSuite8_TotalPerfection(unittest.TestCase):
         for name, html in self.pages.items():
             with self.subTest(page=name):
                 self.assertNotIn("Desarrollado con ❤️", html, f"{name} should not contain 'Desarrollado con ❤️'")
-                self.assertIn("Desarrollado por <strong>GlobalFerociouS</strong>", html, f"{name} must credit GlobalFerociouS")
+                self.assertTrue(re.search(r"Desarrollado por <strong(?: class=\"[^\"]*\")?>GlobalFerociouS</strong>", html), f"{name} must credit GlobalFerociouS")
                 self.assertIn("f-brand-mark", html, f"{name} must use .f-brand-mark for logo gradient")
 
     def test_status_modal_no_refresh_button(self):
