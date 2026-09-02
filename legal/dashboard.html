@@ -54,7 +54,7 @@
         </div>
     </nav>
 
-    <div class="container" style="padding-top:20px;">
+    <div class="container dashboard-layout" style="padding-top:20px;">
         <!-- ESTADO CARGANDO / VERIFICANDO -->
         <div id="view-loading" style="text-align:center; padding:90px 20px;">
             <div class="emblem" style="animation: pulse 1.5s infinite ease-in-out;">💀</div>
@@ -209,7 +209,7 @@
         </main>
 
         <!-- FOOTER PROFESIONAL MULTI-COLUMNA (ESTILO SAPPHIRE / MEE6) -->
-        <footer class="site-footer-v2">
+        <footer id="site-footer" class="site-footer-v2" style="display:none;">
             <div class="footer-cols">
                 <!-- Columna 1: Marca & Eslogan -->
                 <div class="footer-brand-col">
@@ -333,6 +333,16 @@
         const CLIENT_ID = '1367463352774955059';
         const REDIRECT_URI = window.location.origin + '/dashboard';
 
+        function showFooter() {
+            const f = document.getElementById('site-footer');
+            if (f) f.style.display = 'block';
+        }
+
+        function hideFooter() {
+            const f = document.getElementById('site-footer');
+            if (f) f.style.display = 'none';
+        }
+
         const toastContainer = document.createElement('div');
         toastContainer.className = 'toast-container';
         toastContainer.setAttribute('aria-live', 'polite');
@@ -423,6 +433,7 @@
         // 1. CARGA DEL LEADERBOARD DEL SERVIDOR (HUMANIZADA & CON ENLACES A DISCORD)
         async function loadGuildLeaderboard(guildId) {
             const list = document.getElementById('guild-lb-list');
+            hideFooter();
             list.innerHTML = `
                 <div class="skeleton" style="height:68px; opacity:0.8; margin-bottom:12px; border-radius:16px;"></div>
                 <div class="skeleton" style="height:68px; opacity:0.5; margin-bottom:12px; border-radius:16px;"></div>
@@ -477,12 +488,15 @@
                 }
             } catch (e) {
                 list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar el Leaderboard.</div>';
+            } finally {
+                showFooter();
             }
         }
 
         // 2. CARGA DE MIS MENSAJES EN EL SERVIDOR
         async function loadMyMessages(guildId) {
             const list = document.getElementById('my-messages-list');
+            hideFooter();
             list.innerHTML = `
                 <div class="skeleton" style="height:68px; opacity:0.8; margin-bottom:12px; border-radius:16px;"></div>
                 <div class="skeleton" style="height:68px; opacity:0.5; margin-bottom:12px; border-radius:16px;"></div>
@@ -541,11 +555,14 @@
                 }
             } catch (e) {
                 list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar tus mensajes.</div>';
+            } finally {
+                showFooter();
             }
         }
 
         // 3. CARGA DE CONFIGURACIÓN (SOLO ADMINS)
         async function loadGuildConfig(guildId) {
+            hideFooter();
             const selectChan = document.getElementById('cfg-channel-select');
             selectChan.innerHTML = '<option value="">Cargando canales…</option>';
             try {
@@ -596,6 +613,8 @@
                 }
             } catch (e) {
                 showToast('Error cargando ajustes', '✕');
+            } finally {
+                showFooter();
             }
         }
 
@@ -607,6 +626,7 @@
             document.getElementById('view-servers').style.display = 'block';
             window.scrollTo({ top: 0, behavior: 'smooth' });
             renderServersGrid(userGuilds);
+            showFooter();
         }
 
         function renderServersGrid(guildsToRender) {
@@ -732,6 +752,7 @@
             }
 
             // Cambiar vista
+            hideFooter();
             document.getElementById('view-loading').style.display = 'none';
             document.getElementById('view-servers').style.display = 'none';
             document.getElementById('view-dashboard').style.display = 'block';

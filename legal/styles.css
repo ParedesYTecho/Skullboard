@@ -2560,6 +2560,29 @@ input[type="range"]::-moz-range-thumb {
 /* ═══════════════════════════════════════════════════════════════════════════════
    🏛️ FOOTER MULTI-COLUMNA PROFESIONAL (ESTILO SAPPHIRE / MEE6)
    ═══════════════════════════════════════════════════════════════════════════════ */
+.dashboard-layout {
+    min-height: calc(100vh - 72px);
+    display: flex;
+    flex-direction: column;
+}
+
+.dashboard-layout > #view-loading {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 55vh;
+}
+
+.dashboard-layout > main {
+    flex: 1 0 auto;
+}
+
+.dashboard-layout .site-footer-v2 {
+    margin-top: auto;
+}
+
 .site-footer-v2 {
     margin-top: 80px;
     padding-top: 50px;
