@@ -136,8 +136,12 @@ def _fetch_discord_user(token: str):
         return None
     try:
         r = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {token}"}, timeout=6)
-        return r.json() if r.status_code == 200 else None
-    except Exception:
+        if r.status_code != 200:
+            logger.warning(f"⚠️ [OAuth @me] Discord API devolvió HTTP {r.status_code}: {r.text}")
+            return None
+        return r.json()
+    except Exception as e:
+        logger.error(f"❌ [OAuth @me] Error al consultar usuario: {e}")
         return None
 
 def _fetch_discord_guilds(token: str):
@@ -145,8 +149,12 @@ def _fetch_discord_guilds(token: str):
         return None
     try:
         r = requests.get("https://discord.com/api/v10/users/@me/guilds", headers={"Authorization": f"Bearer {token}"}, timeout=8)
-        return r.json() if r.status_code == 200 else None
-    except Exception:
+        if r.status_code != 200:
+            logger.warning(f"⚠️ [OAuth @me/guilds] Discord API devolvió HTTP {r.status_code}: {r.text}")
+            return None
+        return r.json()
+    except Exception as e:
+        logger.error(f"❌ [OAuth @me/guilds] Error al consultar servidores: {e}")
         return None
 
 @sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)

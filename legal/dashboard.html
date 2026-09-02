@@ -242,10 +242,14 @@
                         body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
                     });
                     const data = await res.json();
-                    if (data.ok && data.token) {
+                    if (res.ok && data.ok && data.token) {
                         sessionStorage.setItem('skb_auth_token', data.token);
+                    } else {
+                        sessionStorage.removeItem('skb_auth_token');
                     }
-                } catch (e) {}
+                } catch (e) {
+                    sessionStorage.removeItem('skb_auth_token');
+                }
                 window.history.replaceState(null, null, window.location.pathname);
             }
             return sessionStorage.getItem('skb_auth_token');
@@ -504,11 +508,23 @@
             }
 
             try {
+                // 1. Obtener perfil de usuario
                 const userRes = await fetch(`${API_BASE}/api/auth/me`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
+                
+                if (userRes.status === 401 || userRes.status === 403) {
+                    sessionStorage.removeItem('skb_auth_token');
+                    triggerDiscordAuth();
+                    return;
+                }
+
                 const userData = await userRes.json();
-                if (!userRes.ok || !userData.ok) throw new Error('Token expirado');
+                if (!userRes.ok || !userData.ok) {
+                    sessionStorage.removeItem('skb_auth_token');
+                    triggerDiscordAuth();
+                    return;
+                }
 
                 const user = userData.user;
                 const slot = document.getElementById('auth-nav-slot');
@@ -524,21 +540,42 @@
                 `;
                 document.getElementById('btn-logout').addEventListener('click', () => {
                     sessionStorage.removeItem('skb_auth_token');
-                    window.location.reload();
+                    triggerDiscordAuth();
                 });
 
+                // 2. Obtener servidores del usuario
                 const guildsRes = await fetch(`${API_BASE}/api/auth/guilds`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
                 });
+
+                if (guildsRes.status === 401 || guildsRes.status === 403) {
+                    // Token caducado o sin permisos de scope 'guilds': limpiar sesión y forzar re-login limpio
+                    sessionStorage.removeItem('skb_auth_token');
+                    triggerDiscordAuth();
+                    return;
+                }
+
                 const guildsData = await guildsRes.json();
+                if (!guildsRes.ok || !guildsData.ok) {
+                    sessionStorage.removeItem('skb_auth_token');
+                    triggerDiscordAuth();
+                    return;
+                }
+
                 userGuilds = guildsData.guilds || [];
 
                 if (userGuilds.length === 0) {
+                    const inviteBotUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands`;
                     document.getElementById('view-loading').innerHTML = `
-                        <div class="emblem">💀</div>
+                        <div class="emblem">🏰</div>
                         <h2 style="margin-top:16px;">No se encontraron servidores</h2>
-                        <p style="color:var(--ink-soft); max-width:400px; margin:8px auto 20px;">No formas parte de ningún servidor de Discord en esta cuenta.</p>
-                        <a href="/" class="btn btn-ghost btn-sm">Volver al inicio</a>
+                        <p style="color:var(--ink-soft); max-width:440px; margin:8px auto 20px;">
+                            No formas parte de ningún servidor de Discord en esta cuenta o necesitas invitar a SkullBoard a tu comunidad.
+                        </p>
+                        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                            <a href="${inviteBotUrl}" target="_blank" class="btn btn-primary btn-sm">+ Añadir Bot a un Servidor</a>
+                            <button onclick="sessionStorage.removeItem('skb_auth_token'); triggerDiscordAuth();" class="btn btn-ghost btn-sm">🔄 Reconectar con Discord</button>
+                        </div>
                     `;
                     return;
                 }
