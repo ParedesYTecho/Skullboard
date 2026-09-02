@@ -71,10 +71,6 @@
             <a href="#comandos" class="nav-link">Comandos</a>
             <a href="/cambios" class="nav-link">Cambios</a>
             <a href="/dashboard" class="nav-link" style="color:var(--violet-2); font-weight:700;">Panel Web</a>
-            <button type="button" class="status-pill open-status-modal" title="Estado de la infraestructura" style="padding:4px 10px; font-size:0.75rem;">
-                <span class="status-dot"></span>
-                <span class="status-pill-text">Status</span>
-            </button>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
                 <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
             </button>
@@ -470,10 +466,10 @@
                 <!-- Columna 1: Marca & Eslogan -->
                 <div class="footer-brand-col">
                     <a href="/" class="footer-brand-header">
-                        <span class="mark">💀</span> SkullBoard
+                        <span class="f-brand-mark">💀</span> SkullBoard
                     </a>
                     <p class="footer-slogan">
-                        A Discord Starboard Bot — Done Right.<br>
+                        A Discord Skullboard Bot — Done Right.<br>
                         Destaca los mejores momentos y mensajes de tu comunidad con elegancia y alta velocidad.
                     </p>
                     <div style="margin-top:4px;">
@@ -529,7 +525,7 @@
             <!-- Barra Inferior -->
             <div class="footer-bottom-bar">
                 <span>© 2024–2026 SkullBoard • No afiliado con Discord Inc.</span>
-                <span>Desarrollado con ❤️ por <strong>GlobalFerociouS</strong></span>
+                <span>Desarrollado por <strong>GlobalFerociouS</strong></span>
             </div>
         </footer>
     </div>
@@ -576,9 +572,6 @@
                     <div class="status-card-val" id="status-uptime-val">--</div>
                     <div class="status-card-sub">Uptime continuo de sesión</div>
                 </div>
-            </div>
-            <div style="margin-top:20px; text-align:right;">
-                <button type="button" id="btn-refresh-status" class="btn btn-ghost btn-sm">🔄 Actualizar estado</button>
             </div>
         </div>
     </div>
@@ -976,14 +969,19 @@
                 if (e.target === statusOverlay) statusOverlay.classList.remove('active');
             });
         }
-        const btnRefreshStatus = document.getElementById('btn-refresh-status');
-        if (btnRefreshStatus) {
-            btnRefreshStatus.addEventListener('click', () => {
-                btnRefreshStatus.textContent = 'Actualizando…';
-                fetchSystemStatus().finally(() => {
-                    setTimeout(() => btnRefreshStatus.textContent = '🔄 Actualizar estado', 500);
-                });
-            });
+        // Smart Sticky Navbar (Hide on scroll down, reveal on scroll up - Sapphire Style)
+        let lastScrollY = window.scrollY;
+        const mainNav = document.querySelector('.nav');
+        if (mainNav) {
+            window.addEventListener('scroll', () => {
+                const currentScrollY = window.scrollY;
+                if (currentScrollY > lastScrollY && currentScrollY > 60) {
+                    mainNav.classList.add('nav-hidden');
+                } else {
+                    mainNav.classList.remove('nav-hidden');
+                }
+                lastScrollY = Math.max(0, currentScrollY);
+            }, { passive: true });
         }
 
         fetchSystemStatus();

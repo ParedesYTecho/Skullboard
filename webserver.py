@@ -424,6 +424,8 @@ def api_guild_channels(guild_id: str):
                 ]
         except Exception:
             pass
+
+    return _cors(jsonify(ok=True, channels=channels))
             
 _cache_invalidator = None
 
@@ -659,11 +661,19 @@ def api_guild_leaderboard_public(guild_id: str):
         item["author_global_name"] = profile.get("global_name") or item["author_username"]
         item["author_avatar_url"] = profile.get("avatar_url")
 
-        sb_msg_id = item.get("skullboard_message_id")
-        if starboard_channel_id and sb_msg_id:
-            item["jump_url"] = f"https://discord.com/channels/{guild_id}/{starboard_channel_id}/{sb_msg_id}"
+        orig_chan = str(item.get("channel_id") or "")
+        orig_mid = str(item.get("message_id") or "")
+        sb_msg_id = str(item.get("skullboard_message_id") or "")
+
+        target_chan = orig_chan if orig_chan else starboard_channel_id
+        target_mid = orig_mid if orig_chan else sb_msg_id
+
+        if target_chan and target_mid:
+            item["jump_url"] = f"https://discord.com/channels/{guild_id}/{target_chan}/{target_mid}"
+            item["app_jump_url"] = f"discord://-/channels/{guild_id}/{target_chan}/{target_mid}"
         else:
             item["jump_url"] = None
+            item["app_jump_url"] = None
 
         enriched.append(item)
 
@@ -709,11 +719,20 @@ def api_guild_my_messages(guild_id: str):
     enriched_msgs = []
     for m in msgs:
         item = dict(m)
-        sb_msg_id = item.get("skullboard_message_id")
-        if starboard_channel_id and sb_msg_id:
-            item["jump_url"] = f"https://discord.com/channels/{guild_id}/{starboard_channel_id}/{sb_msg_id}"
+        orig_chan = str(item.get("channel_id") or "")
+        orig_mid = str(item.get("message_id") or "")
+        sb_msg_id = str(item.get("skullboard_message_id") or "")
+
+        target_chan = orig_chan if orig_chan else starboard_channel_id
+        target_mid = orig_mid if orig_chan else sb_msg_id
+
+        if target_chan and target_mid:
+            item["jump_url"] = f"https://discord.com/channels/{guild_id}/{target_chan}/{target_mid}"
+            item["app_jump_url"] = f"discord://-/channels/{guild_id}/{target_chan}/{target_mid}"
         else:
             item["jump_url"] = None
+            item["app_jump_url"] = None
+
         enriched_msgs.append(item)
 
     return _cors(jsonify(

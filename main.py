@@ -339,15 +339,18 @@ async def get_tracked_message(message_id: str) -> Optional[int]:
         logger.error(f"Error en get_tracked_message ({message_id}): {e}")
     return None
 
-async def set_tracked_message(message_id: str, skullboard_id: int, count: int, author_id: str, guild_id: str):
+async def set_tracked_message(message_id: str, skullboard_id: int, count: int, author_id: str, guild_id: str, channel_id: Optional[str] = None):
     try:
-        await db_upsert("tracked_messages", {
+        data = {
             "message_id":            str(message_id),
             "skullboard_message_id": skullboard_id,
             "skull_count":           count,
             "author_id":             str(author_id),
             "guild_id":              str(guild_id)
-        })
+        }
+        if channel_id:
+            data["channel_id"] = str(channel_id)
+        await db_upsert("tracked_messages", data)
         _guild_record_cache.pop(str(guild_id), None)  # Invalidate record cache
     except Exception as e:
         logger.error(f"Error en set_tracked_message ({message_id}): {e}")
@@ -895,7 +898,7 @@ async def _check(msg: discord.Message):
                         except Exception:
                             pass
                 return
-            await set_tracked_message(mid, sent.id, count, msg.author.id, gid)
+            await set_tracked_message(mid, sent.id, count, msg.author.id, gid, str(msg.channel.id))
             _guild_record_cache.pop(gid, None)
 
             # DM de notificación al autor

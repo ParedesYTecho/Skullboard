@@ -45,10 +45,6 @@
             <a href="/" class="nav-link">Inicio</a>
             <a href="/cambios" class="nav-link">Cambios</a>
             <a href="/dashboard" class="nav-link active">Panel</a>
-            <button type="button" class="status-pill open-status-modal" title="Estado de la infraestructura" style="padding:4px 10px; font-size:0.75rem;">
-                <span class="status-dot"></span>
-                <span class="status-pill-text">Status</span>
-            </button>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
                 <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
             </button>
@@ -139,17 +135,17 @@
                         </div>
                     </div>
                     <div class="stat-metric-card">
-                        <div class="stat-metric-icon">⭐</div>
+                        <div class="stat-metric-icon">💀</div>
                         <div>
                             <div id="my-total-messages" class="stat-metric-val">0</div>
-                            <div class="stat-metric-label">Mensajes en Starboard</div>
+                            <div class="stat-metric-label">Mensajes en Skullboard</div>
                         </div>
                     </div>
                 </div>
 
                 <div class="bento-card" style="padding:28px; border-radius:20px;">
                     <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:4px;">Tus Mensajes Destacados</h3>
-                    <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:20px;">Lista de tus publicaciones que alcanzaron el umbral de Starboard en este servidor.</p>
+                    <p style="color:var(--ink-soft); font-size:0.9rem; margin-bottom:20px;">Lista de tus publicaciones que alcanzaron el umbral de Skullboard en este servidor.</p>
 
                     <div id="my-messages-list" style="display:flex; flex-direction:column; gap:12px;">
                         <div style="text-align:center; padding:24px; color:var(--ink-soft);">Cargando tus mensajes…</div>
@@ -167,7 +163,7 @@
 
                     <form id="guild-config-form" style="display:flex; flex-direction:column; gap:20px;">
                         <div>
-                            <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Canal de Starboard:</label>
+                            <label style="display:block; font-weight:600; margin-bottom:8px; font-size:0.9rem;">Canal de Skullboard:</label>
                             <select id="cfg-channel-select" class="form-control-input" style="margin-bottom:8px;">
                                 <option value="">Cargando canales…</option>
                             </select>
@@ -179,7 +175,10 @@
                                 <label style="font-weight:600; font-size:0.9rem;">Umbral de Calaveras para destacar:</label>
                                 <span id="cfg-skulls-val" style="font-weight:800; color:var(--violet-2); font-size:1.1rem;">1 💀</span>
                             </div>
-                            <input type="range" id="cfg-skulls" min="1" max="50" value="1">
+                            <div class="cfg-num-row">
+                                <input type="range" id="cfg-skulls" min="1" max="50" value="1" style="flex:1;">
+                                <input type="number" id="cfg-skulls-num" min="1" max="50" value="1" class="cfg-number-input" title="Escribe el número">
+                            </div>
                         </div>
 
                         <div>
@@ -192,7 +191,10 @@
                                 <label style="font-weight:600; font-size:0.9rem;">Umbral de Auto-Pin (0 = Desactivado):</label>
                                 <span id="cfg-pin-val" style="font-weight:700;">Desactivado</span>
                             </div>
-                            <input type="range" id="cfg-pin" min="0" max="50" value="0">
+                            <div class="cfg-num-row">
+                                <input type="range" id="cfg-pin" min="0" max="50" value="0" style="flex:1;">
+                                <input type="number" id="cfg-pin-num" min="0" max="50" value="0" class="cfg-number-input" title="Escribe el número">
+                            </div>
                         </div>
 
                         <div style="margin-top:10px; display:flex; align-items:center; gap:16px;">
@@ -212,10 +214,10 @@
                 <!-- Columna 1: Marca & Eslogan -->
                 <div class="footer-brand-col">
                     <a href="/" class="footer-brand-header">
-                        <span class="mark">💀</span> SkullBoard
+                        <span class="f-brand-mark">💀</span> SkullBoard
                     </a>
                     <p class="footer-slogan">
-                        A Discord Starboard Bot — Done Right.<br>
+                        A Discord Skullboard Bot — Done Right.<br>
                         Destaca los mejores momentos y mensajes de tu comunidad con elegancia y alta velocidad.
                     </p>
                     <div style="margin-top:4px;">
@@ -271,7 +273,7 @@
             <!-- Barra Inferior -->
             <div class="footer-bottom-bar">
                 <span>© 2024–2026 SkullBoard • No afiliado con Discord Inc.</span>
-                <span>Desarrollado con ❤️ por <strong>GlobalFerociouS</strong></span>
+                <span>Desarrollado por <strong>GlobalFerociouS</strong></span>
             </div>
         </footer>
     </div>
@@ -318,9 +320,6 @@
                     <div class="status-card-val" id="status-uptime-val">--</div>
                     <div class="status-card-sub">Uptime continuo de sesión</div>
                 </div>
-            </div>
-            <div style="margin-top:20px; text-align:right;">
-                <button type="button" id="btn-refresh-status" class="btn btn-ghost btn-sm">🔄 Actualizar estado</button>
             </div>
         </div>
     </div>
@@ -451,7 +450,7 @@
                             : `<span class="lb-avatar-fallback">${authorName.charAt(0).toUpperCase()}</span>`;
 
                         const jumpBtnHtml = m.jump_url
-                            ? `<a href="${m.jump_url}" target="_blank" rel="noopener noreferrer" class="btn-jump-discord" title="Abrir mensaje en Discord">
+                            ? `<a href="${m.jump_url}" onclick="openDiscordJump(event, '${m.app_jump_url || ''}', '${m.jump_url}')" class="btn-jump-discord" title="Abrir mensaje en Discord">
                                 <span>Ver en Discord</span>
                                 <svg style="width:13px;height:13px;"><use href="#i-link"/></svg>
                                </a>`
@@ -504,8 +503,18 @@
                             row.className = 'lb-card';
                             row.style.animationDelay = `${Math.min(idx, 15) * 35}ms`;
 
+                            let dateStr = '';
+                            try {
+                                const ts = Number((BigInt(m.message_id) >> 22n) + 1420070400000n);
+                                const d = new Date(ts);
+                                dateStr = d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                            } catch (e) {
+                                dateStr = 'Fecha registrada';
+                            }
+                            const chanLabel = m.channel_id ? `#canal · ${dateStr}` : dateStr;
+
                             const jumpBtnHtml = m.jump_url
-                                ? `<a href="${m.jump_url}" target="_blank" rel="noopener noreferrer" class="btn-jump-discord" title="Abrir mensaje en Discord">
+                                ? `<a href="${m.jump_url}" onclick="openDiscordJump(event, '${m.app_jump_url || ''}', '${m.jump_url}')" class="btn-jump-discord" title="Abrir mensaje en Discord">
                                     <span>Ver en Discord</span>
                                     <svg style="width:13px;height:13px;"><use href="#i-link"/></svg>
                                    </a>`
@@ -513,10 +522,10 @@
 
                             row.innerHTML = `
                                 <div class="lb-card-left">
-                                    <div class="lb-medal rank-other">⭐</div>
+                                    <div class="my-msg-icon-skull" title="Destacado con calaveras">☠️</div>
                                     <div class="lb-user-details">
-                                        <span class="lb-user-name">Mensaje Destacado</span>
-                                        <span class="lb-user-handle">Registrado en el Starboard</span>
+                                        <span class="lb-user-name">${chanLabel}</span>
+                                        <span class="lb-user-handle">Destacado en Skullboard</span>
                                     </div>
                                 </div>
                                 <div class="lb-card-right">
@@ -571,11 +580,19 @@
                     if (chanId && selectChan.querySelector(`option[value="${chanId}"]`)) {
                         selectChan.value = chanId;
                     }
-                    document.getElementById('cfg-skulls').value = cfg.min_skulls || 1;
-                    document.getElementById('cfg-skulls-val').textContent = `${cfg.min_skulls || 1} 💀`;
+                    const skullsVal = cfg.min_skulls || 1;
+                    document.getElementById('cfg-skulls').value = skullsVal;
+                    const skullsNum = document.getElementById('cfg-skulls-num');
+                    if (skullsNum) skullsNum.value = skullsVal;
+                    document.getElementById('cfg-skulls-val').textContent = `${skullsVal} 💀`;
+
                     document.getElementById('cfg-prefix').value = cfg.prefix || 'sk!';
-                    document.getElementById('cfg-pin').value = cfg.pin_threshold || 0;
-                    document.getElementById('cfg-pin-val').textContent = (cfg.pin_threshold > 0) ? `${cfg.pin_threshold} 💀` : 'Desactivado';
+
+                    const pinVal = cfg.pin_threshold || 0;
+                    document.getElementById('cfg-pin').value = pinVal;
+                    const pinNum = document.getElementById('cfg-pin-num');
+                    if (pinNum) pinNum.value = pinVal;
+                    document.getElementById('cfg-pin-val').textContent = (pinVal > 0) ? `${pinVal} 💀` : 'Desactivado';
                 }
             } catch (e) {
                 showToast('Error cargando ajustes', '✕');
@@ -695,11 +712,13 @@
             document.getElementById('current-guild-name').textContent = guild.name;
 
             const badge = document.getElementById('current-guild-badge');
-            if (guild.has_bot) {
-                badge.innerHTML = '<span class="pill ok" style="font-size:0.75rem;">● Activo</span>';
-            } else {
-                const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${guild.id}&disable_guild_select=true`;
-                badge.innerHTML = `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 10px; font-size:0.75rem;">+ Invitar</a>`;
+            if (badge) {
+                if (!guild.has_bot) {
+                    const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${guild.id}&disable_guild_select=true`;
+                    badge.innerHTML = `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 10px; font-size:0.75rem;">+ Invitar</a>`;
+                } else {
+                    badge.innerHTML = '';
+                }
             }
 
             // Pestaña de ajustes según permisos de admin
@@ -910,14 +929,67 @@
                 if (e.target === statusOverlay) statusOverlay.classList.remove('active');
             });
         }
-        const btnRefreshStatus = document.getElementById('btn-refresh-status');
-        if (btnRefreshStatus) {
-            btnRefreshStatus.addEventListener('click', () => {
-                btnRefreshStatus.textContent = 'Actualizando…';
-                fetchSystemStatus().finally(() => {
-                    setTimeout(() => btnRefreshStatus.textContent = '🔄 Actualizar estado', 500);
-                });
+        // Función de salto nativo a Discord con fallback web
+        function openDiscordJump(e, appUrl, webUrl) {
+            e.preventDefault();
+            if (appUrl) {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = appUrl;
+                document.body.appendChild(iframe);
+                setTimeout(() => iframe.remove(), 800);
+            }
+            window.open(webUrl, '_blank', 'noopener,noreferrer');
+        }
+
+        // Sincronización bidireccional de sliders e inputs numéricos
+        const skullsRange = document.getElementById('cfg-skulls');
+        const skullsNum = document.getElementById('cfg-skulls-num');
+        const skullsVal = document.getElementById('cfg-skulls-val');
+        if (skullsRange && skullsNum) {
+            skullsRange.addEventListener('input', (e) => {
+                skullsNum.value = e.target.value;
+                skullsVal.textContent = `${e.target.value} 💀`;
             });
+            skullsNum.addEventListener('input', (e) => {
+                let v = parseInt(e.target.value) || 1;
+                if (v < 1) v = 1;
+                if (v > 50) v = 50;
+                skullsRange.value = v;
+                skullsVal.textContent = `${v} 💀`;
+            });
+        }
+
+        const pinRange = document.getElementById('cfg-pin');
+        const pinNum = document.getElementById('cfg-pin-num');
+        const pinVal = document.getElementById('cfg-pin-val');
+        if (pinRange && pinNum) {
+            pinRange.addEventListener('input', (e) => {
+                pinNum.value = e.target.value;
+                pinVal.textContent = (e.target.value > 0) ? `${e.target.value} 💀` : 'Desactivado';
+            });
+            pinNum.addEventListener('input', (e) => {
+                let v = parseInt(e.target.value);
+                if (isNaN(v) || v < 0) v = 0;
+                if (v > 50) v = 50;
+                pinRange.value = v;
+                pinVal.textContent = (v > 0) ? `${v} 💀` : 'Desactivado';
+            });
+        }
+
+        // Smart Sticky Navbar (Hide on scroll down, reveal on scroll up - Sapphire Style)
+        let lastScrollY = window.scrollY;
+        const mainNav = document.querySelector('.nav');
+        if (mainNav) {
+            window.addEventListener('scroll', () => {
+                const currentScrollY = window.scrollY;
+                if (currentScrollY > lastScrollY && currentScrollY > 60) {
+                    mainNav.classList.add('nav-hidden');
+                } else {
+                    mainNav.classList.remove('nav-hidden');
+                }
+                lastScrollY = Math.max(0, currentScrollY);
+            }, { passive: true });
         }
 
         fetchSystemStatus();

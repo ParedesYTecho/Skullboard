@@ -599,6 +599,84 @@ class TestSuite7_VisualAndStatusRenovation(unittest.TestCase):
         self.assertIn(".lb-card", self.styles_content, "styles.css must style .lb-card")
 
 
+# ─── Test Suite 8: Total Perfection (Navbar, Number Inputs, Channels Fix, Footer & Skull) ─
+class TestSuite8_TotalPerfection(unittest.TestCase):
+    """Verifies the v2.5.2 Total Perfection requirements:
+    - Smart Sticky Navbar and removal of status-pill from navbar
+    - Hybrid clean footer without 'con ❤️'
+    - Status modal without refresh button
+    - Number inputs for skulls and pin thresholds
+    - Eradication of 'Starboard' in dashboard metrics & skull ☠️ with snowflake dates
+    - api_guild_channels returning ok=True and channels
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.webserver_content = _get_file_content(os.path.join(ROOT_DIR, "webserver.py"))
+        cls.styles_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "styles.css"))
+        cls.pages = {
+            fname: _get_file_content(os.path.join(ROOT_DIR, "legal", fname))
+            for fname in ("dashboard.html", "index.html", "cambios.html", "terms.html", "privacy.html")
+        }
+
+    def test_channels_api_returns_ok_true(self):
+        """webserver.py api_guild_channels must return _cors(jsonify(ok=True, channels=channels))."""
+        self.assertRegex(
+            self.webserver_content,
+            r"return\s+_cors\(jsonify\(ok=True,\s*channels=channels\)\)",
+            "api_guild_channels must return ok=True with channels list to prevent 500 error."
+        )
+
+    def test_number_inputs_present_in_dashboard(self):
+        """dashboard.html must contain number inputs for skulls and pin thresholds."""
+        dash = self.pages["dashboard.html"]
+        self.assertIn('id="cfg-skulls-num"', dash, "dashboard.html must contain #cfg-skulls-num input")
+        self.assertIn('id="cfg-pin-num"', dash, "dashboard.html must contain #cfg-pin-num input")
+        self.assertIn('class="cfg-number-input"', dash, "dashboard.html must style number inputs with .cfg-number-input")
+
+    def test_navbar_no_status_pill(self):
+        """None of the 5 HTML pages should have .status-pill inside the <nav> element."""
+        for name, html in self.pages.items():
+            with self.subTest(page=name):
+                # Extraer bloque <nav> ... </nav>
+                nav_match = re.search(r"<nav[\s\S]*?</nav>", html)
+                self.assertIsNotNone(nav_match, f"{name} must have a <nav> block")
+                self.assertNotIn(
+                    "status-pill",
+                    nav_match.group(0),
+                    f"{name} has status-pill inside <nav>. Status indicator belongs strictly in footer."
+                )
+
+    def test_footer_no_heart_and_has_brand_mark(self):
+        """All 5 HTML pages must have f-brand-mark and no 'con ❤️'."""
+        for name, html in self.pages.items():
+            with self.subTest(page=name):
+                self.assertNotIn("Desarrollado con ❤️", html, f"{name} should not contain 'Desarrollado con ❤️'")
+                self.assertIn("Desarrollado por <strong>GlobalFerociouS</strong>", html, f"{name} must credit GlobalFerociouS")
+                self.assertIn("f-brand-mark", html, f"{name} must use .f-brand-mark for logo gradient")
+
+    def test_status_modal_no_refresh_button(self):
+        """None of the 5 HTML pages should have the 'btn-refresh-status' button."""
+        for name, html in self.pages.items():
+            with self.subTest(page=name):
+                self.assertNotIn("btn-refresh-status", html, f"{name} should not contain btn-refresh-status")
+
+    def test_dashboard_skullboard_metrics_and_skull_icon(self):
+        """dashboard.html must say 'Mensajes en Skullboard' and use .my-msg-icon-skull with ☠️."""
+        dash = self.pages["dashboard.html"]
+        self.assertIn("Mensajes en Skullboard", dash, "dashboard.html must say 'Mensajes en Skullboard'")
+        self.assertIn("Canal de Skullboard:", dash, "dashboard.html must say 'Canal de Skullboard:'")
+        self.assertIn("my-msg-icon-skull", dash, "dashboard.html must use .my-msg-icon-skull")
+        self.assertIn("☠️", dash, "dashboard.html must feature skull emoji ☠️")
+
+    def test_smart_sticky_navbar_behavior_in_scripts_and_css(self):
+        """All 5 HTML pages and styles.css must implement the Smart Sticky Navbar (nav-hidden)."""
+        self.assertIn(".nav.nav-hidden", self.styles_content, "styles.css must define .nav.nav-hidden")
+        for name, html in self.pages.items():
+            with self.subTest(page=name):
+                self.assertIn("nav-hidden", html, f"{name} must toggle 'nav-hidden' on scroll")
+
+
 # ─── Custom Test Result Handler for Clean Presentation ────────────────────────
 class SafeguardTestResult(unittest.TestResult):
     def __init__(self):
@@ -640,6 +718,7 @@ def run_safeguards():
         ("Suite 5: Frontend Sliders (max=50) & Clean Absolute URLs (R2)", TestSuite5_FrontendSlidersAndCleanUrls),
         ("Suite 6: System Context Documentation Synchronization (R3)", TestSuite6_DocumentationSync),
         ("Suite 7: Visual & Status Renovation (Sapphire Footer, Status API & Jump URLs)", TestSuite7_VisualAndStatusRenovation),
+        ("Suite 8: Total Perfection (Smart Navbar, Number Inputs, Channels Fix & Skull ☠️)", TestSuite8_TotalPerfection),
     ]
 
     total_tests = 0
