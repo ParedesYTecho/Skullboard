@@ -3,6 +3,7 @@ import discord
 import logging
 import os
 import re
+import traceback
 import webserver
 import asyncio
 import random
@@ -834,7 +835,13 @@ async def _check(msg: discord.Message):
                 if now - _perm_failover_cooldown.get(gid, 0) > 3600:
                     _perm_failover_cooldown[gid] = now
                     logger.warning(f"⚠️ [Perm Failover] Sin permisos para enviar en canal {cfg['skullboard_channel_id']} ({msg.guild.name})")
-                    if msg.guild.owner:
+                    owner = msg.guild.owner
+                    if not owner and msg.guild.owner_id:
+                        try:
+                            owner = await bot.fetch_user(msg.guild.owner_id)
+                        except Exception:
+                            owner = None
+                    if owner:
                         try:
                             owner_embed = discord.Embed(
                                 title="⚠️ [SkullBoard] Faltan permisos en tu canal de Starboard",
@@ -846,7 +853,7 @@ async def _check(msg: discord.Message):
                                 color=0xf59e0b
                             )
                             owner_embed.set_footer(text="Auto-Diagnóstico Defensivo · SkullBoard v2.5.0")
-                            await msg.guild.owner.send(embed=owner_embed)
+                            await owner.send(embed=owner_embed)
                         except Exception:
                             pass
                 return
@@ -2016,7 +2023,12 @@ async def serverinfo_cmd(ctx, guild_id: int = None):
         logger.error(f"Error en serverinfo_cmd para guild {gid}: {e}")
         msg_count = 0
 
-    owner   = guild.owner
+    owner = guild.owner
+    if not owner and guild.owner_id:
+        try:
+            owner = await bot.fetch_user(guild.owner_id)
+        except Exception:
+            owner = None
     created = guild.created_at.strftime("%d/%m/%Y")
 
     embed = discord.Embed(title=guild.name, color=0xfaa61a)
@@ -2154,25 +2166,23 @@ async def _stats_embed(guild: discord.Guild, member: discord.Member) -> discord.
     gid = str(guild.id)
     uid = str(member.id)
     try:
-        resp = await supabase.table("tracked_messages") \
-            .select("skull_count,skullboard_message_id") \
-            .eq("guild_id", gid).eq("author_id", uid).execute()
+        resp = await supabase.rpc("get_guild_user_stats", {"p_guild_id": gid, "p_author_id": uid}).execute()
     except Exception as e:
-        logger.error(f"Error en stats para {uid} en guild {gid}: {e}")
+        logger.error(f"Error en RPC get_guild_user_stats para {uid} en guild {gid}: {e}")
         return discord.Embed(title="❌ Error", description="No se pudieron obtener las estadísticas.", color=0xed4245)
 
-    if not resp.data:
+    if not resp.data or resp.data[0].get("total_messages", 0) == 0:
         return discord.Embed(
             title=f"📊 Stats de {member.display_name}",
             description="Este usuario no tiene ningún mensaje en el skullboard.",
             color=0x4e5058
         )
 
-    total_msgs   = len(resp.data)
-    total_skulls = sum(r.get("skull_count") or 0 for r in resp.data)
-    best_row     = max(resp.data, key=lambda r: r.get("skull_count") or 0)
-    best_count   = best_row.get("skull_count") or 0
-    best_sb_id   = best_row.get("skullboard_message_id")
+    stats        = resp.data[0]
+    total_msgs   = stats.get("total_messages") or 0
+    total_skulls = stats.get("total_skulls") or 0
+    best_count   = stats.get("record_count") or 0
+    best_sb_id   = stats.get("best_skullboard_message_id")
     cfg          = await get_guild_config(guild.id)
     link         = None
     if best_sb_id and cfg.get("skullboard_channel_id"):
@@ -2417,6 +2427,20 @@ async def reset_slash(interaction: discord.Interaction):
     view = ConfirmResetView()
     await interaction.response.send_message(embed=embed_warn, view=view, ephemeral=True)
 
+# ─── Eventos de Sharding y Conectividad ────────────────────────────────────────
+@bot.event
+async def on_shard_disconnect(shard_id: int):
+    logger.warning(f"⚠️ Shard #{shard_id} desconectado de la Gateway")
+    await send_system_alert(
+        title=f"Shard #{shard_id} Desconectado",
+        description=f"El shard #{shard_id} ha perdido conexión con la Gateway de Discord.",
+        level="WARNING",
+        extra_fields=[
+            {"name": "Shard ID", "value": str(shard_id), "inline": True},
+            {"name": "Total Shards", "value": str(bot.shard_count or "Desconocido"), "inline": True}
+        ]
+    )
+
 # ─── Manejo de errores global ─────────────────────────────────────────────────
 @bot.event
 async def on_command_error(ctx, error):
@@ -2437,6 +2461,20 @@ async def on_command_error(ctx, error):
         except: pass
         return
     logger.error(f"Error en comando de texto: {error}", exc_info=error)
+    try:
+        tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    except Exception:
+        tb = str(error)
+    await send_system_alert(
+        title=f"Error en comando: `{ctx.command}`",
+        description=f"```{tb[:1900]}```",
+        level="ERROR",
+        extra_fields=[
+            {"name": "Servidor", "value": f"{ctx.guild.name} (`{ctx.guild.id}`)" if ctx.guild else "DM", "inline": True},
+            {"name": "Canal", "value": f"{ctx.channel.name} (`{ctx.channel.id}`)" if hasattr(ctx.channel, "name") else "DM", "inline": True},
+            {"name": "Autor", "value": f"{ctx.author} (`{ctx.author.id}`)", "inline": True}
+        ]
+    )
 
 @tree.error
 async def on_app_command_error(interaction: discord.Interaction, error: app_commands.AppCommandError):
@@ -2455,6 +2493,20 @@ async def on_app_command_error(interaction: discord.Interaction, error: app_comm
     except Exception:
         pass
     logger.error(f"Error en slash command: {error}", exc_info=error)
+    cmd_name = interaction.command.name if interaction.command else "desconocido"
+    try:
+        tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    except Exception:
+        tb = str(error)
+    await send_system_alert(
+        title=f"Error en Slash Command: `/{cmd_name}`",
+        description=f"```{tb[:1900]}```",
+        level="ERROR",
+        extra_fields=[
+            {"name": "Servidor", "value": f"{interaction.guild.name} (`{interaction.guild.id}`)" if interaction.guild else "DM", "inline": True},
+            {"name": "Usuario", "value": f"{interaction.user} (`{interaction.user.id}`)", "inline": True}
+        ]
+    )
 
 # ─── Ejecución Resiliente con Protección contra 429 / Cloudflare ────────────
 def _reset_bot_session():

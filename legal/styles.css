@@ -2122,8 +2122,9 @@ input[type="range"]::-moz-range-thumb {
     border-color: var(--border-strong);
 }
 
-/* ====== Guild Switcher & Metric Cards (Werewolf / Modern UI) ====== */
+/* ====== Guild Switcher & Metric Cards (Werewolf / Modern UI & Shimmer Beam) ====== */
 .guild-switcher-bar {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -2135,6 +2136,30 @@ input[type="range"]::-moz-range-thumb {
     border-radius: 18px;
     margin-bottom: 24px;
     backdrop-filter: blur(12px);
+    overflow: hidden;
+}
+
+/* Shimmer Border Beam sutil y elegante */
+.guild-switcher-bar::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1.5px;
+    background: linear-gradient(90deg, transparent 0%, var(--violet-2) 50%, transparent 100%);
+    background-size: 200% 100%;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: border-beam-sweep 5s linear infinite;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+@keyframes border-beam-sweep {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 .guild-picker-control {
@@ -2145,11 +2170,12 @@ input[type="range"]::-moz-range-thumb {
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 6px 14px 6px 8px;
-    transition: border-color .2s ease;
+    transition: border-color .2s ease, box-shadow .2s ease;
 }
 
 .guild-picker-control:hover {
     border-color: var(--violet-2);
+    box-shadow: 0 0 14px var(--glow);
 }
 
 .guild-picker-select {
@@ -2177,6 +2203,7 @@ input[type="range"]::-moz-range-thumb {
 }
 
 .stat-metric-card {
+    position: relative;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 18px;
@@ -2184,12 +2211,31 @@ input[type="range"]::-moz-range-thumb {
     display: flex;
     align-items: center;
     gap: 18px;
-    transition: transform .2s ease, border-color .2s ease;
+    overflow: hidden;
+    transition: transform .25s cubic-bezier(0.16, 1, 0.3, 1), border-color .2s ease, box-shadow .2s ease;
 }
 
 .stat-metric-card:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
     border-color: var(--border-strong);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15), 0 0 20px var(--glow);
+}
+
+.stat-metric-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -120%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+    transform: skewX(-20deg);
+    pointer-events: none;
+}
+
+.stat-metric-card:hover::after {
+    left: 200%;
+    transition: left 0.75s ease-in-out;
 }
 
 .stat-metric-icon {
@@ -2220,8 +2266,49 @@ input[type="range"]::-moz-range-thumb {
     margin-top: 2px;
 }
 
+/* Staggered Cascade Entrance para elementos de Leaderboard */
+.lb-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    animation: item-cascade 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+    transition: transform .2s cubic-bezier(0.16, 1, 0.3, 1), border-color .2s ease, background .2s ease;
+}
+
 .lb-item:hover {
     border-color: var(--border-strong);
-    transform: translateX(3px);
+    background: var(--surface-2);
+    transform: translateX(4px);
 }
+
+@keyframes item-cascade {
+    0% {
+        opacity: 0;
+        transform: translateY(12px) scale(0.98);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.server-tab-panel {
+    animation: tab-fade-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes tab-fade-in {
+    0% {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 

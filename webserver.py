@@ -8,6 +8,8 @@ import secrets
 import time
 import re
 import html
+import random
+import functools
 
 # ─── Serialización y Métricas de Rendimiento ─────────────────────────────────
 try:
@@ -70,6 +72,33 @@ _oauth_states: OrderedDict[str, float] = OrderedDict()
 _OAUTH_STATE_TTL = 600
 _MAX_OAUTH_STATES = 1000
 
+# ─── PostgREST Resilience Retry Engine ─────────────────────────────────────────
+def sync_db_retry(max_retries: int = 3, base_delay: float = 0.3, max_delay: float = 2.0):
+    """Reintenta automáticamente llamadas síncronas PostgREST ante fallos temporales."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            delay = base_delay
+            last_exc = None
+            for attempt in range(1, max_retries + 1):
+                try:
+                    return func(*args, **kwargs)
+                except Exception as e:
+                    last_exc = e
+                    if attempt == max_retries:
+                        print(f"[ERROR] [Sync DB Retry] Fallo tras {max_retries} intentos ({func.__name__}): {e}")
+                        raise
+                    jitter = random.uniform(0.8, 1.2)
+                    sleep_time = min(delay * jitter, max_delay)
+                    print(f"[WARN] [Sync DB Retry] Intento {attempt}/{max_retries} en {func.__name__} fallo: {e}. Reintentando en {sleep_time:.2f}s...")
+                    time.sleep(sleep_time)
+                    delay *= 2
+            if last_exc:
+                raise last_exc
+        return wrapper
+    return decorator
+
+@sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 def _sb_count(table: str):
     """Cuenta filas de una tabla vía REST (Content-Range), sin traer datos."""
     if not (SUPABASE_URL and SUPABASE_KEY):
@@ -81,8 +110,12 @@ def _sb_count(table: str):
                      "Prefer": "count=exact", "Range": "0-0"},
             params={"select": "guild_id"}, timeout=6,
         )
+        if r.status_code >= 500:
+            r.raise_for_status()
         total = r.headers.get("Content-Range", "").split("/")[-1]
         return int(total) if total.isdigit() else None
+    except (requests.RequestException, TimeoutError) as e:
+        raise e
     except Exception:
         return None
 
@@ -116,6 +149,7 @@ def _fetch_discord_guilds(token: str):
     except Exception:
         return None
 
+@sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 def _sb_select(table: str, params: dict):
     if not (SUPABASE_URL and SUPABASE_KEY):
         return []
@@ -125,10 +159,15 @@ def _sb_select(table: str, params: dict):
             headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
             params=params, timeout=6
         )
+        if r.status_code >= 500:
+            r.raise_for_status()
         return r.json() if r.status_code == 200 else []
+    except (requests.RequestException, TimeoutError) as e:
+        raise e
     except Exception:
         return []
 
+@sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 def _sb_upsert(table: str, data: dict):
     if not (SUPABASE_URL and SUPABASE_KEY):
         return False
@@ -143,9 +182,35 @@ def _sb_upsert(table: str, data: dict):
             },
             json=data, timeout=6
         )
+        if r.status_code >= 500:
+            r.raise_for_status()
         return r.status_code in (200, 201, 204)
+    except (requests.RequestException, TimeoutError) as e:
+        raise e
     except Exception:
         return False
+
+@sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
+def _sb_rpc(function_name: str, payload: dict):
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        return []
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/rpc/{function_name}",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json"
+            },
+            json=payload, timeout=6
+        )
+        if r.status_code >= 500:
+            r.raise_for_status()
+        return r.json() if r.status_code == 200 else []
+    except (requests.RequestException, TimeoutError) as e:
+        raise e
+    except Exception:
+        return []
 
 def _get_real_ip() -> str:
     cf_ip = request.headers.get("CF-Connecting-IP")
@@ -219,8 +284,8 @@ def api_health():
     return resp
 
 def _is_guild_authorized(perms_int: int, is_owner: bool) -> bool:
-    """Valida permisos estilo Sapphire/Werewolf: ADMINISTRATOR (0x8), MANAGE_GUILD (0x20) o OWNER."""
-    return bool(perms_int & 0x8) or bool(perms_int & 0x20) or bool(is_owner)
+    """Valida permisos estrictos: ADMINISTRATOR (0x8) o OWNER del servidor."""
+    return bool(perms_int & 0x8) or bool(is_owner)
 
 # ─── Dashboard API Endpoints (Discord OAuth2 Secured) ────────────────────────
 @app.route('/api/auth/token', methods=["POST", "OPTIONS"])
@@ -297,12 +362,8 @@ def api_auth_guilds():
     if user_guilds and SUPABASE_URL and SUPABASE_KEY:
         gids = [g["id"] for g in user_guilds]
         try:
-            r = requests.get(
-                f"{SUPABASE_URL}/rest/v1/settings",
-                headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
-                params={"guild_id": f"in.({','.join(gids)})"}, timeout=6
-            )
-            settings_map = {str(s["guild_id"]): s for s in (r.json() if r.status_code == 200 else [])}
+            rows = _sb_select("settings", {"guild_id": f"in.({','.join(gids)})"})
+            settings_map = {str(s["guild_id"]): s for s in (rows or [])}
             for g in user_guilds:
                 g["config"] = settings_map.get(g["id"])
                 g["has_bot"] = g["id"] in settings_map
@@ -387,17 +448,18 @@ def api_guild_config(guild_id: str):
             return _cors(jsonify(ok=True, config=payload))
         return _cors(jsonify(ok=False, error="Error al guardar configuración")), 500
 
-@app.route('/api/leaderboard/global', methods=["GET", "OPTIONS"])
-def api_leaderboard_global():
-    """Devuelve los mensajes con más calaveras a nivel global de forma pública."""
-    if request.method == "OPTIONS":
-        return _cors(app.response_class(status=204))
-    
-    msgs = _sb_select("tracked_messages", {
-        "order": "skull_count.desc",
-        "limit": 20
-    })
-    return _cors(jsonify(ok=True, messages=msgs))
+# [v2.5.0 Spec] Ruta global desactivada temporalmente (desacople de UI y privacidad)
+# @app.route('/api/leaderboard/global', methods=["GET", "OPTIONS"])
+# def api_leaderboard_global():
+#     """Devuelve los mensajes con más calaveras a nivel global de forma pública."""
+#     if request.method == "OPTIONS":
+#         return _cors(app.response_class(status=204))
+#     
+#     msgs = _sb_select("tracked_messages", {
+#         "order": "skull_count.desc",
+#         "limit": 20
+#     })
+#     return _cors(jsonify(ok=True, messages=msgs))
 
 @app.route('/api/guild/<guild_id>/leaderboard/public', methods=["GET", "OPTIONS"])
 def api_guild_leaderboard_public(guild_id: str):
@@ -412,22 +474,23 @@ def api_guild_leaderboard_public(guild_id: str):
     })
     return _cors(jsonify(ok=True, messages=msgs))
 
-@app.route('/api/guild/<guild_id>/leaderboard', methods=["GET", "OPTIONS"])
-def api_guild_leaderboard(guild_id: str):
-    if request.method == "OPTIONS":
-        return _cors(app.response_class(status=204))
-
-    token = _extract_bearer(request)
-    guilds = _fetch_discord_guilds(token)
-    if guilds is None:
-        return _cors(jsonify(ok=False, error="No autorizado")), 401
-
-    msgs = _sb_select("tracked_messages", {
-        "guild_id": f"eq.{guild_id}",
-        "order": "skull_count.desc",
-        "limit": 50
-    })
-    return _cors(jsonify(ok=True, messages=msgs))
+# [v2.5.0 Spec] Ruta duplicada desactivada (la UI utiliza /api/guild/<guild_id>/leaderboard/public)
+# @app.route('/api/guild/<guild_id>/leaderboard', methods=["GET", "OPTIONS"])
+# def api_guild_leaderboard(guild_id: str):
+#     if request.method == "OPTIONS":
+#         return _cors(app.response_class(status=204))
+# 
+#     token = _extract_bearer(request)
+#     guilds = _fetch_discord_guilds(token)
+#     if guilds is None:
+#         return _cors(jsonify(ok=False, error="No autorizado")), 401
+# 
+#     msgs = _sb_select("tracked_messages", {
+#         "guild_id": f"eq.{guild_id}",
+#         "order": "skull_count.desc",
+#         "limit": 50
+#     })
+#     return _cors(jsonify(ok=True, messages=msgs))
 
 @app.route('/api/guild/<guild_id>/my-messages', methods=["GET", "OPTIONS"])
 def api_guild_my_messages(guild_id: str):
@@ -441,18 +504,27 @@ def api_guild_my_messages(guild_id: str):
         return _cors(jsonify(ok=False, error="No autorizado")), 401
 
     user_id = str(user.get("id"))
-    msgs = _sb_select("tracked_messages", {
-        "guild_id": f"eq.{guild_id}",
-        "author_id": f"eq.{user_id}",
-        "order": "skull_count.desc",
-        "limit": 50
-    })
 
-    total_skulls = sum(int(m.get("skull_count", 0)) for m in (msgs or []))
+    try:
+        stats_res = _sb_rpc("get_guild_user_stats", {"p_guild_id": str(guild_id), "p_author_id": user_id})
+        stats = stats_res[0] if (isinstance(stats_res, list) and stats_res) else {"total_messages": 0, "total_skulls": 0}
+    except Exception:
+        stats = {"total_messages": 0, "total_skulls": 0}
+
+    try:
+        msgs = _sb_select("tracked_messages", {
+            "guild_id": f"eq.{guild_id}",
+            "author_id": f"eq.{user_id}",
+            "order": "skull_count.desc",
+            "limit": 50
+        })
+    except Exception:
+        msgs = []
+
     return _cors(jsonify(
         ok=True,
-        total_skulls=total_skulls,
-        total_messages=len(msgs) if msgs else 0,
+        total_skulls=int(stats.get("total_skulls") or 0),
+        total_messages=int(stats.get("total_messages") or 0),
         messages=msgs or []
     ))
 

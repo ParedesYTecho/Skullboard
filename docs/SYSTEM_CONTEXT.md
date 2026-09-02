@@ -64,7 +64,7 @@ graph TD
     subgraph Render_PaaS["Backend Host (Render Cloud)"]
         subgraph Python_Process["Proceso Python Único"]
             subgraph Main_Thread["Hilo Principal: Asyncio Event Loop"]
-                Bot["SkullBot (discord.ext.commands.Bot)"]
+                Bot["SkullBot (discord.ext.commands.AutoShardedBot)"]
                 Tree["GuildOnlyTree (Slash Commands)"]
                 Debouncer["MessageDebouncer (Generacional 2.0s)"]
                 MsgLocks["KeyedAsyncLock (_check_locks / _resync_locks)"]
@@ -275,11 +275,21 @@ erDiagram
 | Endpoint | Método | Autenticación / Rate Limit | Descripción / Respuesta |
 | :--- | :---: | :--- | :--- |
 | `/` | `GET` | Público | Sirve `legal/index.html` con soporte para temas y assets. |
-| `/<filename>` | `GET` | Público | Enrutador estático con Clean URLs y redirección 301 para `.html`. |
-| `/api/stats` | `GET` | Público (Cache 60s) | Retorna `{"servers": int, "highlighted": int}` para la dashboard. |
-| `/api/contact` | `POST` | 1 req / 30s por IP (LRU)<br>10 req / min global | Recibe formulario de contacto, sanitiza CRLF/XSS y despacha vía Resend. |
-| `/verify` | `GET` | Discord OAuth2 | Inicia el flujo de verificación de rol con token anti-CSRF (`state`). |
-| `/callback` | `GET` | Validación de State TTL | Finaliza OAuth2 y asigna el Linked Role (`is_owner`) en Discord. |
+| `/<path:filename>` | `GET` | Público | Enrutador estático con Clean URLs y redirección 301 permanente para `.html`. |
+| `/api/stats` | `GET` | Público (Cache 60s) | Retorna `{"servers": int, "highlighted": int, "commands": int}` para landing y dashboard. |
+| `/api/health` | `GET` | Público | Chequeo de salud del servicio con uptime en segundos y memoria RSS en MB. |
+| `/api/contact` | `POST` | 1 req / 30s por IP (LRU)<br>10 req / min global | Recibe formulario de contacto, sanitiza CRLF/XSS y despacha email vía Resend. |
+| `/verify` | `GET` | Discord OAuth2 | Inicia el flujo de verificación de rol (`identify`, `role_connections.write`) con `state` anti-CSRF. |
+| `/callback` | `GET` | Validación de State TTL | Finaliza OAuth2 de Linked Role y asigna la metadata `is_owner` si el ID coincide con `BOT_OWNER_ID`. |
+| `/api/auth/token` | `POST` | Público | Intercambia el Authorization Code de Discord OAuth2 por un Access Token seguro (`client_secret`). |
+| `/api/auth/me` | `GET` | Bearer Token | Retorna el objeto de usuario de Discord (`/users/@me`) autenticado. |
+| `/api/auth/guilds` | `GET` | Bearer Token | Retorna servidores del usuario con bandera `is_admin` (`0x8`) y estado de SkullBoard (`has_bot`, `config`). |
+| `/api/guild/<guild_id>/channels` | `GET` | Bearer Token (Admin `0x8`) | Lista canales de texto (tipo 0) y anuncios (tipo 5) del servidor para el selector de configuración. |
+| `/api/guild/<guild_id>/config` | `GET`, `POST` | Bearer Token (Admin `0x8`) | `GET`: Consulta configuración del servidor.<br>`POST`: Guarda `min_skulls`, `prefix`, `channel_id`, `pin_threshold`. |
+| `/api/guild/<guild_id>/leaderboard/public` | `GET` | Público | Retorna los 25 mensajes con más calaveras de un servidor sin requerir login. |
+| `/api/guild/<guild_id>/leaderboard` | `GET` | Bearer Token | Retorna los 50 mensajes con más calaveras para miembros autenticados del servidor. |
+| `/api/guild/<guild_id>/my-messages` | `GET` | Bearer Token | Retorna mensajes destacados del usuario autenticado con conteos exactos de BD. |
+| `/api/og` | `GET` | Público (Cache 120s) | Genera dinámicamente la tarjeta vectorial SVG OpenGraph con métricas en vivo. |
 
 ---
 
@@ -304,9 +314,12 @@ erDiagram
 | :--- | :--- | :--- |
 | `DISCORD_TOKEN` | Render / Local | Token secreto del bot de Discord para autenticación en Gateway y REST API. |
 | `SUPABASE_URL` | Render / Local | URL del proyecto Supabase (ej. `https://tjmcclgyirqjatezkqgr.supabase.co`). |
-| `SUPABASE_KEY` | Render / Local | API Key de servicio de Supabase (Service Role / Anon). |
-| `APPLICATION_ID` | Render / Local | ID de la aplicación de Discord (`1367463352774955059`). |
-| `DISCORD_CLIENT_SECRET`| Render / Local | Secreto OAuth2 para el intercambio de tokens en Linked Roles. |
+| `SUPABASE_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Render / Local | API Key de servicio de Supabase (Service Role / Anon). |
+| `APPLICATION_ID` / `DISCORD_APPLICATION_ID` | Render / Local | ID de la aplicación de Discord (`1367463352774955059`). |
+| `DISCORD_CLIENT_SECRET`| Render / Local | Secreto OAuth2 para el intercambio de tokens en el Dashboard y Linked Roles. |
+| `DISCORD_REDIRECT_URI` | Render / Local | URI de redirección OAuth2 para Linked Roles (ej. `https://skullboard-fqf1.onrender.com/callback`). |
+| `DISCORD_ALERTS_WEBHOOK_URL` | Render / Local | URL del webhook de Discord para observabilidad, errores críticos (`send_system_alert`) y desconexiones de shards. |
+| `BOT_OWNER_ID` | Render / Local | Snowflake ID del propietario (`561225979389804544`) para control de acceso, comandos de administración y verificación de roles. |
 | `RESEND_API_KEY` | Render / Local | Clave de API de Resend para el despacho de correos en `/api/contact`. |
 | `PORT` | Render / Local | Puerto TCP para el servidor web Flask (por defecto `8080`). |
 

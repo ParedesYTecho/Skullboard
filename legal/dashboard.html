@@ -42,8 +42,8 @@
         <a class="brand" href="/" aria-label="SkullBoard Inicio"><span class="mark">💀</span> SkullBoard</a>
         <div class="nav-links">
             <a href="/" class="nav-link">Inicio</a>
-            <a href="cambios" class="nav-link">Cambios</a>
-            <a href="dashboard" class="nav-link active">Panel</a>
+            <a href="/cambios" class="nav-link">Cambios</a>
+            <a href="/dashboard" class="nav-link active">Panel</a>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
                 <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
             </button>
@@ -155,7 +155,7 @@
                                 <label style="font-weight:600; font-size:0.9rem;">Umbral de Calaveras para destacar:</label>
                                 <span id="cfg-skulls-val" style="font-weight:800; color:var(--violet-2); font-size:1.1rem;">1 💀</span>
                             </div>
-                            <input type="range" id="cfg-skulls" min="1" max="20" value="1">
+                            <input type="range" id="cfg-skulls" min="1" max="50" value="1">
                         </div>
 
                         <div>
@@ -168,7 +168,7 @@
                                 <label style="font-weight:600; font-size:0.9rem;">Umbral de Auto-Pin (0 = Desactivado):</label>
                                 <span id="cfg-pin-val" style="font-weight:700;">Desactivado</span>
                             </div>
-                            <input type="range" id="cfg-pin" min="0" max="25" value="0">
+                            <input type="range" id="cfg-pin" min="0" max="50" value="0">
                         </div>
 
                         <div style="margin-top:10px; display:flex; align-items:center; gap:16px;">
@@ -184,7 +184,7 @@
 
         <!-- Footer -->
         <footer style="margin-top:60px; padding:30px 0; border-top:1px solid var(--border); text-align:center; color:var(--ink-dim); font-size:0.85rem;">
-            SkullBoard v2.5.0 · <a href="/" style="color:var(--ink);">Inicio</a> · <a href="cambios" style="color:var(--ink);">Historial de Cambios</a>
+            SkullBoard v2.5.0 · <a href="/" style="color:var(--ink);">Inicio</a> · <a href="/cambios" style="color:var(--ink);">Historial de Cambios</a>
         </footer>
     </div>
 
@@ -293,6 +293,7 @@
                     data.messages.forEach((m, idx) => {
                         const row = document.createElement('div');
                         row.className = 'lb-item';
+                        row.style.animationDelay = `${Math.min(idx, 15) * 35}ms`;
                         const medal = medals[idx] || `#${idx + 1}`;
                         row.innerHTML = `
                             <div style="display:flex; align-items:center; gap:14px;">
@@ -331,9 +332,10 @@
 
                     if (data.messages && data.messages.length > 0) {
                         list.innerHTML = '';
-                        data.messages.forEach(m => {
+                        data.messages.forEach((m, idx) => {
                             const row = document.createElement('div');
                             row.className = 'lb-item';
+                            row.style.animationDelay = `${Math.min(idx, 15) * 35}ms`;
                             row.innerHTML = `
                                 <div style="display:flex; align-items:center; gap:14px;">
                                     <span style="font-size:1.2rem;">⭐</span>

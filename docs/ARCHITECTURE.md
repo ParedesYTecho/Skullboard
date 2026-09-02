@@ -22,7 +22,7 @@ flowchart TD
 
     subgraph SkullBoard_Process["Proceso Python (Single Process)"]
         subgraph Async_Loop["Asyncio Loop (Main Thread)"]
-            Bot["SkullBot (discord.ext.commands.Bot)"]
+            Bot["SkullBot (discord.ext.commands.AutoShardedBot)"]
             Tree["GuildOnlyTree (app_commands.CommandTree)"]
             
             subgraph Concurrency_Control["Mecanismos de Concurrencia"]
