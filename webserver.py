@@ -11,6 +11,9 @@ import html
 import random
 import functools
 import hashlib
+import logging
+
+logger = logging.getLogger("skullboard.webserver")
 
 # ─── Serialización y Métricas de Rendimiento ─────────────────────────────────
 try:
@@ -125,6 +128,13 @@ def _cors(resp):
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return resp
+
+@app.after_request
+def after_request_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    return response
 
 def _extract_bearer(req) -> str:
     auth = req.headers.get("Authorization", "")
