@@ -3135,12 +3135,13 @@ input[type="number"] {
     appearance: textfield !important;
 }
 
-/* Gradiente oficial en autor del footer */
+/* Gradiente oficial en autor del footer (Blanco luminoso) */
 .gradient-author {
-    background: linear-gradient(135deg, #a78bfa 0%, #ec4899 50%, #38bdf8 100%);
+    background: linear-gradient(180deg, #ffffff 0%, #e2e8f0 70%, #94a3b8 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     font-weight: 800;
+    text-shadow: 0 0 14px rgba(255, 255, 255, 0.4);
 }
 
 /* ====== Sapphire-style User Profile Trigger & Dropdown ====== */

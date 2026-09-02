@@ -10,6 +10,7 @@ import re
 import html
 import random
 import functools
+import hashlib
 
 # ─── Serialización y Métricas de Rendimiento ─────────────────────────────────
 try:
@@ -131,15 +132,32 @@ def _extract_bearer(req) -> str:
         return auth[7:].strip()
     return ""
 
+_discord_user_cache = {}
+_discord_guilds_cache = {}
+_discord_cache_lock = Lock()
+_DISCORD_CACHE_TTL = 120  # 2 minutos de cache
+
 def _fetch_discord_user(token: str):
     if not token:
         return None
+    token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+    now = time.time()
+    with _discord_cache_lock:
+        if token_hash in _discord_user_cache:
+            ts, val = _discord_user_cache[token_hash]
+            if now - ts < _DISCORD_CACHE_TTL:
+                return val
     try:
         r = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {token}"}, timeout=6)
         if r.status_code != 200:
             logger.warning(f"⚠️ [OAuth @me] Discord API devolvió HTTP {r.status_code}: {r.text}")
             return None
-        return r.json()
+        data = r.json()
+        with _discord_cache_lock:
+            _discord_user_cache[token_hash] = (now, data)
+            if len(_discord_user_cache) > 500:
+                _discord_user_cache.pop(next(iter(_discord_user_cache)))
+        return data
     except Exception as e:
         logger.error(f"❌ [OAuth @me] Error al consultar usuario: {e}")
         return None
@@ -147,12 +165,24 @@ def _fetch_discord_user(token: str):
 def _fetch_discord_guilds(token: str):
     if not token:
         return None
+    token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+    now = time.time()
+    with _discord_cache_lock:
+        if token_hash in _discord_guilds_cache:
+            ts, val = _discord_guilds_cache[token_hash]
+            if now - ts < _DISCORD_CACHE_TTL:
+                return val
     try:
         r = requests.get("https://discord.com/api/v10/users/@me/guilds", headers={"Authorization": f"Bearer {token}"}, timeout=8)
         if r.status_code != 200:
             logger.warning(f"⚠️ [OAuth @me/guilds] Discord API devolvió HTTP {r.status_code}: {r.text}")
             return None
-        return r.json()
+        data = r.json()
+        with _discord_cache_lock:
+            _discord_guilds_cache[token_hash] = (now, data)
+            if len(_discord_guilds_cache) > 500:
+                _discord_guilds_cache.pop(next(iter(_discord_guilds_cache)))
+        return data
     except Exception as e:
         logger.error(f"❌ [OAuth @me/guilds] Error al consultar servidores: {e}")
         return None
