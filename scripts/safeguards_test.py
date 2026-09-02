@@ -253,6 +253,17 @@ class TestSuite2_StrictAdminPermission(unittest.TestCase):
                 endpoints_checked += 1
         self.assertGreaterEqual(endpoints_checked, 2, "Must verify _is_guild_authorized in protected endpoints.")
 
+    def test_guilds_endpoint_filters_non_manageable_servers(self):
+        """Verify api_auth_guilds filters out servers where the bot is absent AND user lacks invite permissions."""
+        webserver_source = _get_file_content(self.webserver_path)
+        self.assertIn("can_invite", webserver_source, "webserver.py must compute can_invite permission.")
+        self.assertIn(
+            "dashboard_guilds",
+            webserver_source,
+            "webserver.py must filter user_guilds into dashboard_guilds before returning JSON."
+        )
+
+
 
 # ─── Test Suite 3: Webhook Alerts Wiring (R2) ──────────────────────────────────
 class TestSuite3_WebhookAlertsWiring(unittest.TestCase):

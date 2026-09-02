@@ -684,7 +684,8 @@
                     triggerDiscordAuth();
                 });
 
-                userGuilds = guildsData.guilds || [];
+                // Filtrar defensivamente: solo servidores con bot activo o donde el usuario tiene permisos para invitarlo
+                userGuilds = (guildsData.guilds || []).filter(g => g.has_bot || g.can_invite || g.owner || g.is_admin);
 
                 if (userGuilds.length === 0) {
                     const inviteBotUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands`;

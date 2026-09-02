@@ -358,13 +358,15 @@ def api_auth_guilds():
         perms = int(g.get("permissions", 0))
         is_owner = g.get("owner", False)
         is_admin = _is_guild_authorized(perms, is_owner)
+        can_invite = bool(is_owner or (perms & 0x8) == 0x8 or (perms & 0x20) == 0x20)
         user_guilds.append({
             "id": str(g.get("id")),
             "name": g.get("name"),
             "icon": g.get("icon"),
             "owner": is_owner,
             "permissions": perms,
-            "is_admin": is_admin
+            "is_admin": is_admin,
+            "can_invite": can_invite
         })
 
     if user_guilds and SUPABASE_URL and SUPABASE_KEY:
@@ -378,10 +380,17 @@ def api_auth_guilds():
         except Exception:
             pass
 
-    # Servidores con el bot instalado primero, luego por permisos de admin y alfabético
-    user_guilds.sort(key=lambda x: (not x.get("has_bot", False), not x.get("is_admin", False), x.get("name", "").lower()))
+    # Filtrar servidores ruidosos (paridad con Werewolf):
+    # Solo mostrar servidores donde el bot ya está dentro O donde el usuario tiene permisos para invitarlo (can_invite)
+    dashboard_guilds = [
+        g for g in user_guilds
+        if g.get("has_bot", False) or g.get("can_invite", False)
+    ]
 
-    return _cors(jsonify(ok=True, guilds=user_guilds))
+    # Servidores con el bot instalado primero, luego por permisos de admin y alfabético
+    dashboard_guilds.sort(key=lambda x: (not x.get("has_bot", False), not x.get("is_admin", False), x.get("name", "").lower()))
+
+    return _cors(jsonify(ok=True, guilds=dashboard_guilds))
 
 @app.route('/api/guild/<guild_id>/channels', methods=["GET", "OPTIONS"])
 def api_guild_channels(guild_id: str):
