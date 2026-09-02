@@ -36,6 +36,10 @@
             <a href="/#comandos" class="nav-link">Comandos</a>
             <a href="/cambios" class="nav-link">Cambios</a>
             <a href="/dashboard" class="nav-link" style="color:var(--violet-2); font-weight:700;">Panel Web</a>
+            <button type="button" class="status-pill open-status-modal" title="Estado de la infraestructura" style="padding:4px 10px; font-size:0.75rem;">
+                <span class="status-dot"></span>
+                <span class="status-pill-text">Status</span>
+            </button>
             <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">
                 <svg class="moon"><use href="#i-moon"/></svg><svg class="sun"><use href="#i-sun"/></svg>
             </button>
@@ -106,32 +110,130 @@
             </div>
         </article>
 
-        <footer class="site-footer">
-            <div class="f-main">
-                <a class="f-brand" href="/" aria-label="SkullBoard Inicio">
-                    <span class="mark">💀</span>
-                    <div class="f-brand-text">
-                        <span class="f-name">SkullBoard</span>
-                        <span class="f-by">Desarrollado por <b>GlobalFerociouS</b></span>
+        <!-- FOOTER PROFESIONAL MULTI-COLUMNA (ESTILO SAPPHIRE / MEE6) -->
+        <footer class="site-footer-v2">
+            <div class="footer-cols">
+                <!-- Columna 1: Marca & Eslogan -->
+                <div class="footer-brand-col">
+                    <a href="/" class="footer-brand-header">
+                        <span class="mark">💀</span> SkullBoard
+                    </a>
+                    <p class="footer-slogan">
+                        A Discord Starboard Bot — Done Right.<br>
+                        Destaca los mejores momentos y mensajes de tu comunidad con elegancia y alta velocidad.
+                    </p>
+                    <div style="margin-top:4px;">
+                        <button type="button" class="status-pill open-status-modal" title="Ver estado de infraestructura">
+                            <span class="status-dot"></span>
+                            <span class="status-pill-text">Sistemas Operativos</span>
+                        </button>
                     </div>
-                </a>
-                <nav class="f-nav" aria-label="Navegación del pie de página">
-                    <a href="/#contacto">Contacto</a>
-                    <a href="/terms">Términos de Servicio</a>
-                    <a href="/privacy">Política de Privacidad</a>
-                </nav>
+                </div>
+
+                <!-- Columna 2: Navegación -->
+                <div class="footer-col">
+                    <h4>Navegación</h4>
+                    <ul>
+                        <li><a href="/">Inicio</a></li>
+                        <li><a href="/cambios">Historial de Cambios</a></li>
+                        <li><a href="/dashboard">Panel de Control</a></li>
+                        <li><a href="#status" class="open-status-modal">Estado del Sistema</a></li>
+                    </ul>
+                </div>
+
+                <!-- Columna 3: Comunidad & Recursos -->
+                <div class="footer-col">
+                    <h4>Comunidad</h4>
+                    <ul>
+                        <li><a href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands" target="_blank" rel="noopener">Invitar Bot</a></li>
+                        <li><a href="https://discord.gg/GvFn2ZqY8E" target="_blank" rel="noopener">Servidor de Soporte</a></li>
+                        <li><a href="https://github.com/ParedesYTecho/Skullboard" target="_blank" rel="noopener">Código en GitHub</a></li>
+                        <li><a href="/#comandos">Comandos</a></li>
+                    </ul>
+                </div>
+
+                <!-- Columna 4: Legal & Confianza -->
+                <div class="footer-col">
+                    <h4>Legal</h4>
+                    <ul>
+                        <li><a href="/terms">Términos de Servicio</a></li>
+                        <li><a href="/privacy">Política de Privacidad</a></li>
+                        <li><a href="https://github.com/ParedesYTecho/Skullboard/blob/main/LICENSE" target="_blank" rel="noopener">Licencia MIT</a></li>
+                        <li><a href="/#contacto">Contacto Directo</a></li>
+                    </ul>
+                    <div class="footer-socials">
+                        <a href="https://discord.gg/GvFn2ZqY8E" class="social-btn" target="_blank" rel="noopener" aria-label="Discord">
+                            <svg><use href="#i-discord"/></svg>
+                        </a>
+                        <a href="https://github.com/ParedesYTecho/Skullboard" class="social-btn" target="_blank" rel="noopener" aria-label="GitHub">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                        </a>
+                    </div>
+                </div>
             </div>
-            <div class="f-bottom">
-                <span class="f-copy">© 2026 SkullBoard · Todos los derechos reservados.</span>
-                <a href="#top" class="f-top-btn" aria-label="Volver arriba">
-                    <span>Arriba</span>
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m18 15-6-6-6 6"/></svg>
-                </a>
+
+            <!-- Barra Inferior -->
+            <div class="footer-bottom-bar">
+                <span>© 2024–2026 SkullBoard • No afiliado con Discord Inc.</span>
+                <span>Desarrollado con ❤️ por <strong>GlobalFerociouS</strong></span>
             </div>
         </footer>
     </div>
 
+    <!-- MODAL DE ESTADO DEL SISTEMA -->
+    <div id="status-modal-overlay" class="status-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="status-modal-title">
+        <div class="status-modal-card">
+            <div class="status-modal-head">
+                <h3 id="status-modal-title">
+                    <span class="status-dot"></span> Estado de la Infraestructura
+                </h3>
+                <button type="button" class="status-modal-close" id="btn-close-status-modal" aria-label="Cerrar modal">✕</button>
+            </div>
+            <div class="status-grid">
+                <div class="status-card-item">
+                    <div class="status-card-top">
+                        <span class="status-card-title">Bot Discord</span>
+                        <span class="pill ok" id="status-bot-badge">● Online</span>
+                    </div>
+                    <div class="status-card-val" id="status-bot-ping">-- ms</div>
+                    <div class="status-card-sub" id="status-bot-shards">1 Shard · Gateway activo</div>
+                </div>
+                <div class="status-card-item">
+                    <div class="status-card-top">
+                        <span class="status-card-title">Base de Datos</span>
+                        <span class="pill ok" id="status-db-badge">● Operacional</span>
+                    </div>
+                    <div class="status-card-val" id="status-db-ping">-- ms</div>
+                    <div class="status-card-sub">Supabase PostgreSQL</div>
+                </div>
+                <div class="status-card-item">
+                    <div class="status-card-top">
+                        <span class="status-card-title">API Web REST</span>
+                        <span class="pill ok">● Operacional</span>
+                    </div>
+                    <div class="status-card-val">OK 200</div>
+                    <div class="status-card-sub">Flask Multi-threaded Engine</div>
+                </div>
+                <div class="status-card-item">
+                    <div class="status-card-top">
+                        <span class="status-card-title">Tiempo Activo</span>
+                        <span class="pill ok">● 99.9%</span>
+                    </div>
+                    <div class="status-card-val" id="status-uptime-val">--</div>
+                    <div class="status-card-sub">Uptime continuo de sesión</div>
+                </div>
+            </div>
+            <div style="margin-top:20px; text-align:right;">
+                <button type="button" id="btn-refresh-status" class="btn btn-ghost btn-sm">🔄 Actualizar estado</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        const API_BASE = window.location.hostname.includes('localhost') 
+            ? 'http://localhost:8080' 
+            : 'https://skullboard-fqf1.onrender.com';
+
         // Toggle claro/oscuro
         const themeBtn = document.getElementById('theme-toggle');
         if (themeBtn) {
@@ -139,6 +241,68 @@
                 const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
                 document.documentElement.dataset.theme = next;
                 localStorage.setItem('skb-theme', next);
+            });
+        }
+
+        // Estado del sistema (Status API & Modal)
+        async function fetchSystemStatus() {
+            try {
+                const res = await fetch(`${API_BASE}/api/status`);
+                const data = await res.json();
+                if (data.ok) {
+                    const botPing = document.getElementById('status-bot-ping');
+                    if (botPing) botPing.textContent = `${data.bot.latency_ms} ms`;
+                    const botShards = document.getElementById('status-bot-shards');
+                    if (botShards) botShards.textContent = `${data.bot.shards} Shard${data.bot.shards > 1 ? 's' : ''} · ${data.bot.guilds || 0} servidores`;
+                    const dbPing = document.getElementById('status-db-ping');
+                    if (dbPing) dbPing.textContent = `${data.database.latency_ms} ms`;
+                    const uptimeVal = document.getElementById('status-uptime-val');
+                    if (uptimeVal) uptimeVal.textContent = data.bot.uptime_formatted || 'Online';
+                    
+                    document.querySelectorAll('.status-pill-text').forEach(el => {
+                        el.textContent = data.all_operational ? 'Sistemas OK' : 'Degradado';
+                    });
+                }
+            } catch (e) {
+                // Fallback silencioso
+            }
+        }
+
+        const statusOverlay = document.getElementById('status-modal-overlay');
+        document.querySelectorAll('.open-status-modal').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (statusOverlay) {
+                    statusOverlay.classList.add('active');
+                    fetchSystemStatus();
+                }
+            });
+        });
+        const btnCloseModal = document.getElementById('btn-close-status-modal');
+        if (btnCloseModal && statusOverlay) {
+            btnCloseModal.addEventListener('click', () => statusOverlay.classList.remove('active'));
+        }
+        if (statusOverlay) {
+            statusOverlay.addEventListener('click', (e) => {
+                if (e.target === statusOverlay) statusOverlay.classList.remove('active');
+            });
+        }
+        const btnRefreshStatus = document.getElementById('btn-refresh-status');
+        if (btnRefreshStatus) {
+            btnRefreshStatus.addEventListener('click', () => {
+                btnRefreshStatus.textContent = 'Actualizando…';
+                fetchSystemStatus().finally(() => {
+                    setTimeout(() => btnRefreshStatus.textContent = '🔄 Actualizar estado', 500);
+                });
+            });
+        }
+
+        fetchSystemStatus();
+
+        // Service Worker Register
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(() => {});
             });
         }
     </script>

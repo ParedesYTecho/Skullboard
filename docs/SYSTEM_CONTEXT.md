@@ -278,6 +278,7 @@ erDiagram
 | `/<path:filename>` | `GET` | Público | Enrutador estático con Clean URLs y redirección 301 permanente para `.html`. |
 | `/api/stats` | `GET` | Público (Cache 60s) | Retorna `{"servers": int, "highlighted": int, "commands": int}` para landing y dashboard. |
 | `/api/health` | `GET` | Público | Chequeo de salud del servicio con uptime en segundos y memoria RSS en MB. |
+| `/api/status` | `GET` | Público (Cache 15s) | Retorna estado en vivo de Bot (latencia/shards/uptime), BD Supabase y API REST. |
 | `/api/contact` | `POST` | 1 req / 30s por IP (LRU)<br>10 req / min global | Recibe formulario de contacto, sanitiza CRLF/XSS y despacha email vía Resend. |
 | `/verify` | `GET` | Discord OAuth2 | Inicia el flujo de verificación de rol (`identify`, `role_connections.write`) con `state` anti-CSRF. |
 | `/callback` | `GET` | Validación de State TTL | Finaliza OAuth2 de Linked Role y asigna la metadata `is_owner` si el ID coincide con `BOT_OWNER_ID`. |

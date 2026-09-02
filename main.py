@@ -8,6 +8,7 @@ import webserver
 import asyncio
 import random
 import time
+import math
 from datetime import datetime, timezone
 from discord.ext import commands, tasks
 from discord import app_commands
@@ -491,6 +492,22 @@ class SkullBot(commands.AutoShardedBot):
 
 bot  = SkullBot(command_prefix=get_prefix, intents=intents, help_command=None, tree_cls=GuildOnlyTree)
 tree = bot.tree
+
+_bot_start_time = time.time()
+
+def get_bot_status() -> dict:
+    ready = bot.is_ready() and not bot.is_closed()
+    lat = round(bot.latency * 1000, 1) if (bot.latency is not None and not math.isnan(bot.latency) and not math.isinf(bot.latency)) else 0.0
+    shard_count = len(bot.shards) if hasattr(bot, "shards") and bot.shards else 1
+    return {
+        "online": ready,
+        "latency_ms": lat,
+        "shards": shard_count,
+        "guilds": len(bot.guilds) if ready else 0,
+        "uptime_seconds": int(time.time() - _bot_start_time)
+    }
+
+webserver.set_bot_status_provider(get_bot_status)
 
 async def get_formatted_prefix(ctx_or_interaction) -> str:
     guild = getattr(ctx_or_interaction, "guild", None)

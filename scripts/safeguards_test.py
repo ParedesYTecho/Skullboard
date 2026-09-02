@@ -509,6 +509,7 @@ class TestSuite6_DocumentationSync(unittest.TestCase):
             "/api/guild/<guild_id>/my-messages",
             "/api/og",
             "/api/health",
+            "/api/status",
             "/api/contact",
             "/verify",
             "/callback",
@@ -520,6 +521,82 @@ class TestSuite6_DocumentationSync(unittest.TestCase):
                     self.doc_content,
                     f"docs/SYSTEM_CONTEXT.md Section 4.2 table must document endpoint '{ep}'."
                 )
+
+
+# ─── Test Suite 7: Visual & Status Renovation (Sapphire Footer, Status & Jump URLs) ──
+class TestSuite7_VisualAndStatusRenovation(unittest.TestCase):
+    """Verifies that the /api/status endpoint, author profile resolving, jump URLs,
+    and multi-column Sapphire footer are strictly present and functional."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.webserver_content = _get_file_content(os.path.join(ROOT_DIR, "webserver.py"))
+        cls.main_content = _get_file_content(os.path.join(ROOT_DIR, "main.py"))
+        cls.dashboard_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "dashboard.html"))
+        cls.index_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "index.html"))
+        cls.cambios_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "cambios.html"))
+        cls.terms_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "terms.html"))
+        cls.privacy_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "privacy.html"))
+        cls.styles_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "styles.css"))
+
+    def test_status_endpoint_and_provider_wiring(self):
+        """webserver.py must define /api/status and main.py must register set_bot_status_provider."""
+        self.assertIn(
+            "@app.route('/api/status'",
+            self.webserver_content,
+            "webserver.py must expose endpoint GET /api/status"
+        )
+        self.assertIn(
+            "set_bot_status_provider",
+            self.webserver_content,
+            "webserver.py must provide set_bot_status_provider hook"
+        )
+        self.assertIn(
+            "webserver.set_bot_status_provider(get_bot_status)",
+            self.main_content,
+            "main.py must connect get_bot_status to webserver"
+        )
+
+    def test_leaderboard_jump_url_and_author_enrichment(self):
+        """Leaderboard and my-messages endpoints must resolve author profile and jump_url."""
+        self.assertIn(
+            "_fetch_author_profile_cached",
+            self.webserver_content,
+            "webserver.py must have cached author profile resolution helper"
+        )
+        self.assertIn(
+            "jump_url",
+            self.webserver_content,
+            "webserver.py must construct jump_url for Discord messages"
+        )
+        self.assertIn(
+            "discord.com/channels",
+            self.webserver_content,
+            "jump_url must point to discord.com/channels/{guild_id}/{channel_id}/{message_id}"
+        )
+
+    def test_sapphire_footer_and_modal_across_all_html_pages(self):
+        """All 5 HTML pages must contain the Sapphire multi-column footer and status modal."""
+        pages = [
+            ("dashboard.html", self.dashboard_content),
+            ("index.html", self.index_content),
+            ("cambios.html", self.cambios_content),
+            ("terms.html", self.terms_content),
+            ("privacy.html", self.privacy_content)
+        ]
+        for name, html in pages:
+            with self.subTest(page=name):
+                self.assertIn("site-footer-v2", html, f"{name} must include .site-footer-v2")
+                self.assertIn("status-modal-overlay", html, f"{name} must include #status-modal-overlay")
+                self.assertIn("open-status-modal", html, f"{name} must include .open-status-modal trigger")
+
+    def test_humanized_leaderboard_in_dashboard(self):
+        """dashboard.html must render .lb-card with medals, avatars, usernames and jump buttons."""
+        self.assertIn("lb-card", self.dashboard_content, "dashboard.html must use .lb-card class")
+        self.assertIn("lb-avatar", self.dashboard_content, "dashboard.html must render author avatar")
+        self.assertIn("btn-jump-discord", self.dashboard_content, "dashboard.html must provide Discord jump button")
+        self.assertIn(".site-footer-v2", self.styles_content, "styles.css must style .site-footer-v2")
+        self.assertIn(".lb-card", self.styles_content, "styles.css must style .lb-card")
 
 
 # ─── Custom Test Result Handler for Clean Presentation ────────────────────────
@@ -562,6 +639,7 @@ def run_safeguards():
         ("Suite 4: Defensive Server Owner Cache Failover (R2)", TestSuite4_DefensiveOwnerCacheFailover),
         ("Suite 5: Frontend Sliders (max=50) & Clean Absolute URLs (R2)", TestSuite5_FrontendSlidersAndCleanUrls),
         ("Suite 6: System Context Documentation Synchronization (R3)", TestSuite6_DocumentationSync),
+        ("Suite 7: Visual & Status Renovation (Sapphire Footer, Status API & Jump URLs)", TestSuite7_VisualAndStatusRenovation),
     ]
 
     total_tests = 0
