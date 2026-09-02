@@ -733,14 +733,14 @@ footer.site-footer {
     text-decoration: none;
 }
 
-/* ====== Tema claro (Muted Darker Slate / Confort sin deslumbramiento) ====== */
+/* ====== Tema claro (Gris Cerámico / Muted Slate Confort sin deslumbramiento) ====== */
 :root[data-theme="light"] {
-    --bg: #f8fafc;
-    --bg-soft: #f1f5f9;
-    --surface: #ffffff;
-    --surface-2: #f8fafc;
-    --border: rgba(15, 23, 42, 0.08);
-    --border-strong: rgba(15, 23, 42, 0.20);
+    --bg: #f0f2f5;
+    --bg-soft: #e8ecf0;
+    --surface: #f8f9fb;
+    --surface-2: #eaedf1;
+    --border: rgba(15, 23, 42, 0.10);
+    --border-strong: rgba(15, 23, 42, 0.22);
     --violet: #6366f1;
     --violet-2: #4f46e5;
     --violet-deep: #4338ca;
@@ -1995,25 +1995,222 @@ footer.site-footer {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════════
-   🎛️ DASHBOARD UI DESIGN SYSTEM COMPONENTS
+   🎛️ DASHBOARD UI DESIGN SYSTEM COMPONENTS (ESTILO WEREWOLF)
    ═══════════════════════════════════════════════════════════════════════════════ */
+
+/* Cabecera de Selección de Servidores */
+.servers-head {
+    margin-bottom: 28px;
+    text-align: left;
+}
+
+.servers-eyebrow {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--violet-2);
+    margin-bottom: 6px;
+}
+
+.servers-head h1 {
+    font-size: 1.85rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--ink);
+    margin-bottom: 6px;
+}
+
+.servers-summary {
+    color: var(--ink-soft);
+    font-size: 0.95rem;
+}
+
+/* Buscador de Servidores */
+.guild-search-wrap {
+    margin-bottom: 24px;
+    position: relative;
+    max-width: 440px;
+}
+
+.guild-search-wrap input {
+    width: 100%;
+    padding: 12px 16px 12px 42px;
+    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    font-size: 0.92rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color .2s ease, box-shadow .2s ease;
+}
+
+.guild-search-wrap input:focus {
+    border-color: var(--violet);
+    box-shadow: 0 0 0 3px var(--glow);
+}
+
+.guild-search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 18px;
+    height: 18px;
+    color: var(--ink-dim);
+    pointer-events: none;
+}
+
+/* Cuadrícula de Servidores */
+.guild-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
 .guild-card {
     display: flex;
     flex-direction: column;
+    justify-content: space-between;
     padding: 22px;
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-    transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
+    border-radius: 18px;
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.04);
+    transition: transform .2s cubic-bezier(0.16, 1, 0.3, 1), border-color .2s ease, box-shadow .2s ease;
 }
 
 .guild-card:hover {
     transform: translateY(-3px);
     border-color: var(--border-strong);
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.09);
 }
 
+.guild-card.inactive {
+    opacity: 0.88;
+}
+
+.guild-card.inactive:hover {
+    opacity: 1;
+}
+
+.guild-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.guild-card-icon {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    object-fit: cover;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+}
+
+.guild-card-icon-fallback {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    display: grid;
+    place-items: center;
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: var(--ink);
+    flex-shrink: 0;
+}
+
+.guild-card-name {
+    font-size: 1.12rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.guild-card-sub {
+    font-size: 0.85rem;
+    color: var(--ink-soft);
+    margin-bottom: 18px;
+    line-height: 1.45;
+    min-height: 38px;
+}
+
+.guild-card-cta {
+    margin-top: auto;
+    display: flex;
+}
+
+.guild-card-cta .btn {
+    width: 100%;
+    justify-content: center;
+    padding: 10px 16px;
+    font-size: 0.88rem;
+}
+
+/* Badges minimalistas */
+.pill.ok {
+    background: rgba(16, 185, 129, 0.12);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.28);
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.pill.pill-info {
+    background: var(--surface-2);
+    color: var(--ink-dim);
+    border: 1px solid var(--border);
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Botón de Cambiar Servidor en Cabecera */
+.btn-switch-guild {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--ink);
+    cursor: pointer;
+    text-decoration: none;
+    transition: background .15s ease, border-color .15s ease, transform .15s ease;
+}
+
+.btn-switch-guild:hover {
+    background: var(--surface);
+    border-color: var(--border-strong);
+    transform: translateX(-2px);
+    text-decoration: none;
+}
+
+/* Inputs y Selects */
 .form-control-input {
     width: 100%;
     padding: 12px 16px;
@@ -2030,6 +2227,36 @@ footer.site-footer {
 .form-control-input:focus {
     border-color: var(--violet);
     box-shadow: 0 0 0 3px var(--glow);
+}
+
+/* Corrección de visualización para selects en Modo Oscuro y Claro */
+select.form-control-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238e8e99' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 16px;
+    padding-right: 40px;
+    cursor: pointer;
+}
+
+select.form-control-input,
+select.form-control-input option {
+    background-color: var(--surface-2);
+    color: var(--ink);
+}
+
+/* Skeleton Loaders */
+.skeleton {
+    background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.5s infinite;
+    border-radius: 10px;
+}
+
+@keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
 }
 
 .segmented-tabs {

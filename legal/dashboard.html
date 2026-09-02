@@ -35,6 +35,7 @@
             <symbol id="i-arrow-left" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></symbol>
             <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></symbol>
             <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a4 4 0 0 0 6 .5l2-2a4 4 0 0 0-6-6l-1 1M14 11a4 4 0 0 0-6-.5l-2 2a4 4 0 0 0 6 6l1-1"/></symbol>
+            <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></symbol>
         </defs>
     </svg>
 
@@ -60,16 +61,35 @@
             <p style="color:var(--ink-soft); font-weight:600; margin-top:16px;">Conectando con Discord…</p>
         </div>
 
-        <!-- VISTA PRINCIPAL DEL SERVIDOR -->
+        <!-- VISTA 1: LISTA DE SERVIDORES (ESTILO WEREWOLF) -->
+        <main id="view-servers" style="display:none;">
+            <header class="servers-head">
+                <div class="servers-eyebrow">Tu panel</div>
+                <h1>Tus servidores</h1>
+                <p id="servers-summary-text" class="servers-summary">Cargando tus servidores…</p>
+            </header>
+
+            <div id="guild-search-container" class="guild-search-wrap" style="display:none;">
+                <svg class="guild-search-icon"><use href="#i-search"/></svg>
+                <input type="text" id="guild-search-input" placeholder="Buscar servidor por nombre…" autocomplete="off">
+            </div>
+
+            <ul id="guilds-grid-list" class="guild-grid">
+                <!-- Tarjetas inyectadas dinámicamente -->
+            </ul>
+        </main>
+
+        <!-- VISTA 2: PANEL DEL SERVIDOR SELECCIONADO -->
         <main id="view-dashboard" style="display:none;">
-            <!-- BARRA CONTEXTUAL DE SERVIDOR (ESTILO WEREWOLF) -->
+            <!-- BARRA CONTEXTUAL DE SERVIDOR -->
             <div class="guild-switcher-bar">
                 <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-                    <div class="guild-picker-control">
-                        <img id="current-guild-icon" src="skullboard_icon.png" alt="Servidor" style="width:28px; height:28px; border-radius:8px; object-fit:cover;">
-                        <select id="guild-switcher-select" class="guild-picker-select" aria-label="Seleccionar servidor">
-                            <!-- Opciones inyectadas dinámicamente -->
-                        </select>
+                    <button id="btn-switch-guild" class="btn-switch-guild" type="button" title="Volver a la lista de servidores">
+                        ← Servidores
+                    </button>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img id="current-guild-icon" src="skullboard_icon.png" alt="Servidor" style="width:32px; height:32px; border-radius:10px; object-fit:cover; border:1px solid var(--border);">
+                        <span id="current-guild-name" style="font-weight:700; font-size:1.05rem; color:var(--ink);">Cargando…</span>
                     </div>
                     <div id="current-guild-badge"></div>
                 </div>
@@ -77,13 +97,13 @@
                 <!-- Pestañas del Servidor -->
                 <div class="segmented-tabs" style="margin:0;">
                     <button id="tab-btn-leaderboard" class="segmented-tab active" type="button">
-                        <svg class="icon" style="width:16px;height:16px;"><use href="#i-crown"/></svg> 👑 Leaderboard
+                        👑 Leaderboard
                     </button>
                     <button id="tab-btn-my-messages" class="segmented-tab" type="button">
-                        <svg class="icon" style="width:16px;height:16px;"><use href="#i-skull"/></svg> 💀 Mis Mensajes
+                        💀 Mis Mensajes
                     </button>
                     <button id="tab-btn-config" class="segmented-tab" type="button" style="display:none;">
-                        <svg class="icon" style="width:16px;height:16px;"><use href="#i-gear"/></svg> ⚙️ Ajustes
+                        ⚙️ Ajustes
                     </button>
                 </div>
             </div>
@@ -287,7 +307,11 @@
         // 1. CARGA DEL LEADERBOARD DEL SERVIDOR
         async function loadGuildLeaderboard(guildId) {
             const list = document.getElementById('guild-lb-list');
-            list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--ink-soft);">Cargando mejores mensajes…</div>';
+            list.innerHTML = `
+                <div class="skeleton" style="height:62px; opacity:0.8; margin-bottom:10px;"></div>
+                <div class="skeleton" style="height:62px; opacity:0.5; margin-bottom:10px;"></div>
+                <div class="skeleton" style="height:62px; opacity:0.3; margin-bottom:10px;"></div>
+            `;
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${guildId}/leaderboard/public`);
                 const data = await res.json();
@@ -324,7 +348,10 @@
         // 2. CARGA DE MIS MENSAJES EN EL SERVIDOR
         async function loadMyMessages(guildId) {
             const list = document.getElementById('my-messages-list');
-            list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--ink-soft);">Cargando tus estadísticas…</div>';
+            list.innerHTML = `
+                <div class="skeleton" style="height:62px; opacity:0.8; margin-bottom:10px;"></div>
+                <div class="skeleton" style="height:62px; opacity:0.5; margin-bottom:10px;"></div>
+            `;
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${guildId}/my-messages`, {
                     headers: { 'Authorization': `Bearer ${authToken}` }
@@ -410,23 +437,127 @@
             }
         }
 
-        // Selección de Servidor
-        function selectGuild(guild) {
+        // Vistas y Navegación de Servidores
+        function showServersView() {
+            activeGuild = null;
+            document.getElementById('view-loading').style.display = 'none';
+            document.getElementById('view-dashboard').style.display = 'none';
+            document.getElementById('view-servers').style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            renderServersGrid(userGuilds);
+        }
+
+        function renderServersGrid(guildsToRender) {
+            const withBot = userGuilds.filter(g => g.has_bot).length;
+            const summaryText = document.getElementById('servers-summary-text');
+            if (userGuilds.length > 0) {
+                summaryText.innerHTML = `<strong>${userGuilds.length}</strong> servidor${userGuilds.length === 1 ? '' : 'es'} en total · <strong>${withBot}</strong> con el bot activo`;
+            } else {
+                summaryText.textContent = 'Aquí aparecerán los servidores donde juegas o administras.';
+            }
+
+            const searchContainer = document.getElementById('guild-search-container');
+            if (userGuilds.length > 6) {
+                searchContainer.style.display = 'block';
+            } else {
+                searchContainer.style.display = 'none';
+            }
+
+            const grid = document.getElementById('guilds-grid-list');
+            grid.innerHTML = '';
+
+            if (guildsToRender.length === 0) {
+                grid.innerHTML = '<li style="grid-column:1/-1; text-align:center; padding:32px; color:var(--ink-soft);">No se encontraron servidores con ese nombre.</li>';
+                return;
+            }
+
+            guildsToRender.forEach((g) => {
+                const li = document.createElement('li');
+                li.className = `guild-card${g.has_bot ? '' : ' inactive'}`;
+
+                const iconHtml = g.icon
+                    ? `<img class="guild-card-icon" src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png" alt="Icono de ${g.name}">`
+                    : `<span class="guild-card-icon-fallback">${(g.name || 'S').charAt(0).toUpperCase()}</span>`;
+
+                const badgeHtml = g.has_bot
+                    ? '<span class="pill ok">● Bot activo</span>'
+                    : '<span class="pill pill-info">○ Sin bot</span>';
+
+                const subText = g.has_bot
+                    ? (g.is_admin ? 'Configura o revisa la leaderboard de este servidor' : 'Revisa tus estadísticas y mensajes destacados')
+                    : 'Añade el bot para empezar a registrar calaveras';
+
+                const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${g.id}&disable_guild_select=true`;
+
+                const ctaHtml = g.has_bot
+                    ? `<button type="button" class="btn btn-primary btn-enter-guild" data-gid="${g.id}">Entrar →</button>`
+                    : `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost" style="border:1px solid var(--border);">➕ Añadir bot</a>`;
+
+                li.innerHTML = `
+                    <div>
+                        <div class="guild-card-top">
+                            ${iconHtml}
+                            ${badgeHtml}
+                        </div>
+                        <h3 class="guild-card-name" title="${g.name}">${g.name}</h3>
+                        <p class="guild-card-sub">${subText}</p>
+                    </div>
+                    <div class="guild-card-cta">
+                        ${ctaHtml}
+                    </div>
+                `;
+                grid.appendChild(li);
+            });
+
+            // Asignar listeners a botones "Entrar →"
+            grid.querySelectorAll('.btn-enter-guild').forEach((btn) => {
+                btn.addEventListener('click', () => {
+                    const targetGuild = userGuilds.find(g => g.id === btn.dataset.gid);
+                    if (targetGuild) selectGuild(targetGuild, true);
+                });
+            });
+        }
+
+        // Buscador interactivo de servidores
+        document.getElementById('guild-search-input').addEventListener('input', (e) => {
+            const term = e.target.value.trim().toLowerCase();
+            if (!term) {
+                renderServersGrid(userGuilds);
+            } else {
+                const filtered = userGuilds.filter(g => (g.name || '').toLowerCase().includes(term));
+                renderServersGrid(filtered);
+            }
+        });
+
+        // Botón de retorno al listado de servidores
+        document.getElementById('btn-switch-guild').addEventListener('click', () => {
+            localStorage.removeItem('skb_last_guild_id');
+            showServersView();
+        });
+
+        // Selección y Apertura de un Servidor
+        function selectGuild(guild, saveToStorage = true) {
             activeGuild = guild;
+            if (saveToStorage) {
+                localStorage.setItem('skb_last_guild_id', guild.id);
+            }
+
             const iconImg = document.getElementById('current-guild-icon');
             iconImg.src = guild.icon
                 ? `https://cdn.discordapp.com/icons/${guild.id}/${guild.icon}.png`
                 : 'skullboard_icon.png';
 
+            document.getElementById('current-guild-name').textContent = guild.name;
+
             const badge = document.getElementById('current-guild-badge');
             if (guild.has_bot) {
-                badge.innerHTML = '<span class="tag-pill new" style="font-size:0.75rem;">✓ Conectado</span>';
+                badge.innerHTML = '<span class="pill ok" style="font-size:0.75rem;">● Activo</span>';
             } else {
                 const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${guild.id}&disable_guild_select=true`;
-                badge.innerHTML = `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 10px; font-size:0.75rem;">+ Invitar Bot</a>`;
+                badge.innerHTML = `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost btn-sm" style="padding:4px 10px; font-size:0.75rem;">+ Invitar</a>`;
             }
 
-            // Mostrar u ocultar pestaña de ajustes según permisos de admin
+            // Pestaña de ajustes según permisos de admin
             if (guild.is_admin) {
                 tabBtnCfg.style.display = 'inline-flex';
             } else {
@@ -435,6 +566,11 @@
                     switchServerTab(tabBtnLb, panelLb);
                 }
             }
+
+            // Cambiar vista
+            document.getElementById('view-loading').style.display = 'none';
+            document.getElementById('view-servers').style.display = 'none';
+            document.getElementById('view-dashboard').style.display = 'block';
 
             // Cargar contenido de la pestaña activa
             if (tabBtnLb.classList.contains('active')) {
@@ -499,7 +635,7 @@
             }
         });
 
-        // INICIALIZACIÓN
+        // INICIALIZACIÓN OPTIMIZADA (EN PARALELO Y CON MEMORIA)
         async function init() {
             authToken = await getOrExchangeAuthToken();
             if (!authToken) {
@@ -508,20 +644,24 @@
             }
 
             try {
-                // 1. Obtener perfil de usuario
-                const userRes = await fetch(`${API_BASE}/api/auth/me`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-                
-                if (userRes.status === 401 || userRes.status === 403) {
+                // Carga en paralelo de perfil y servidores (50% menos latencia)
+                const [userRes, guildsRes] = await Promise.all([
+                    fetch(`${API_BASE}/api/auth/me`, { headers: { 'Authorization': `Bearer ${authToken}` } }),
+                    fetch(`${API_BASE}/api/auth/guilds`, { headers: { 'Authorization': `Bearer ${authToken}` } })
+                ]);
+
+                if (userRes.status === 401 || userRes.status === 403 || guildsRes.status === 401 || guildsRes.status === 403) {
                     sessionStorage.removeItem('skb_auth_token');
+                    localStorage.removeItem('skb_last_guild_id');
                     triggerDiscordAuth();
                     return;
                 }
 
-                const userData = await userRes.json();
-                if (!userRes.ok || !userData.ok) {
+                const [userData, guildsData] = await Promise.all([userRes.json(), guildsRes.json()]);
+
+                if (!userRes.ok || !userData.ok || !guildsRes.ok || !guildsData.ok) {
                     sessionStorage.removeItem('skb_auth_token');
+                    localStorage.removeItem('skb_last_guild_id');
                     triggerDiscordAuth();
                     return;
                 }
@@ -540,27 +680,9 @@
                 `;
                 document.getElementById('btn-logout').addEventListener('click', () => {
                     sessionStorage.removeItem('skb_auth_token');
+                    localStorage.removeItem('skb_last_guild_id');
                     triggerDiscordAuth();
                 });
-
-                // 2. Obtener servidores del usuario
-                const guildsRes = await fetch(`${API_BASE}/api/auth/guilds`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-
-                if (guildsRes.status === 401 || guildsRes.status === 403) {
-                    // Token caducado o sin permisos de scope 'guilds': limpiar sesión y forzar re-login limpio
-                    sessionStorage.removeItem('skb_auth_token');
-                    triggerDiscordAuth();
-                    return;
-                }
-
-                const guildsData = await guildsRes.json();
-                if (!guildsRes.ok || !guildsData.ok) {
-                    sessionStorage.removeItem('skb_auth_token');
-                    triggerDiscordAuth();
-                    return;
-                }
 
                 userGuilds = guildsData.guilds || [];
 
@@ -580,25 +702,15 @@
                     return;
                 }
 
-                // Poblar Dropdown de Servidores
-                const guildSelect = document.getElementById('guild-switcher-select');
-                guildSelect.innerHTML = '';
-                userGuilds.forEach((g) => {
-                    const opt = document.createElement('option');
-                    opt.value = g.id;
-                    opt.textContent = `${g.has_bot ? '✓ ' : ''}${g.name}${g.is_admin ? ' (Admin)' : ''}`;
-                    guildSelect.appendChild(opt);
-                });
+                // Memoria: si hay un servidor guardado en localStorage, entrar directo
+                const savedGuildId = localStorage.getItem('skb_last_guild_id');
+                const savedGuild = userGuilds.find(g => g.id === savedGuildId);
 
-                guildSelect.addEventListener('change', (e) => {
-                    const found = userGuilds.find(g => g.id === e.target.value);
-                    if (found) selectGuild(found);
-                });
-
-                // Seleccionar primer servidor
-                document.getElementById('view-loading').style.display = 'none';
-                document.getElementById('view-dashboard').style.display = 'block';
-                selectGuild(userGuilds[0]);
+                if (savedGuild && savedGuild.has_bot) {
+                    selectGuild(savedGuild, false);
+                } else {
+                    showServersView();
+                }
 
             } catch (err) {
                 console.error(err);
