@@ -316,6 +316,16 @@
         const CLIENT_ID = '1367463352774955059';
         const REDIRECT_URI = window.location.origin + '/dashboard';
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function showFooter() {
             const f = document.getElementById('site-footer');
             if (f) f.style.display = 'block';
@@ -1021,8 +1031,16 @@
                     if (userData.ok && userData.user && guildsData.ok && guildsData.guilds) {
                         localStorage.setItem('skb_cached_user', JSON.stringify(userData.user));
                         localStorage.setItem('skb_cached_guilds', JSON.stringify(guildsData.guilds));
-                        renderNavUserProfile(userData.user);
-                        processAndApplyGuilds(guildsData.guilds);
+                        try {
+                            renderNavUserProfile(userData.user);
+                        } catch (e) {
+                            console.error('Error renderNavUserProfile:', e);
+                        }
+                        try {
+                            processAndApplyGuilds(guildsData.guilds);
+                        } catch (e) {
+                            console.error('Error processAndApplyGuilds:', e);
+                        }
                     }
                 } else if (!hasRenderedCached) {
                     document.getElementById('view-loading').innerHTML = `
