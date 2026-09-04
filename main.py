@@ -1223,8 +1223,8 @@ async def top_cmd(ctx):
     gid = str(ctx.guild.id)
     try:
         resp = await supabase.table("tracked_messages") \
-            .select("skull_count,author_id,skullboard_message_id") \
-            .eq("guild_id", gid).order("skull_count", desc=True).limit(10).execute()
+            .select("message_id,channel_id,skull_count,author_id,skullboard_message_id") \
+            .eq("guild_id", gid).order("skull_count", desc=True).limit(20).execute()
     except Exception as e:
         logger.error(f"Error en top_cmd para guild {gid}: {e}")
         embed = discord.Embed(title="❌ Error", description="No se pudo obtener el top.", color=0xed4245)
@@ -1237,19 +1237,45 @@ async def top_cmd(ctx):
     medals = ["🥇", "🥈", "🥉"]
     cfg    = await get_guild_config(ctx.guild.id)
     lines  = []
-    for i, row in enumerate(resp.data):
-        pos   = medals[i] if i < 3 else f"{i+1}."
+    valid_count = 0
+    for row in resp.data:
+        if valid_count >= 10:
+            break
+        name = await resolve_display_name(ctx.guild, row.get("author_id"))
+        name_clean = name.lower().strip()
+        if (
+            name_clean in ("deleted user", "deleted_user", "usuario desconocido")
+            or name_clean.startswith("deleted user")
+        ):
+            continue
+
+        pos   = medals[valid_count] if valid_count < 3 else f"{valid_count+1}."
         count = row.get("skull_count") or 0
-        name  = await resolve_display_name(ctx.guild, row.get("author_id"))
+        orig_mid = row.get("message_id")
+        orig_cid = row.get("channel_id")
         sb_id = row.get("skullboard_message_id")
-        if cfg["skullboard_channel_id"] and sb_id:
-            link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{sb_id}"
+        sb_cid = cfg.get("skullboard_channel_id")
+
+        link = None
+        if orig_cid and orig_mid:
+            link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
+        elif sb_cid and sb_id:
+            link = f"https://discord.com/channels/{gid}/{sb_cid}/{sb_id}"
+        elif orig_mid and sb_cid:
+            link = f"https://discord.com/channels/{gid}/{sb_cid}/{orig_mid}"
+
+        if link:
             lines.append(f"{pos} **[{name}]({link})** — **{count} 💀**")
         else:
             lines.append(f"{pos} **{name}** — **{count} 💀**")
+        valid_count += 1
+
+    if not lines:
+        embed = discord.Embed(title="🏆 Top Skullboard", description="Aún no hay mensajes válidos en el skullboard.", color=0x4e5058)
+        return await ctx.send(embed=embed)
 
     embed = discord.Embed(title="🏆 Top Skullboard", description="\n".join(lines), color=0xfaa61a)
-    embed.set_footer(text=f"Top {len(resp.data)} mensajes del servidor")
+    embed.set_footer(text=f"Top {len(lines)} mensajes del servidor")
     await ctx.send(embed=embed)
 
 @bot.command(name="stats", aliases=["estadisticas"])
@@ -1869,6 +1895,8 @@ async def backfill_cmd(ctx):
                     if count > registros_dict[orig_msg_id]["skull_count"]:
                         registros_dict[orig_msg_id]["skull_count"] = count
                         registros_dict[orig_msg_id]["skullboard_message_id"] = data["sb_msg_id"]
+                        if data.get("orig_chan_id"):
+                            registros_dict[orig_msg_id]["channel_id"] = str(data["orig_chan_id"])
                 else:
                     registros_dict[orig_msg_id] = {
                         "message_id": str(orig_msg_id),
@@ -1877,6 +1905,8 @@ async def backfill_cmd(ctx):
                         "author_id": str(author_id),
                         "guild_id": gid
                     }
+                    if data.get("orig_chan_id"):
+                        registros_dict[orig_msg_id]["channel_id"] = str(data["orig_chan_id"])
 
             procesados += 1
             if procesados % 30 == 0:
@@ -2166,8 +2196,8 @@ async def top_slash(interaction: discord.Interaction):
     gid = str(interaction.guild.id)
     try:
         resp = await supabase.table("tracked_messages") \
-            .select("skull_count,author_id,skullboard_message_id") \
-            .eq("guild_id", gid).order("skull_count", desc=True).limit(10).execute()
+            .select("message_id,channel_id,skull_count,author_id,skullboard_message_id") \
+            .eq("guild_id", gid).order("skull_count", desc=True).limit(20).execute()
     except Exception as e:
         logger.error(f"Error en /top: {e}")
         embed = discord.Embed(title="❌ Error", description="No se pudo obtener el top.", color=0xed4245)
@@ -2180,19 +2210,45 @@ async def top_slash(interaction: discord.Interaction):
     medals = ["🥇", "🥈", "🥉"]
     cfg    = await get_guild_config(interaction.guild.id)
     lines  = []
-    for i, row in enumerate(resp.data):
-        pos   = medals[i] if i < 3 else f"{i+1}."
+    valid_count = 0
+    for row in resp.data:
+        if valid_count >= 10:
+            break
+        name = await resolve_display_name(interaction.guild, row.get("author_id"))
+        name_clean = name.lower().strip()
+        if (
+            name_clean in ("deleted user", "deleted_user", "usuario desconocido")
+            or name_clean.startswith("deleted user")
+        ):
+            continue
+
+        pos   = medals[valid_count] if valid_count < 3 else f"{valid_count+1}."
         count = row.get("skull_count") or 0
-        name  = await resolve_display_name(interaction.guild, row.get("author_id"))
+        orig_mid = row.get("message_id")
+        orig_cid = row.get("channel_id")
         sb_id = row.get("skullboard_message_id")
-        if cfg.get("skullboard_channel_id") and sb_id:
-            link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{sb_id}"
+        sb_cid = cfg.get("skullboard_channel_id")
+
+        link = None
+        if orig_cid and orig_mid:
+            link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
+        elif sb_cid and sb_id:
+            link = f"https://discord.com/channels/{gid}/{sb_cid}/{sb_id}"
+        elif orig_mid and sb_cid:
+            link = f"https://discord.com/channels/{gid}/{sb_cid}/{orig_mid}"
+
+        if link:
             lines.append(f"{pos} **[{name}]({link})** — **{count} 💀**")
         else:
             lines.append(f"{pos} **{name}** — **{count} 💀**")
+        valid_count += 1
+
+    if not lines:
+        embed = discord.Embed(title="🏆 Top Skullboard", description="Aún no hay mensajes válidos en el skullboard.", color=0x4e5058)
+        return await interaction.followup.send(embed=embed)
 
     embed = discord.Embed(title="🏆 Top Skullboard", description="\n".join(lines), color=0xfaa61a)
-    embed.set_footer(text=f"Top {len(resp.data)} mensajes del servidor")
+    embed.set_footer(text=f"Top {len(lines)} mensajes del servidor")
     await interaction.followup.send(embed=embed)
 
 @tree.command(name="random", description="Muestra un mensaje aleatorio del skullboard")
@@ -2228,8 +2284,29 @@ async def _stats_embed(guild: discord.Guild, member: discord.Member) -> discord.
     best_sb_id   = stats.get("best_skullboard_message_id")
     cfg          = await get_guild_config(guild.id)
     link         = None
-    if best_sb_id and cfg.get("skullboard_channel_id"):
-        link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{best_sb_id}"
+
+    # Intentar obtener el enlace directo al mensaje original del mejor mensaje
+    try:
+        best_msg_resp = await supabase.table("tracked_messages") \
+            .select("message_id,channel_id,skullboard_message_id") \
+            .eq("guild_id", gid).eq("author_id", uid) \
+            .order("skull_count", desc=True).limit(1).execute()
+        if best_msg_resp.data:
+            bm = best_msg_resp.data[0]
+            orig_cid = bm.get("channel_id")
+            orig_mid = bm.get("message_id")
+            sb_id = bm.get("skullboard_message_id")
+            sb_cid = cfg.get("skullboard_channel_id")
+            if orig_cid and orig_mid:
+                link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
+            elif sb_cid and sb_id:
+                link = f"https://discord.com/channels/{gid}/{sb_cid}/{sb_id}"
+            elif orig_mid and sb_cid:
+                link = f"https://discord.com/channels/{gid}/{sb_cid}/{orig_mid}"
+    except Exception as e:
+        logger.debug(f"Error resolviendo enlace directo para best message en stats: {e}")
+        if best_sb_id and cfg.get("skullboard_channel_id"):
+            link = f"https://discord.com/channels/{gid}/{cfg['skullboard_channel_id']}/{best_sb_id}"
 
     embed = discord.Embed(title=f"📊 Stats de {member.display_name}", color=0x8b5cf6)
     embed.set_thumbnail(url=member.display_avatar.url)

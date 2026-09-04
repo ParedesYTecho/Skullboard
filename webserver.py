@@ -701,14 +701,30 @@ def api_guild_leaderboard_public(guild_id: str):
         item["author_global_name"] = profile.get("global_name") or item["author_username"]
         item["author_avatar_url"] = profile.get("avatar_url")
 
+        uname_lower = str(item["author_username"]).lower().strip()
+        gname_lower = str(item["author_global_name"]).lower().strip()
+        if (
+            uname_lower in ("deleted user", "deleted_user", "usuario desconocido")
+            or uname_lower.startswith("deleted user")
+            or gname_lower in ("deleted user", "deleted_user", "usuario desconocido")
+            or gname_lower.startswith("deleted user")
+        ):
+            continue
+
         orig_chan = str(item.get("channel_id") or "")
         orig_mid = str(item.get("message_id") or "")
         sb_msg_id = str(item.get("skullboard_message_id") or "")
 
-        # Prioridad absoluta: Saltar al mensaje publicado en el canal oficial de Skullboard
-        if starboard_channel_id and sb_msg_id:
+        # Prioridad de enlace: Si existe el canal y mensaje original, enlazar directo al mensaje real
+        if orig_chan and orig_mid:
+            target_chan = orig_chan
+            target_mid = orig_mid
+        elif starboard_channel_id and sb_msg_id:
             target_chan = starboard_channel_id
             target_mid = sb_msg_id
+        elif orig_mid and starboard_channel_id:
+            target_chan = starboard_channel_id
+            target_mid = orig_mid
         else:
             target_chan = orig_chan
             target_mid = orig_mid
@@ -763,6 +779,16 @@ def api_guild_leaderboard_users(guild_id: str):
         author_username = profile.get("username") or f"Usuario {author_id[-4:] if len(author_id) >= 4 else author_id}"
         author_global_name = profile.get("global_name") or author_username
         author_avatar_url = profile.get("avatar_url")
+
+        uname_lower = author_username.lower().strip()
+        gname_lower = author_global_name.lower().strip()
+        if (
+            uname_lower in ("deleted user", "deleted_user", "usuario desconocido")
+            or uname_lower.startswith("deleted user")
+            or gname_lower in ("deleted user", "deleted_user", "usuario desconocido")
+            or gname_lower.startswith("deleted user")
+        ):
+            continue
 
         users.append({
             "author_id": author_id,
@@ -819,9 +845,15 @@ def api_guild_my_messages(guild_id: str):
         orig_mid = str(item.get("message_id") or "")
         sb_msg_id = str(item.get("skullboard_message_id") or "")
 
-        if starboard_channel_id and sb_msg_id:
+        if orig_chan and orig_mid:
+            target_chan = orig_chan
+            target_mid = orig_mid
+        elif starboard_channel_id and sb_msg_id:
             target_chan = starboard_channel_id
             target_mid = sb_msg_id
+        elif orig_mid and starboard_channel_id:
+            target_chan = starboard_channel_id
+            target_mid = orig_mid
         else:
             target_chan = orig_chan
             target_mid = orig_mid

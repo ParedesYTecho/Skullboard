@@ -54,7 +54,23 @@
         </div>
     </nav>
 
-    <div class="container dashboard-layout" style="padding-top:20px;">
+    <div class="container dashboard-layout">
+        <!-- ESTADO NO AUTENTICADO (ESTILO WEREWOLF) -->
+        <div id="view-unauthenticated" style="display:none; text-align:center; padding:70px 20px;">
+            <div class="emblem" style="margin:0 auto 20px; font-size:64px;">💀</div>
+            <h1 style="font-size:2rem; font-weight:800; color:var(--ink); margin-bottom:10px;">Inicia sesión con Discord</h1>
+            <p style="color:var(--ink-soft); max-width:480px; margin:0 auto 28px; font-size:0.95rem; line-height:1.5;">
+                Accede a tu panel para gestionar los ajustes de tu comunidad, consultar los rankings y ver tus estadísticas personales en SkullBoard.
+            </p>
+            <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary" style="padding:12px 28px;">
+                    <svg style="width:20px;height:20px;fill:currentColor;stroke:none;"><use href="#i-discord"/></svg>
+                    <span>Iniciar Sesión con Discord</span>
+                </button>
+                <a href="/" class="btn btn-ghost" style="padding:12px 22px;">Volver al inicio</a>
+            </div>
+        </div>
+
         <!-- ESTADO CARGANDO / VERIFICANDO -->
         <div id="view-loading" style="text-align:center; padding:90px 20px;">
             <div class="emblem" style="animation: pulse 1.5s infinite ease-in-out;">💀</div>
@@ -567,24 +583,34 @@
                                 }
                             }
 
-                            let chanName = 'canal';
-                            if (currentGuildChannels && currentGuildChannels.length > 0) {
+                            let chanName = '';
+                            if (currentGuildChannels && currentGuildChannels.length > 0 && m.channel_id) {
                                 const found = currentGuildChannels.find(c => String(c.id) === String(m.channel_id));
                                 if (found && found.name) {
                                     chanName = String(found.name).replace(/^#\s*/, '');
                                 }
                             }
 
-                            const jumpBtnHtml = m.jump_url
-                                ? `<a href="${m.jump_url}" onclick="openDiscordJump(event, '${m.app_jump_url || ''}', '${m.jump_url}')" class="btn-jump-discord" title="Abrir mensaje en el canal de Skullboard">
+                            let metaChannelHtml = '';
+                            if (chanName) {
+                                metaChannelHtml = `<span class="lb-msg-channel">#${escapeHtml(chanName)}</span>${dateStr ? '<span>·</span>' : ''}`;
+                            } else if (m.channel_id) {
+                                metaChannelHtml = `<span class="lb-msg-channel">#${escapeHtml(m.channel_id)}</span>${dateStr ? '<span>·</span>' : ''}`;
+                            }
+
+                            const directJumpUrl = m.original_jump_url || m.jump_url;
+                            const directAppJumpUrl = m.app_original_jump_url || m.app_jump_url || '';
+
+                            const jumpBtnHtml = directJumpUrl
+                                ? `<a href="${directJumpUrl}" onclick="openDiscordJump(event, '${directAppJumpUrl}', '${directJumpUrl}')" class="btn-jump-discord" title="Abrir mensaje en Skullboard">
                                     <span>Ver en Skullboard 💀</span>
                                     <svg style="width:13px;height:13px;"><use href="#i-link"/></svg>
                                    </a>`
                                 : '';
 
-                            const origBtnHtml = m.original_jump_url
-                                ? `<a href="${m.original_jump_url}" onclick="openDiscordJump(event, '${m.app_original_jump_url || ''}', '${m.original_jump_url}')" class="btn-orig-jump" title="Abrir mensaje original donde se escribió">
-                                    <span>Original ↗</span>
+                            const origBtnHtml = (m.skullboard_jump_url && m.skullboard_jump_url !== directJumpUrl)
+                                ? `<a href="${m.skullboard_jump_url}" onclick="openDiscordJump(event, '${m.app_skullboard_jump_url || ''}', '${m.skullboard_jump_url}')" class="btn-orig-jump" title="Abrir mensaje en el canal de Skullboard">
+                                    <span>Skullboard 💀</span>
                                    </a>`
                                 : '';
 
@@ -595,9 +621,10 @@
                                     <div class="lb-user-details">
                                         <span class="lb-user-name" title="${authorName}">${authorName}</span>
                                         <div class="lb-msg-meta">
-                                            <span class="lb-msg-channel">#${escapeHtml(chanName)}</span>
-                                            ${dateStr ? `<span>·</span><span>${escapeHtml(dateStr)}</span>` : ''}
+                                            ${metaChannelHtml}
+                                            ${dateStr ? `<span>${escapeHtml(dateStr)}</span>` : ''}
                                         </div>
+                                        <span class="lb-user-handle">${authorHandle}</span>
                                     </div>
                                 </div>
                                 <div class="lb-card-right">
@@ -654,25 +681,35 @@
                                 dateStr = 'Fecha registrada';
                             }
 
-                            let chanName = 'canal';
-                            if (currentGuildChannels && currentGuildChannels.length > 0) {
+                            let chanName = '';
+                            if (currentGuildChannels && currentGuildChannels.length > 0 && m.channel_id) {
                                 const found = currentGuildChannels.find(c => String(c.id) === String(m.channel_id));
                                 if (found && found.name) {
                                     chanName = String(found.name).replace(/^#\s*/, '');
                                 }
                             }
-                            const chanLabel = `#${escapeHtml(chanName)} · ${escapeHtml(dateStr)}`;
+                            let chanLabel = '';
+                            if (chanName) {
+                                chanLabel = `#${escapeHtml(chanName)} · ${escapeHtml(dateStr)}`;
+                            } else if (m.channel_id) {
+                                chanLabel = `#${escapeHtml(m.channel_id)} · ${escapeHtml(dateStr)}`;
+                            } else {
+                                chanLabel = `${escapeHtml(dateStr)}`;
+                            }
 
-                            const jumpBtnHtml = m.jump_url
-                                ? `<a href="${m.jump_url}" onclick="openDiscordJump(event, '${m.app_jump_url || ''}', '${m.jump_url}')" class="btn-jump-discord" title="Abrir mensaje en el canal de Skullboard">
+                            const directJumpUrl = m.original_jump_url || m.jump_url;
+                            const directAppJumpUrl = m.app_original_jump_url || m.app_jump_url || '';
+
+                            const jumpBtnHtml = directJumpUrl
+                                ? `<a href="${directJumpUrl}" onclick="openDiscordJump(event, '${directAppJumpUrl}', '${directJumpUrl}')" class="btn-jump-discord" title="Abrir mensaje en Skullboard">
                                     <span>Ver en Skullboard 💀</span>
                                     <svg style="width:13px;height:13px;"><use href="#i-link"/></svg>
                                    </a>`
                                 : '';
 
-                            const origBtnHtml = m.original_jump_url
-                                ? `<a href="${m.original_jump_url}" onclick="openDiscordJump(event, '${m.app_original_jump_url || ''}', '${m.original_jump_url}')" class="btn-orig-jump" title="Abrir mensaje original donde se escribió">
-                                    <span>Original ↗</span>
+                            const origBtnHtml = (m.skullboard_jump_url && m.skullboard_jump_url !== directJumpUrl)
+                                ? `<a href="${m.skullboard_jump_url}" onclick="openDiscordJump(event, '${m.app_skullboard_jump_url || ''}', '${m.skullboard_jump_url}')" class="btn-orig-jump" title="Abrir mensaje en el canal de Skullboard">
+                                    <span>Skullboard 💀</span>
                                    </a>`
                                 : '';
 
@@ -1097,7 +1134,7 @@
                     localStorage.removeItem('skb_cached_guilds');
                     localStorage.removeItem('skb_last_guild_id');
                     sessionStorage.removeItem('skb_auth_token');
-                    triggerDiscordAuth();
+                    window.location.href = '/?logged_out=1';
                 });
             }
         }
@@ -1132,11 +1169,25 @@
             }
         }
 
-        // INICIALIZACIÓN ULTRARRÁPIDA (CON CACHÉ INSTANTÁNEO Y SIN BUCLES DE ERROR)
+        // INICIALIZACIÓN ULTRARRÁPIDA (CON CACHÉ INSTANTÁNEO Y SIN BUCLES DE ERROR - ESTILO WEREWOLF)
         async function init() {
             authToken = await getOrExchangeAuthToken();
             if (!authToken) {
-                triggerDiscordAuth();
+                // Modo Werewolf: si no hay token, no forzar redirección en bucle.
+                // Mostrar vista no autenticada limpia y botón en la barra superior.
+                document.getElementById('view-loading').style.display = 'none';
+                const unauthView = document.getElementById('view-unauthenticated');
+                if (unauthView) unauthView.style.display = 'block';
+                const slot = document.getElementById('auth-nav-slot');
+                if (slot) {
+                    slot.innerHTML = `
+                        <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm" style="font-size:0.84rem; padding:7px 15px;">
+                            <svg style="width:16px;height:16px;fill:currentColor;stroke:none;"><use href="#i-discord"/></svg>
+                            <span>Entrar</span>
+                        </button>
+                    `;
+                }
+                showFooter();
                 return;
             }
 
@@ -1165,14 +1216,25 @@
                     fetch(`${API_BASE}/api/auth/guilds`, { headers: { 'Authorization': `Bearer ${authToken}` } })
                 ]);
 
-                // Solo si Discord rechaza el token con 401 o 403 se limpia y reautentica
+                // Solo si Discord rechaza el token con 401 o 403 se limpia y muestra sesión expirada
                 if (userRes.status === 401 || userRes.status === 403 || guildsRes.status === 401 || guildsRes.status === 403) {
                     localStorage.removeItem('skb_auth_token');
                     localStorage.removeItem('skb_cached_user');
                     localStorage.removeItem('skb_cached_guilds');
                     localStorage.removeItem('skb_last_guild_id');
                     sessionStorage.removeItem('skb_auth_token');
-                    triggerDiscordAuth();
+                    document.getElementById('view-loading').innerHTML = `
+                        <div class="emblem">🔒</div>
+                        <h2 style="margin-top:16px;">Sesión Expirada</h2>
+                        <p style="color:var(--ink-soft); max-width:440px; margin:8px auto 20px;">
+                            Tu sesión con Discord ha caducado. Vuelve a iniciar sesión para continuar.
+                        </p>
+                        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                            <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Iniciar Sesión con Discord</button>
+                            <a href="/" class="btn btn-ghost btn-sm">Volver al inicio</a>
+                        </div>
+                    `;
+                    showFooter();
                     return;
                 }
 

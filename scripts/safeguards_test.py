@@ -737,6 +737,82 @@ class TestSuite9_LeaderboardAndJumpUrls(unittest.TestCase):
         self.assertIn(".btn-orig-jump", self.styles_content, "styles.css must style .btn-orig-jump")
 
 
+# ─── Test Suite 10: Werewolf Auth Session, Deleted User Filtering & Direct Jump URLs ──
+class TestSuite10_WerewolfSessionAndDeletedUserFiltering(unittest.TestCase):
+    """Verifies:
+    - dashboard.html layout does not have style="padding-top:20px;" overlapping the navbar
+    - dashboard.html unauthenticated view with login / home buttons and clean logout redirecting to /?logged_out=1
+    - dashboard.html does not contain hardcoded 'chanName = 'canal'' fallback
+    - webserver.py filters out deleted user accounts in user and message leaderboards
+    - main.py filters deleted users and prioritizes direct message links in top_cmd and top_slash
+    - main.py backfill_cmd preserves channel_id in registros_dict
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.webserver_content = _get_file_content(os.path.join(ROOT_DIR, "webserver.py"))
+        cls.dashboard_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "dashboard.html"))
+        cls.main_content = _get_file_content(os.path.join(ROOT_DIR, "main.py"))
+
+    def test_dashboard_no_inline_padding_top_overlapping_navbar(self):
+        """dashboard.html must not have inline style='padding-top:20px;' that breaks sticky navbar offset."""
+        self.assertNotIn(
+            'style="padding-top:20px;"',
+            self.dashboard_content,
+            "dashboard.html must not override .dashboard-layout with style='padding-top:20px;'"
+        )
+
+    def test_dashboard_werewolf_logout_and_unauthenticated_view(self):
+        """dashboard.html must implement Werewolf pattern: clean redirect to /?logged_out=1 and view-unauthenticated card."""
+        self.assertIn(
+            "/?logged_out=1",
+            self.dashboard_content,
+            "dashboard.html logout button must redirect to '/?logged_out=1' instead of looping auth"
+        )
+        self.assertIn(
+            'id="view-unauthenticated"',
+            self.dashboard_content,
+            "dashboard.html must have #view-unauthenticated container"
+        )
+
+    def test_dashboard_no_hardcoded_canal_fallback(self):
+        """dashboard.html must not hardcode 'let chanName = \'canal\'' which displays dummy #canal text."""
+        self.assertNotIn(
+            "chanName = 'canal'",
+            self.dashboard_content,
+            "dashboard.html must not set dummy fallback 'canal'"
+        )
+
+    def test_webserver_filters_deleted_users(self):
+        """webserver.py must filter out deleted user accounts in both leaderboard endpoints."""
+        self.assertIn(
+            'uname_lower in ("deleted user", "deleted_user", "usuario desconocido")',
+            self.webserver_content,
+            "webserver.py must filter deleted users in leaderboard"
+        )
+
+    def test_main_py_filters_deleted_users_and_direct_jump_urls(self):
+        """main.py must filter deleted users in top_cmd and top_slash and prioritize direct jump links."""
+        self.assertIn(
+            'name_clean in ("deleted user", "deleted_user", "usuario desconocido")',
+            self.main_content,
+            "main.py must filter deleted users in top commands"
+        )
+        self.assertIn(
+            'f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"',
+            self.main_content,
+            "main.py must build direct message jump links to orig_cid/orig_mid"
+        )
+
+    def test_main_py_backfill_preserves_channel_id(self):
+        """main.py backfill_cmd must store orig_chan_id into channel_id."""
+        self.assertIn(
+            'registros_dict[orig_msg_id]["channel_id"] = str(data["orig_chan_id"])',
+            self.main_content,
+            "main.py backfill_cmd must store channel_id from orig_chan_id"
+        )
+
+
 # ─── Custom Test Result Handler for Clean Presentation ────────────────────────
 class SafeguardTestResult(unittest.TestResult):
     def __init__(self):
@@ -780,6 +856,7 @@ def run_safeguards():
         ("Suite 7: Visual & Status Renovation (Sapphire Footer, Status API & Jump URLs)", TestSuite7_VisualAndStatusRenovation),
         ("Suite 8: Total Perfection (Smart Navbar, Number Inputs, Channels Fix & Skull ☠️)", TestSuite8_TotalPerfection),
         ("Suite 9: Real Hybrid Leaderboard, Skullboard Jump URLs & Footer Anchor", TestSuite9_LeaderboardAndJumpUrls),
+        ("Suite 10: Werewolf Auth Session, Deleted User Filtering & Direct Jump URLs", TestSuite10_WerewolfSessionAndDeletedUserFiltering),
     ]
 
     total_tests = 0
