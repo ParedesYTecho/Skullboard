@@ -705,8 +705,13 @@ def api_guild_leaderboard_public(guild_id: str):
         orig_mid = str(item.get("message_id") or "")
         sb_msg_id = str(item.get("skullboard_message_id") or "")
 
-        target_chan = orig_chan if orig_chan else starboard_channel_id
-        target_mid = orig_mid if orig_chan else sb_msg_id
+        # Prioridad absoluta: Saltar al mensaje publicado en el canal oficial de Skullboard
+        if starboard_channel_id and sb_msg_id:
+            target_chan = starboard_channel_id
+            target_mid = sb_msg_id
+        else:
+            target_chan = orig_chan
+            target_mid = orig_mid
 
         if target_chan and target_mid:
             item["jump_url"] = f"https://discord.com/channels/{guild_id}/{target_chan}/{target_mid}"
@@ -715,9 +720,60 @@ def api_guild_leaderboard_public(guild_id: str):
             item["jump_url"] = None
             item["app_jump_url"] = None
 
+        if starboard_channel_id and sb_msg_id:
+            item["skullboard_jump_url"] = f"https://discord.com/channels/{guild_id}/{starboard_channel_id}/{sb_msg_id}"
+            item["app_skullboard_jump_url"] = f"discord://-/channels/{guild_id}/{starboard_channel_id}/{sb_msg_id}"
+        else:
+            item["skullboard_jump_url"] = None
+            item["app_skullboard_jump_url"] = None
+
+        if orig_chan and orig_mid:
+            item["original_jump_url"] = f"https://discord.com/channels/{guild_id}/{orig_chan}/{orig_mid}"
+            item["app_original_jump_url"] = f"discord://-/channels/{guild_id}/{orig_chan}/{orig_mid}"
+        else:
+            item["original_jump_url"] = None
+            item["app_original_jump_url"] = None
+
+        if orig_mid and orig_mid.isdigit() and len(orig_mid) >= 15:
+            try:
+                ms = (int(orig_mid) >> 22) + 1420070400000
+                item["timestamp_ms"] = ms
+            except Exception:
+                item["timestamp_ms"] = None
+        else:
+            item["timestamp_ms"] = None
+
         enriched.append(item)
 
     return _cors(jsonify(ok=True, messages=enriched))
+
+@app.route('/api/guild/<guild_id>/leaderboard/users', methods=["GET", "OPTIONS"])
+def api_guild_leaderboard_users(guild_id: str):
+    """Devuelve el ranking acumulado de usuarios únicos en el servidor mediante la RPC get_guild_leaderboard."""
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+
+    limit = min(max(int(request.args.get("limit", 25)), 1), 100)
+    rows = _sb_rpc("get_guild_leaderboard", {"p_guild_id": str(guild_id), "p_limit": limit}) or []
+
+    users = []
+    for r in rows:
+        author_id = str(r.get("author_id") or "")
+        profile = _fetch_author_profile_cached(author_id) if author_id else {}
+        author_username = profile.get("username") or f"Usuario {author_id[-4:] if len(author_id) >= 4 else author_id}"
+        author_global_name = profile.get("global_name") or author_username
+        author_avatar_url = profile.get("avatar_url")
+
+        users.append({
+            "author_id": author_id,
+            "author_username": author_username,
+            "author_global_name": author_global_name,
+            "author_avatar_url": author_avatar_url,
+            "total_skulls": int(r.get("total_skulls") or 0),
+            "message_count": int(r.get("message_count") or 0)
+        })
+
+    return _cors(jsonify(ok=True, users=users))
 
 @app.route('/api/guild/<guild_id>/my-messages', methods=["GET", "OPTIONS"])
 def api_guild_my_messages(guild_id: str):
@@ -763,8 +819,12 @@ def api_guild_my_messages(guild_id: str):
         orig_mid = str(item.get("message_id") or "")
         sb_msg_id = str(item.get("skullboard_message_id") or "")
 
-        target_chan = orig_chan if orig_chan else starboard_channel_id
-        target_mid = orig_mid if orig_chan else sb_msg_id
+        if starboard_channel_id and sb_msg_id:
+            target_chan = starboard_channel_id
+            target_mid = sb_msg_id
+        else:
+            target_chan = orig_chan
+            target_mid = orig_mid
 
         if target_chan and target_mid:
             item["jump_url"] = f"https://discord.com/channels/{guild_id}/{target_chan}/{target_mid}"
@@ -772,6 +832,29 @@ def api_guild_my_messages(guild_id: str):
         else:
             item["jump_url"] = None
             item["app_jump_url"] = None
+
+        if starboard_channel_id and sb_msg_id:
+            item["skullboard_jump_url"] = f"https://discord.com/channels/{guild_id}/{starboard_channel_id}/{sb_msg_id}"
+            item["app_skullboard_jump_url"] = f"discord://-/channels/{guild_id}/{starboard_channel_id}/{sb_msg_id}"
+        else:
+            item["skullboard_jump_url"] = None
+            item["app_skullboard_jump_url"] = None
+
+        if orig_chan and orig_mid:
+            item["original_jump_url"] = f"https://discord.com/channels/{guild_id}/{orig_chan}/{orig_mid}"
+            item["app_original_jump_url"] = f"discord://-/channels/{guild_id}/{orig_chan}/{orig_mid}"
+        else:
+            item["original_jump_url"] = None
+            item["app_original_jump_url"] = None
+
+        if orig_mid and orig_mid.isdigit() and len(orig_mid) >= 15:
+            try:
+                ms = (int(orig_mid) >> 22) + 1420070400000
+                item["timestamp_ms"] = ms
+            except Exception:
+                item["timestamp_ms"] = None
+        else:
+            item["timestamp_ms"] = None
 
         enriched_msgs.append(item)
 

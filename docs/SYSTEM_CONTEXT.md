@@ -288,6 +288,7 @@ erDiagram
 | `/api/guild/<guild_id>/channels` | `GET` | Bearer Token (Admin `0x8`) | Lista canales de texto (tipo 0) y anuncios (tipo 5) del servidor para el selector de configuración. |
 | `/api/guild/<guild_id>/config` | `GET`, `POST` | Bearer Token (Admin `0x8`) | `GET`: Consulta configuración del servidor.<br>`POST`: Guarda `min_skulls`, `prefix`, `channel_id`, `pin_threshold`. |
 | `/api/guild/<guild_id>/leaderboard/public` | `GET` | Público | Retorna los 25 mensajes con más calaveras de un servidor sin requerir login. |
+| `/api/guild/<guild_id>/leaderboard/users` | `GET` | Público | Retorna el ranking de miembros únicos con calaveras totales acumuladas (RPC `get_guild_leaderboard`). |
 | `/api/guild/<guild_id>/leaderboard` | `GET` | Bearer Token | Retorna los 50 mensajes con más calaveras para miembros autenticados del servidor. |
 | `/api/guild/<guild_id>/my-messages` | `GET` | Bearer Token | Retorna mensajes destacados del usuario autenticado con conteos exactos de BD. |
 | `/api/og` | `GET` | Público (Cache 120s) | Genera dinámicamente la tarjeta vectorial SVG OpenGraph con métricas en vivo. |

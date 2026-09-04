@@ -677,6 +677,66 @@ class TestSuite8_TotalPerfection(unittest.TestCase):
                 self.assertIn("nav-hidden", html, f"{name} must toggle 'nav-hidden' on scroll")
 
 
+# ─── Test Suite 9: Real Hybrid Leaderboard, Jump URLs to Skullboard & Footer Anchor ─
+class TestSuite9_LeaderboardAndJumpUrls(unittest.TestCase):
+    """Verifies:
+    - Jump URLs prioritize the SkullBoard channel and message ID (starboard_channel_id & skullboard_message_id)
+    - Endpoint /api/guild/<guild_id>/leaderboard/users is implemented and uses get_guild_leaderboard
+    - dashboard.html contains the dual sub-tabs for Top Usuarios and Mensajes Legendarios
+    - dashboard.html uses 'Ver en Skullboard 💀' for jump actions
+    - styles.css removes the void bottom gap (padding-bottom: 0 !important on .dashboard-layout)
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.webserver_content = _get_file_content(os.path.join(ROOT_DIR, "webserver.py"))
+        cls.dashboard_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "dashboard.html"))
+        cls.styles_content = _get_file_content(os.path.join(ROOT_DIR, "legal", "styles.css"))
+
+    def test_jump_urls_prioritize_skullboard_channel(self):
+        """webserver.py must prioritize starboard_channel_id and skullboard_message_id for jump URLs."""
+        self.assertIn(
+            "starboard_channel_id and sb_msg_id",
+            self.webserver_content,
+            "webserver.py must check starboard_channel_id and sb_msg_id to prioritize skullboard channel"
+        )
+        self.assertIn(
+            "skullboard_jump_url",
+            self.webserver_content,
+            "webserver.py must explicitly expose skullboard_jump_url"
+        )
+        self.assertIn(
+            "original_jump_url",
+            self.webserver_content,
+            "webserver.py must explicitly expose original_jump_url"
+        )
+
+    def test_leaderboard_users_endpoint_defined(self):
+        """webserver.py must define /api/guild/<guild_id>/leaderboard/users using RPC get_guild_leaderboard."""
+        self.assertIn(
+            "/api/guild/<guild_id>/leaderboard/users",
+            self.webserver_content,
+            "webserver.py must expose /api/guild/<guild_id>/leaderboard/users"
+        )
+        self.assertIn(
+            "get_guild_leaderboard",
+            self.webserver_content,
+            "webserver.py must invoke get_guild_leaderboard RPC for user ranking"
+        )
+
+    def test_dashboard_dual_leaderboard_subtabs(self):
+        """dashboard.html must contain sub-tabs for Top Usuarios and Mensajes Destacados."""
+        self.assertIn('id="lb-sub-btn-users"', self.dashboard_content, "dashboard.html must have #lb-sub-btn-users")
+        self.assertIn('id="lb-sub-btn-messages"', self.dashboard_content, "dashboard.html must have #lb-sub-btn-messages")
+        self.assertIn('Ver en Skullboard 💀', self.dashboard_content, "dashboard.html must label button 'Ver en Skullboard 💀'")
+
+    def test_footer_elevation_css_rules(self):
+        """styles.css must remove bottom void gap from .dashboard-layout and style .site-footer-v2 cleanly."""
+        self.assertIn("padding-bottom: 0 !important", self.styles_content, "styles.css must eliminate bottom void from .dashboard-layout")
+        self.assertIn(".lb-sub-tabs", self.styles_content, "styles.css must style .lb-sub-tabs")
+        self.assertIn(".btn-orig-jump", self.styles_content, "styles.css must style .btn-orig-jump")
+
+
 # ─── Custom Test Result Handler for Clean Presentation ────────────────────────
 class SafeguardTestResult(unittest.TestResult):
     def __init__(self):
@@ -719,6 +779,7 @@ def run_safeguards():
         ("Suite 6: System Context Documentation Synchronization (R3)", TestSuite6_DocumentationSync),
         ("Suite 7: Visual & Status Renovation (Sapphire Footer, Status API & Jump URLs)", TestSuite7_VisualAndStatusRenovation),
         ("Suite 8: Total Perfection (Smart Navbar, Number Inputs, Channels Fix & Skull ☠️)", TestSuite8_TotalPerfection),
+        ("Suite 9: Real Hybrid Leaderboard, Skullboard Jump URLs & Footer Anchor", TestSuite9_LeaderboardAndJumpUrls),
     ]
 
     total_tests = 0
