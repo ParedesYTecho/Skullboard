@@ -564,14 +564,17 @@ def api_guild_config(guild_id: str):
 
     if request.method == "GET":
         cfg = _sb_select("settings", {"guild_id": f"eq.{guild_id}"})
-        data = cfg[0] if cfg else {"guild_id": guild_id, "skullboard_channel_id": 0, "min_skulls": 1, "prefix": "sk!"}
+        data = cfg[0] if cfg else {"guild_id": guild_id, "skullboard_channel_id": "0", "min_skulls": 1, "prefix": "sk!"}
+        if data.get("skullboard_channel_id") is not None:
+            data["skullboard_channel_id"] = str(data["skullboard_channel_id"])
         return _cors(jsonify(ok=True, config=data))
 
     if request.method == "POST":
         body = request.get_json(silent=True) or {}
         min_skulls = max(1, min(int(body.get("min_skulls", 1)), 50))
         prefix = re.sub(r'[\r\n\s]+', '', str(body.get("prefix", "sk!")))[:10] or "sk!"
-        channel_id = int(body.get("skullboard_channel_id") or 0)
+        channel_id_raw = str(body.get("skullboard_channel_id") or "0").strip()
+        channel_id = int(channel_id_raw) if channel_id_raw.isdigit() else 0
         pin_threshold = max(0, min(int(body.get("pin_threshold", 0)), 50))
 
         payload = {
@@ -588,6 +591,7 @@ def api_guild_config(guild_id: str):
                     _cache_invalidator(guild_id)
                 except Exception:
                     pass
+            payload["skullboard_channel_id"] = str(payload["skullboard_channel_id"])
             return _cors(jsonify(ok=True, config=payload))
         return _cors(jsonify(ok=False, error="Error al guardar configuración")), 500
 
@@ -715,13 +719,13 @@ def api_guild_leaderboard_public(guild_id: str):
         orig_mid = str(item.get("message_id") or "")
         sb_msg_id = str(item.get("skullboard_message_id") or "")
 
-        # Prioridad de enlace: Si existe el canal y mensaje original, enlazar directo al mensaje real
-        if orig_chan and orig_mid:
-            target_chan = orig_chan
-            target_mid = orig_mid
-        elif starboard_channel_id and sb_msg_id:
+        # Prioridad de enlace: Si existe el mensaje en Skullboard oficial, enlazar a él
+        if starboard_channel_id and sb_msg_id:
             target_chan = starboard_channel_id
             target_mid = sb_msg_id
+        elif orig_chan and orig_mid:
+            target_chan = orig_chan
+            target_mid = orig_mid
         elif orig_mid and starboard_channel_id:
             target_chan = starboard_channel_id
             target_mid = orig_mid
@@ -845,12 +849,12 @@ def api_guild_my_messages(guild_id: str):
         orig_mid = str(item.get("message_id") or "")
         sb_msg_id = str(item.get("skullboard_message_id") or "")
 
-        if orig_chan and orig_mid:
-            target_chan = orig_chan
-            target_mid = orig_mid
-        elif starboard_channel_id and sb_msg_id:
+        if starboard_channel_id and sb_msg_id:
             target_chan = starboard_channel_id
             target_mid = sb_msg_id
+        elif orig_chan and orig_mid:
+            target_chan = orig_chan
+            target_mid = orig_mid
         elif orig_mid and starboard_channel_id:
             target_chan = starboard_channel_id
             target_mid = orig_mid

@@ -598,19 +598,19 @@
                                 metaChannelHtml = `<span class="lb-msg-channel">#${escapeHtml(m.channel_id)}</span>${dateStr ? '<span>·</span>' : ''}`;
                             }
 
-                            const directJumpUrl = m.original_jump_url || m.jump_url;
-                            const directAppJumpUrl = m.app_original_jump_url || m.app_jump_url || '';
+                            const sbJumpUrl = m.skullboard_jump_url || m.jump_url;
+                            const sbAppJumpUrl = m.app_skullboard_jump_url || m.app_jump_url || '';
 
-                            const jumpBtnHtml = directJumpUrl
-                                ? `<a href="${directJumpUrl}" onclick="openDiscordJump(event, '${directAppJumpUrl}', '${directJumpUrl}')" class="btn-jump-discord" title="Abrir mensaje en Skullboard">
+                            const jumpBtnHtml = sbJumpUrl
+                                ? `<a href="${sbJumpUrl}" onclick="openDiscordJump(event, '${sbAppJumpUrl}', '${sbJumpUrl}')" class="btn-jump-discord" title="Abrir mensaje en el canal de Skullboard">
                                     <span>Ver en Skullboard 💀</span>
                                     <svg style="width:13px;height:13px;"><use href="#i-link"/></svg>
                                    </a>`
                                 : '';
 
-                            const origBtnHtml = (m.skullboard_jump_url && m.skullboard_jump_url !== directJumpUrl)
-                                ? `<a href="${m.skullboard_jump_url}" onclick="openDiscordJump(event, '${m.app_skullboard_jump_url || ''}', '${m.skullboard_jump_url}')" class="btn-orig-jump" title="Abrir mensaje en el canal de Skullboard">
-                                    <span>Skullboard 💀</span>
+                            const origBtnHtml = (m.original_jump_url && m.original_jump_url !== sbJumpUrl)
+                                ? `<a href="${m.original_jump_url}" onclick="openDiscordJump(event, '${m.app_original_jump_url || ''}', '${m.original_jump_url}')" class="btn-orig-jump" title="Abrir mensaje original donde se escribió">
+                                    <span>Original ↗</span>
                                    </a>`
                                 : '';
 
@@ -697,19 +697,19 @@
                                 chanLabel = `${escapeHtml(dateStr)}`;
                             }
 
-                            const directJumpUrl = m.original_jump_url || m.jump_url;
-                            const directAppJumpUrl = m.app_original_jump_url || m.app_jump_url || '';
+                            const sbJumpUrl = m.skullboard_jump_url || m.jump_url;
+                            const sbAppJumpUrl = m.app_skullboard_jump_url || m.app_jump_url || '';
 
-                            const jumpBtnHtml = directJumpUrl
-                                ? `<a href="${directJumpUrl}" onclick="openDiscordJump(event, '${directAppJumpUrl}', '${directJumpUrl}')" class="btn-jump-discord" title="Abrir mensaje en Skullboard">
+                            const jumpBtnHtml = sbJumpUrl
+                                ? `<a href="${sbJumpUrl}" onclick="openDiscordJump(event, '${sbAppJumpUrl}', '${sbJumpUrl}')" class="btn-jump-discord" title="Abrir mensaje en el canal de Skullboard">
                                     <span>Ver en Skullboard 💀</span>
                                     <svg style="width:13px;height:13px;"><use href="#i-link"/></svg>
                                    </a>`
                                 : '';
 
-                            const origBtnHtml = (m.skullboard_jump_url && m.skullboard_jump_url !== directJumpUrl)
-                                ? `<a href="${m.skullboard_jump_url}" onclick="openDiscordJump(event, '${m.app_skullboard_jump_url || ''}', '${m.skullboard_jump_url}')" class="btn-orig-jump" title="Abrir mensaje en el canal de Skullboard">
-                                    <span>Skullboard 💀</span>
+                            const origBtnHtml = (m.original_jump_url && m.original_jump_url !== sbJumpUrl)
+                                ? `<a href="${m.original_jump_url}" onclick="openDiscordJump(event, '${m.app_original_jump_url || ''}', '${m.original_jump_url}')" class="btn-orig-jump" title="Abrir mensaje original donde se escribió">
+                                    <span>Original ↗</span>
                                    </a>`
                                 : '';
 

@@ -1257,10 +1257,10 @@ async def top_cmd(ctx):
         sb_cid = cfg.get("skullboard_channel_id")
 
         link = None
-        if orig_cid and orig_mid:
-            link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
-        elif sb_cid and sb_id:
+        if sb_cid and sb_id:
             link = f"https://discord.com/channels/{gid}/{sb_cid}/{sb_id}"
+        elif orig_cid and orig_mid:
+            link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
         elif orig_mid and sb_cid:
             link = f"https://discord.com/channels/{gid}/{sb_cid}/{orig_mid}"
 
@@ -2230,10 +2230,10 @@ async def top_slash(interaction: discord.Interaction):
         sb_cid = cfg.get("skullboard_channel_id")
 
         link = None
-        if orig_cid and orig_mid:
-            link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
-        elif sb_cid and sb_id:
+        if sb_cid and sb_id:
             link = f"https://discord.com/channels/{gid}/{sb_cid}/{sb_id}"
+        elif orig_cid and orig_mid:
+            link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
         elif orig_mid and sb_cid:
             link = f"https://discord.com/channels/{gid}/{sb_cid}/{orig_mid}"
 
@@ -2297,10 +2297,10 @@ async def _stats_embed(guild: discord.Guild, member: discord.Member) -> discord.
             orig_mid = bm.get("message_id")
             sb_id = bm.get("skullboard_message_id")
             sb_cid = cfg.get("skullboard_channel_id")
-            if orig_cid and orig_mid:
-                link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
-            elif sb_cid and sb_id:
+            if sb_cid and sb_id:
                 link = f"https://discord.com/channels/{gid}/{sb_cid}/{sb_id}"
+            elif orig_cid and orig_mid:
+                link = f"https://discord.com/channels/{gid}/{orig_cid}/{orig_mid}"
             elif orig_mid and sb_cid:
                 link = f"https://discord.com/channels/{gid}/{sb_cid}/{orig_mid}"
     except Exception as e:
