@@ -1,4 +1,4 @@
-﻿---
+---
 description: Regla maestra de orquestacion proactiva. Obliga a Antigravity a seleccionar, cargar y sugerir automaticamente los MCPs, Skills y comandos slash adecuados sin que el usuario tenga que pedirlos.
 globs: ["**/*"]
 ---
@@ -26,9 +26,17 @@ Antigravity debe actuar como un **Tech Lead autónomo y proactivo**. Ante cualqu
 
 ## 🧭 2. Protocolo Proactivo de Comandos Especiales
 
-1. **Cuando una tarea sea compleja, ambigua o involucre decisiones de diseño:**
-   * Antigravity debe **recomendar proactivamente `/grill-me`** para realizar una breve entrevista de alineación técnica antes de escribir código.
+1. **Cuando una tarea sea compleja, ambigua o involucre decisiones de diseño (Vibe-Coding):**
+   * El usuario practica **vibe-coding**: el agente debe inspeccionar primero el código relevante para ubicarse y luego **preguntar o recomendar proactivamente `/grill-me`** para realizar una entrevista de alineación técnica antes de escribir código. Esto ahorra tokens y asegura que la solución refleje fielmente lo que el usuario desea.
 2. **Cuando la tarea sea una refactorización profunda, una auditoría exhaustiva o un desarrollo largo:**
    * Antigravity debe **recomendar o asumir el modo `/goal`** para trabajar de forma autónoma y desatendida hasta certificar el objetivo completado.
 3. **Cuando se resuelva un bug complejo o se descubra una nueva restricción fija:**
    * Antigravity debe **proponer guardar el aprendizaje con `/learn`** para que quede persistido en `.agents/rules/`.
+
+---
+
+## 🔍 3. Búsqueda y Descubrimiento Proactivo de MCPs y Skills
+
+Antigravity debe evaluar proactivamente si existen o se pueden integrar nuevos MCPs o skills para potenciar el proyecto Skullboard:
+1. **Detección de Necesidades de Herramientas**: Si una tarea se beneficia de capacidades externas avanzadas (como testing visual end-to-end con Chrome/Playwright, telemetría de rendimiento, o inspección profunda de Postgres), Antigravity debe buscar o sugerir la configuración del MCP correspondiente.
+2. **Evolución de Habilidades**: Cuando se identifiquen flujos repetitivos o mejoras arquitectónicas, Antigravity debe sugerir empaquetar ese conocimiento en nuevas skills dentro de `.agents/skills/`.
