@@ -20,6 +20,6 @@ If a credential was ever committed: revoke/rotate it first, then purge the affec
 
 ## Database
 
-Review and apply `supabase/migrations/20260909_security_baseline.sql` in Supabase. It enables RLS and revokes direct `anon`/`authenticated` table access. Do not run it against production without backup and explicit approval.
+Applied to production on 2026-09-09: `supabase/migrations/20260909_security_baseline.sql` and `supabase/migrations/20260909_remove_direct_public_rpc_grants.sql`. They enable RLS, revoke direct `anon`/`authenticated` table access, and revoke direct RPC execution. `service_role` retains required access.
 
 RLS policies must be added only after a trusted mapping between Supabase `auth.uid()` and Discord guild ownership exists. Until then, deny-by-default is safer than a guessed policy.
