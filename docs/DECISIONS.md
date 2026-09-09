@@ -30,3 +30,9 @@ Al implementar cambios arquitectónicos, nuevas dependencias, mutaciones de base
 - **Contexto & Decisión**: Configuración de reglas universales multiplataforma para sincronización de contexto entre agentes (Antigravity, Claude, Codex, Cursor, Gemini, OpenCode), activación permanente de modo Caveman (token-efficient) y protocolo Change Awareness.
 - **Archivos Clave**: `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.cursor/rules/`, `.agents/rules/`, `.git/hooks/`, `docs/DECISIONS.md`
 - **Impacto / Lección para futuros agentes**: Antes de cualquier tarea no trivial, ejecutar `git status` / `git diff --stat` y verificar si el grafo de Graphify está desactualizado (`graphify-out/graph.json`). Registrar decisiones mayores en este documento.
+
+### [2026-09-09] Sesión OAuth opaca y baseline RLS
+- **Herramienta / Agente**: Codex
+- **Contexto & Decisión**: El access token de Discord deja de viajar al navegador y se guarda solo en una sesión opaca server-side; CORS queda limitado a orígenes permitidos y la API valida IDs/entradas y limita tasa.
+- **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `supabase/migrations/20260909_security_baseline.sql`, `docs/SECURITY.md`
+- **Impacto / Lección para futuros agentes**: RLS queda deny-by-default para clientes públicos. La migración requiere revisión, backup y aprobación antes de ejecutarse en producción. Sesiones actuales son process-locales; usar Redis si se escalan workers.

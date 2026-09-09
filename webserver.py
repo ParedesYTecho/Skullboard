@@ -1,4 +1,4 @@
-from flask import Flask, request, send_from_directory, redirect, jsonify
+from flask import Flask, request, send_from_directory, redirect, jsonify, make_response
 from threading import Thread, Lock
 from urllib.parse import urlencode
 from collections import OrderedDict
@@ -49,6 +49,18 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 CONTACT_TO   = "globalsupportpyt@gmail.com"
 CONTACT_FROM = "SkullBoard <onboarding@resend.dev>"
 OWNER_ID = str(os.getenv("BOT_OWNER_ID", "561225979389804544"))
+ALLOWED_ORIGINS = {
+    origin.strip().rstrip("/") for origin in os.getenv(
+        "WEB_ALLOWED_ORIGINS", "https://skullboard.vercel.app"
+    ).split(",") if origin.strip()
+}
+SESSION_COOKIE = "skb_session"
+SESSION_TTL = 3600
+_session_lock = Lock()
+# ponytail: process-local sessions; use Redis/shared session store when running multiple workers.
+_sessions: OrderedDict[str, tuple[float, str]] = OrderedDict()
+_rate_lock = Lock()
+_rate_buckets: OrderedDict[tuple[str, str], list[float]] = OrderedDict()
 
 EMAIL_REGEX = re.compile(r'^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$')
 
@@ -58,6 +70,9 @@ def set_security_headers(response):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "SAMEORIGIN"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
     return response
 
 # ─── Thread-Safe Caches ───────────────────────────────────────────────────────
@@ -124,23 +139,52 @@ def _sb_count(table: str):
         return None
 
 def _cors(resp):
-    resp.headers["Access-Control-Allow-Origin"]  = "*"
+    origin = request.headers.get("Origin", "").rstrip("/")
+    if origin in ALLOWED_ORIGINS:
+        resp.headers["Access-Control-Allow-Origin"] = origin
+        resp.headers["Access-Control-Allow-Credentials"] = "true"
+        resp.headers["Vary"] = "Origin"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
     return resp
 
 @app.after_request
 def after_request_cors(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
-    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
-    return response
+    return _cors(response)
 
 def _extract_bearer(req) -> str:
     auth = req.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
         return auth[7:].strip()
     return ""
+
+def _new_session(discord_token: str) -> str:
+    session_id = secrets.token_urlsafe(32)
+    with _session_lock:
+        _sessions[session_id] = (time.time() + SESSION_TTL, discord_token)
+        while len(_sessions) > 5000:
+            _sessions.popitem(last=False)
+    return session_id
+
+def _session_token() -> str:
+    session_id = request.cookies.get(SESSION_COOKIE, "")
+    with _session_lock:
+        session = _sessions.get(session_id)
+        if not session:
+            return ""
+        expiry, token = session
+        if expiry <= time.time():
+            _sessions.pop(session_id, None)
+            return ""
+        _sessions.move_to_end(session_id)
+        return token
+
+def _session_user():
+    token = _session_token()
+    return _fetch_discord_user(token) if token else None
+
+def _valid_guild_id(value: str) -> bool:
+    return bool(re.fullmatch(r"[0-9]{15,20}", str(value)))
 
 _discord_user_cache = {}
 _discord_guilds_cache = {}
@@ -160,7 +204,7 @@ def _fetch_discord_user(token: str):
     try:
         r = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {token}"}, timeout=6)
         if r.status_code != 200:
-            logger.warning(f"⚠️ [OAuth @me] Discord API devolvió HTTP {r.status_code}: {r.text}")
+            logger.warning(f"⚠️ [OAuth @me] Discord API devolvió HTTP {r.status_code}")
             return None
         data = r.json()
         with _discord_cache_lock:
@@ -185,7 +229,7 @@ def _fetch_discord_guilds(token: str):
     try:
         r = requests.get("https://discord.com/api/v10/users/@me/guilds", headers={"Authorization": f"Bearer {token}"}, timeout=8)
         if r.status_code != 200:
-            logger.warning(f"⚠️ [OAuth @me/guilds] Discord API devolvió HTTP {r.status_code}: {r.text}")
+            logger.warning(f"⚠️ [OAuth @me/guilds] Discord API devolvió HTTP {r.status_code}")
             return None
         data = r.json()
         with _discord_cache_lock:
@@ -261,18 +305,25 @@ def _sb_rpc(function_name: str, payload: dict):
         return []
 
 def _get_real_ip() -> str:
-    cf_ip = request.headers.get("CF-Connecting-IP")
-    if cf_ip:
-        return cf_ip.strip()
-    real_ip = request.headers.get("X-Real-IP")
-    if real_ip:
-        return real_ip.strip()
-    xff = request.headers.get("X-Forwarded-For")
-    if xff:
-        ips = [i.strip() for i in xff.split(",") if i.strip()]
-        if ips:
-            return ips[0]
     return request.remote_addr or "127.0.0.1"
+
+@app.before_request
+def enforce_rate_limit():
+    if not request.path.startswith("/api/"):
+        return None
+    limit = 30 if request.path in ("/api/auth/token", "/api/contact") else 120
+    now = time.time()
+    key = (_get_real_ip(), request.path)
+    with _rate_lock:
+        recent = [stamp for stamp in _rate_buckets.get(key, []) if now - stamp < 60]
+        if len(recent) >= limit:
+            return _cors(jsonify(ok=False, error="Demasiadas solicitudes.")), 429
+        recent.append(now)
+        _rate_buckets[key] = recent
+        _rate_buckets.move_to_end(key)
+        while len(_rate_buckets) > 10000:
+            _rate_buckets.popitem(last=False)
+    return None
 
 @app.route('/')
 def index():
@@ -315,7 +366,6 @@ def api_stats():
                 _stats_cache["refreshing"] = False
 
     resp = app.response_class(json_dumps(data), mimetype="application/json")
-    resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Cache-Control"] = "public, max-age=60"
     return resp
 
@@ -328,7 +378,6 @@ def api_health():
         "timestamp": int(time.time())
     }
     resp = app.response_class(json_dumps(data), mimetype="application/json")
-    resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
 def _is_guild_authorized(perms_int: int, is_owner: bool) -> bool:
@@ -338,16 +387,20 @@ def _is_guild_authorized(perms_int: int, is_owner: bool) -> bool:
 # ─── Dashboard API Endpoints (Discord OAuth2 Secured) ────────────────────────
 @app.route('/api/auth/token', methods=["POST", "OPTIONS"])
 def api_auth_token():
-    """Intercambia Authorization Code por Access Token seguro con el client secret."""
+    """Intercambia OAuth code por sesión opaca; el token Discord queda en servidor."""
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
+    if request.headers.get("Origin", "").rstrip("/") not in ALLOWED_ORIGINS:
+        return _cors(jsonify(ok=False, error="Origen no permitido")), 403
     
     body = request.get_json(silent=True) or {}
     code = body.get("code")
     redirect_uri = body.get("redirect_uri", "https://skullboard.vercel.app/dashboard")
     
-    if not code:
+    if not isinstance(code, str) or not (8 <= len(code) <= 512):
         return _cors(jsonify(ok=False, error="Código de autorización faltante")), 400
+    if redirect_uri != "https://skullboard.vercel.app/dashboard":
+        return _cors(jsonify(ok=False, error="Redirect URI no permitida")), 400
     
     if not DISCORD_CLIENT_SECRET:
         return _cors(jsonify(ok=False, error="DISCORD_CLIENT_SECRET no configurado en el servidor")), 500
@@ -363,32 +416,47 @@ def api_auth_token():
     try:
         r = requests.post("https://discord.com/api/v10/oauth2/token", data=data, headers=headers, timeout=8)
         if r.status_code != 200:
-            return _cors(jsonify(ok=False, error="Discord rechazó el código de autorización", details=r.text)), 400
+            return _cors(jsonify(ok=False, error="Discord rechazó el código de autorización")), 400
         token_data = r.json()
         access_token = token_data.get("access_token")
-        
+        if not access_token:
+            return _cors(jsonify(ok=False, error="No se pudo obtener la sesión")), 400
         user_res = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {access_token}"}, timeout=6)
         user_info = user_res.json() if user_res.status_code == 200 else {}
-        
-        return _cors(jsonify(ok=True, token=access_token, user=user_info))
-    except Exception as e:
-        return _cors(jsonify(ok=False, error=str(e))), 500
+        if not user_info.get("id"):
+            return _cors(jsonify(ok=False, error="No se pudo validar la sesión")), 401
+        session_id = _new_session(access_token)
+        response = make_response(_cors(jsonify(ok=True, user=user_info)))
+        response.set_cookie(SESSION_COOKIE, session_id, max_age=SESSION_TTL, httponly=True,
+                            secure=True, samesite="Lax", path="/")
+        return response
+    except (requests.RequestException, ValueError):
+        return _cors(jsonify(ok=False, error="Error al autenticar con Discord")), 502
 
 @app.route('/api/auth/me', methods=["GET", "OPTIONS"])
 def api_auth_me():
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
-    token = _extract_bearer(request)
-    user = _fetch_discord_user(token)
+    user = _session_user()
     if not user:
         return _cors(jsonify(ok=False, error="Token no válido o expirado")), 401
     return _cors(jsonify(ok=True, user=user))
+
+@app.route('/api/auth/logout', methods=["POST", "OPTIONS"])
+def api_auth_logout():
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    with _session_lock:
+        _sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
+    response = make_response(_cors(jsonify(ok=True)))
+    response.delete_cookie(SESSION_COOKIE, path="/")
+    return response
 
 @app.route('/api/auth/guilds', methods=["GET", "OPTIONS"])
 def api_auth_guilds():
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
-    token = _extract_bearer(request)
+    token = _session_token()
     guilds = _fetch_discord_guilds(token)
     if guilds is None:
         return _cors(jsonify(ok=False, error="Token no válido o expirado")), 401
@@ -438,7 +506,9 @@ def api_guild_channels(guild_id: str):
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
     
-    token = _extract_bearer(request)
+    if not _valid_guild_id(guild_id):
+        return _cors(jsonify(ok=False, error="Servidor inválido")), 400
+    token = _session_token()
     guilds = _fetch_discord_guilds(token)
     if guilds is None:
         return _cors(jsonify(ok=False, error="No autorizado")), 401
@@ -553,7 +623,9 @@ def api_guild_config(guild_id: str):
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
     
-    token = _extract_bearer(request)
+    if not _valid_guild_id(guild_id):
+        return _cors(jsonify(ok=False, error="Servidor inválido")), 400
+    token = _session_token()
     guilds = _fetch_discord_guilds(token)
     if guilds is None:
         return _cors(jsonify(ok=False, error="No autorizado")), 401
@@ -571,11 +643,14 @@ def api_guild_config(guild_id: str):
 
     if request.method == "POST":
         body = request.get_json(silent=True) or {}
-        min_skulls = max(1, min(int(body.get("min_skulls", 1)), 50))
+        try:
+            min_skulls = max(1, min(int(body.get("min_skulls", 1)), 50))
+            pin_threshold = max(0, min(int(body.get("pin_threshold", 0)), 50))
+        except (TypeError, ValueError):
+            return _cors(jsonify(ok=False, error="Configuración numérica inválida")), 400
         prefix = re.sub(r'[\r\n\s]+', '', str(body.get("prefix", "sk!")))[:10] or "sk!"
         channel_id_raw = str(body.get("skullboard_channel_id") or "0").strip()
         channel_id = int(channel_id_raw) if channel_id_raw.isdigit() else 0
-        pin_threshold = max(0, min(int(body.get("pin_threshold", 0)), 50))
 
         payload = {
             "guild_id": str(guild_id),
@@ -680,6 +755,8 @@ def api_guild_leaderboard_public(guild_id: str):
     """Devuelve el leaderboard público de un servidor con autores resueltos y jump URLs."""
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
+    if not _valid_guild_id(guild_id):
+        return _cors(jsonify(ok=False, error="Servidor inválido")), 400
 
     msgs = _sb_select("tracked_messages", {
         "guild_id": f"eq.{guild_id}",
@@ -772,8 +849,13 @@ def api_guild_leaderboard_users(guild_id: str):
     """Devuelve el ranking acumulado de usuarios únicos en el servidor mediante la RPC get_guild_leaderboard."""
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
+    if not _valid_guild_id(guild_id):
+        return _cors(jsonify(ok=False, error="Servidor inválido")), 400
 
-    limit = min(max(int(request.args.get("limit", 25)), 1), 100)
+    try:
+        limit = min(max(int(request.args.get("limit", 25)), 1), 100)
+    except (TypeError, ValueError):
+        return _cors(jsonify(ok=False, error="Límite inválido")), 400
     rows = _sb_rpc("get_guild_leaderboard", {"p_guild_id": str(guild_id), "p_limit": limit}) or []
 
     users = []
@@ -810,8 +892,10 @@ def api_guild_my_messages(guild_id: str):
     """Devuelve los mensajes destacados creados por el usuario con jump URLs."""
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
+    if not _valid_guild_id(guild_id):
+        return _cors(jsonify(ok=False, error="Servidor inválido")), 400
 
-    token = _extract_bearer(request)
+    token = _session_token()
     user = _fetch_discord_user(token)
     if not user:
         return _cors(jsonify(ok=False, error="No autorizado")), 401
@@ -943,7 +1027,6 @@ def api_og():
     </svg>"""
     resp = app.response_class(svg, mimetype="image/svg+xml")
     resp.headers["Cache-Control"] = "public, max-age=120"
-    resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
 @app.route('/api/contact', methods=["POST", "OPTIONS"])

@@ -397,7 +397,7 @@
             window.location.href = authUrl;
         }
 
-        // Intercambio seguro de código OAuth2 con persistencia en localStorage
+        // El token Discord queda en servidor; navegador solo recibe cookie HttpOnly.
         async function getOrExchangeAuthToken() {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
@@ -405,23 +405,18 @@
                 try {
                     const res = await fetch(`${API_BASE}/api/auth/token`, {
                         method: 'POST',
+                        credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
                     });
                     const data = await res.json();
-                    if (res.ok && data.ok && data.token) {
-                        localStorage.setItem('skb_auth_token', data.token);
-                        sessionStorage.setItem('skb_auth_token', data.token);
-                        if (data.user) {
-                            localStorage.setItem('skb_cached_user', JSON.stringify(data.user));
-                        }
-                    }
+                    if (res.ok && data.ok) authToken = 'server-session';
                 } catch (e) {
                     console.error('Error al intercambiar token:', e);
                 }
                 window.history.replaceState(null, null, window.location.pathname);
             }
-            return localStorage.getItem('skb_auth_token') || sessionStorage.getItem('skb_auth_token');
+            return authToken || 'server-session';
         }
 
         let userGuilds = [];
@@ -657,9 +652,7 @@
                 <div class="skeleton" style="height:68px; opacity:0.5; margin-bottom:12px; border-radius:16px;"></div>
             `;
             try {
-                const res = await fetch(`${API_BASE}/api/guild/${guildId}/my-messages`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                const res = await fetch(`${API_BASE}/api/guild/${guildId}/my-messages`, { credentials: 'include' });
                 const data = await res.json();
                 if (data.ok) {
                     document.getElementById('my-total-skulls').textContent = data.total_skulls || 0;
@@ -838,9 +831,7 @@
             if (container) container.innerHTML = '<div class="channel-option-loading">Cargando canales…</div>';
 
             try {
-                const chanRes = await fetch(`${API_BASE}/api/guild/${guildId}/channels`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                const chanRes = await fetch(`${API_BASE}/api/guild/${guildId}/channels`, { credentials: 'include' });
                 const chanData = await chanRes.json();
                 if (chanData.ok && chanData.channels && chanData.channels.length > 0) {
                     currentGuildChannels = chanData.channels;
@@ -853,9 +844,7 @@
             }
 
             try {
-                const res = await fetch(`${API_BASE}/api/guild/${guildId}/config`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
+                const res = await fetch(`${API_BASE}/api/guild/${guildId}/config`, { credentials: 'include' });
                 const data = await res.json();
                 if (data.ok && data.config) {
                     const cfg = data.config;
@@ -1043,10 +1032,8 @@
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${activeGuild.id}/config`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${authToken}`
-                    },
+                    credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 const data = await res.json();
@@ -1129,11 +1116,10 @@
             const btnDropdownLogout = document.getElementById('btn-dropdown-logout');
             if (btnDropdownLogout) {
                 btnDropdownLogout.addEventListener('click', () => {
-                    localStorage.removeItem('skb_auth_token');
                     localStorage.removeItem('skb_cached_user');
                     localStorage.removeItem('skb_cached_guilds');
                     localStorage.removeItem('skb_last_guild_id');
-                    sessionStorage.removeItem('skb_auth_token');
+                    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
                     window.location.href = '/?logged_out=1';
                 });
             }
@@ -1152,7 +1138,7 @@
                     </p>
                     <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
                         <a href="${inviteBotUrl}" target="_blank" class="btn btn-primary btn-sm">+ Añadir Bot a un Servidor</a>
-                        <button onclick="localStorage.removeItem('skb_auth_token'); triggerDiscordAuth();" class="btn btn-ghost btn-sm">🔄 Reconectar con Discord</button>
+                        <button onclick="triggerDiscordAuth();" class="btn btn-ghost btn-sm">🔄 Reconectar con Discord</button>
                     </div>
                 `;
                 return;
@@ -1212,17 +1198,15 @@
             // 2. Sincronización en segundo plano con la API
             try {
                 const [userRes, guildsRes] = await Promise.all([
-                    fetch(`${API_BASE}/api/auth/me`, { headers: { 'Authorization': `Bearer ${authToken}` } }),
-                    fetch(`${API_BASE}/api/auth/guilds`, { headers: { 'Authorization': `Bearer ${authToken}` } })
+                    fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' }),
+                    fetch(`${API_BASE}/api/auth/guilds`, { credentials: 'include' })
                 ]);
 
                 // Solo si Discord rechaza el token con 401 o 403 se limpia y muestra sesión expirada
                 if (userRes.status === 401 || userRes.status === 403 || guildsRes.status === 401 || guildsRes.status === 403) {
-                    localStorage.removeItem('skb_auth_token');
                     localStorage.removeItem('skb_cached_user');
                     localStorage.removeItem('skb_cached_guilds');
                     localStorage.removeItem('skb_last_guild_id');
-                    sessionStorage.removeItem('skb_auth_token');
                     document.getElementById('view-loading').innerHTML = `
                         <div class="emblem">🔒</div>
                         <h2 style="margin-top:16px;">Sesión Expirada</h2>
@@ -1263,7 +1247,7 @@
                         </p>
                         <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
                             <button onclick="window.location.reload();" class="btn btn-ghost btn-sm">Reintentar conexión</button>
-                            <button onclick="localStorage.removeItem('skb_auth_token'); localStorage.removeItem('skb_cached_user'); localStorage.removeItem('skb_cached_guilds'); localStorage.removeItem('skb_last_guild_id'); sessionStorage.removeItem('skb_auth_token'); triggerDiscordAuth();" class="btn btn-primary btn-sm">Reconectar con Discord</button>
+                            <button onclick="localStorage.removeItem('skb_cached_user'); localStorage.removeItem('skb_cached_guilds'); localStorage.removeItem('skb_last_guild_id'); triggerDiscordAuth();" class="btn btn-primary btn-sm">Reconectar con Discord</button>
                         </div>
                     `;
                 }
@@ -1278,7 +1262,7 @@
                         </p>
                         <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
                             <button onclick="window.location.reload();" class="btn btn-ghost btn-sm">Reintentar</button>
-                            <button onclick="localStorage.removeItem('skb_auth_token'); localStorage.removeItem('skb_cached_user'); localStorage.removeItem('skb_cached_guilds'); localStorage.removeItem('skb_last_guild_id'); sessionStorage.removeItem('skb_auth_token'); triggerDiscordAuth();" class="btn btn-primary btn-sm">Reconectar con Discord</button>
+                            <button onclick="localStorage.removeItem('skb_cached_user'); localStorage.removeItem('skb_cached_guilds'); localStorage.removeItem('skb_last_guild_id'); triggerDiscordAuth();" class="btn btn-primary btn-sm">Reconectar con Discord</button>
                         </div>
                     `;
                 }
