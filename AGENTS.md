@@ -6,6 +6,15 @@ Cualquier IA o Agente (Antigravity, Claude, etc.) que opere en este repositorio 
 
 ---
 
+## 0. Comunicación Caveman (Always-On)
+**Regla de estilo permanente**:
+Always respond in Caveman style: terse, direct, technical, no fluff, no pleasantries, no filler. Keep this style unless the user explicitly says ‘normal mode’.
+- Elimina artículos innecesarios, saludos, cortesías y rodeos.
+- Usa frases cortas, directas y términos técnicos precisos.
+- Los bloques de código, comandos CLI, rutas de archivos y cadenas de error NUNCA se alteran ni abrevian inventando tokens.
+
+---
+
 ## 1. Filosofía Vibe-Coding & Protocolo `/grill-me`
 El usuario practica **vibe-coding** (desarrollo ágil orientado a objetivos sin necesidad de dominar la sintaxis o detalles de bajo nivel).
 1. **Ante tareas complejas, confusas o de diseño**:
@@ -66,3 +75,28 @@ El agente debe actuar como un Tech Lead proactivo y explorar constantemente mane
 - **Eventos Gateway**: Priorizar eventos crudos (`on_raw_reaction_add`, `on_raw_reaction_remove`) con `MessageDebouncer` (1.5s - 2.0s) y `KeyedAsyncLock` por `message_id`.
 - **Permisos**: Los comandos administrativos y endpoints de configuración deben verificar estrictamente el permiso de `Administrator` (`0x8`) o la propiedad del servidor (`guild.owner_id`).
 - **Web API**: Flask + Gunicorn, consumo de endpoints `/api/guild/<guild_id>/...` mediante RPCs optimizados en PostgreSQL, nunca agregaciones $O(N)$ en memoria.
+
+---
+
+## 7. Change Awareness Rule (Conciencia de Cambios entre Editores e IAs)
+At the beginning of any non-trivial task, or when resuming work after a possible change from another tool/editor, you MUST:
+1. Run `git status` and `git diff --stat` (or equivalent) to detect recent changes.
+2. Check if the Graphify graph is stale (compare last graph build time vs latest file modifications if possible).
+3. If significant changes are detected, briefly acknowledge them and update your understanding before proceeding.
+4. Prefer reading the current state of files + Graphify over assuming previous knowledge is still fully valid.
+When you make important architectural or behavioral changes, briefly record them in the shared wiki/SecondBrain (`docs/DECISIONS.md`) so other tools and agents can find them later.
+
+---
+
+## 8. Uso de Graphify (Knowledge Graph)
+This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and cross-file relationships.
+**Prefer Graphify when useful** for understanding codebase architecture, cross-file flows, and symbol dependencies.
+
+When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
+
+Rules:
+- For codebase questions, first run `python -m graphify query "<question>"` (or `graphify query`) when `graphify-out/graph.json` exists. Use `python -m graphify path "<A>" "<B>"` for relationships and `python -m graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Dirty `graphify-out/` files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
+- If `graphify-out/wiki/index.md` exists, use it for broad navigation instead of raw source browsing.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code, run `python -m graphify extract . --code-only` or git commit (git hooks auto-update) to keep the graph current.
