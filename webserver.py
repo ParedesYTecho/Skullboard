@@ -51,7 +51,7 @@ CONTACT_FROM = "SkullBoard <onboarding@resend.dev>"
 OWNER_ID = str(os.getenv("BOT_OWNER_ID", "561225979389804544"))
 ALLOWED_ORIGINS = {
     origin.strip().rstrip("/") for origin in os.getenv(
-        "WEB_ALLOWED_ORIGINS", "https://skullboard.vercel.app"
+        "WEB_ALLOWED_ORIGINS", "https://skullboard.vercel.app,http://localhost:8080,http://127.0.0.1:8080"
     ).split(",") if origin.strip()
 }
 SESSION_COOKIE = "skb_session"
@@ -399,7 +399,15 @@ def api_auth_token():
     
     if not isinstance(code, str) or not (8 <= len(code) <= 512):
         return _cors(jsonify(ok=False, error="Código de autorización faltante")), 400
-    if redirect_uri != "https://skullboard.vercel.app/dashboard":
+    valid_redirects = {
+        "https://skullboard.vercel.app/dashboard",
+        "https://skullboard.vercel.app/dashboard/",
+        "http://localhost:8080/dashboard",
+        "http://localhost:8080/dashboard/",
+        "http://127.0.0.1:8080/dashboard",
+        "http://127.0.0.1:8080/dashboard/",
+    }
+    if redirect_uri not in valid_redirects:
         return _cors(jsonify(ok=False, error="Redirect URI no permitida")), 400
     
     if not DISCORD_CLIENT_SECRET:

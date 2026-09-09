@@ -448,7 +448,6 @@
             if (activeGuild) loadGuildConfig(activeGuild.id);
         });
 
-        let activeGuild = null;
         let currentGuildLoadId = 0;
         let currentLbMode = 'users';
 
@@ -1300,7 +1299,7 @@
                     fetch(`${API_BASE}/api/auth/guilds`, { credentials: 'include' })
                 ]);
 
-                // Solo si Discord rechaza el token con 401 o 403 se limpia y muestra sesión expirada
+                // Si Discord rechaza el token con 401 o 403 se limpia la sesión
                 if (userRes.status === 401 || userRes.status === 403 || guildsRes.status === 401 || guildsRes.status === 403) {
                     localStorage.removeItem('skb_cached_user');
                     localStorage.removeItem('skb_cached_guilds');
@@ -1308,20 +1307,38 @@
                     const viewServers = document.getElementById('view-servers');
                     const viewDash = document.getElementById('view-dashboard');
                     const viewLoading = document.getElementById('view-loading');
+                    const unauthView = document.getElementById('view-unauthenticated');
                     if (viewServers) viewServers.style.display = 'none';
                     if (viewDash) viewDash.style.display = 'none';
-                    if (viewLoading) {
-                        viewLoading.style.display = 'block';
-                        viewLoading.innerHTML = `
-                            <div class="emblem">🔒</div>
-                            <h2 style="margin-top:16px;">Sesión Expirada</h2>
-                            <p style="color:var(--ink-soft); max-width:440px; margin:8px auto 20px;">
-                                Tu sesión con Discord ha caducado. Vuelve a iniciar sesión para continuar.
-                            </p>
-                            <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
-                                <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Iniciar Sesión con Discord</button>
-                                <a href="/" class="btn btn-ghost btn-sm">Volver al inicio</a>
-                            </div>
+                    if (viewLoading) viewLoading.style.display = 'none';
+
+                    if (!hasRenderedCached) {
+                        // Modo bienvenida / login limpio para primera visita
+                        if (unauthView) unauthView.style.display = 'block';
+                    } else {
+                        // Sesión activa que acaba de expirar
+                        if (viewLoading) {
+                            viewLoading.style.display = 'block';
+                            viewLoading.innerHTML = `
+                                <div class="emblem">🔒</div>
+                                <h2 style="margin-top:16px;">Sesión Expirada</h2>
+                                <p style="color:var(--ink-soft); max-width:440px; margin:8px auto 20px;">
+                                    Tu sesión con Discord ha caducado. Vuelve a iniciar sesión para continuar.
+                                </p>
+                                <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                                    <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Iniciar Sesión con Discord</button>
+                                    <a href="/" class="btn btn-ghost btn-sm">Volver al inicio</a>
+                                </div>
+                            `;
+                        }
+                    }
+                    const slot = document.getElementById('auth-nav-slot');
+                    if (slot) {
+                        slot.innerHTML = `
+                            <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm" style="font-size:0.84rem; padding:7px 15px;">
+                                <svg style="width:16px;height:16px;fill:currentColor;stroke:none;"><use href="#i-discord"/></svg>
+                                <span>Entrar</span>
+                            </button>
                         `;
                     }
                     showFooter();
