@@ -271,6 +271,11 @@ def format_pretty(intent, result, meta):
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
     p = argparse.ArgumentParser(description="Surface relevant lessons for an intent.")
     p.add_argument("intent", help="Free-text description of what you're about to do.")
     p.add_argument("--top", type=int, default=3)

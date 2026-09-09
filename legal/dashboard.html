@@ -228,7 +228,7 @@
                         <div>
                             <label for="cfg-prefix" style="display:block; font-weight:600; margin-bottom:4px; font-size:0.92rem;">Prefijo de comandos:</label>
                             <p style="color:var(--ink-soft); font-size:0.82rem; margin-bottom:8px;">Prefijo para comandos tradicionales de texto (ej: sk!).</p>
-                            <input type="text" id="cfg-prefix" class="form-control-input" style="width:120px; font-weight:700; font-size:1.05rem;" value="sk!" maxlength="5">
+                            <input type="text" id="cfg-prefix" class="form-control-input" style="width:120px; font-weight:700; font-size:1.05rem;" value="sk!" maxlength="10">
                         </div>
 
                         <div>
@@ -448,6 +448,8 @@
             if (activeGuild) loadGuildConfig(activeGuild.id);
         });
 
+        let activeGuild = null;
+        let currentGuildLoadId = 0;
         let currentLbMode = 'users';
 
         // Listeners para el sub-selector de Leaderboard (Top Usuarios vs Mensajes Legendarios)
@@ -467,6 +469,7 @@
         // 1. CARGA DEL LEADERBOARD DEL SERVIDOR (RANKING DE USUARIOS O MENSAJES LEGENDARIOS)
         async function loadGuildLeaderboard(guildId, mode = currentLbMode) {
             currentLbMode = mode;
+            const thisLoadId = ++currentGuildLoadId;
             const list = document.getElementById('guild-lb-list');
             const iconEl = document.getElementById('lb-view-icon');
             const titleEl = document.getElementById('lb-view-title');
@@ -508,8 +511,17 @@
                 const res = await fetch(endpoint);
                 const data = await res.json();
 
+                if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
+                    return;
+                }
+
+                if (!data.ok) {
+                    list.innerHTML = `<div style="text-align:center; padding:28px; color:var(--bad);">${escapeHtml(data.error || 'Error al cargar el Leaderboard.')}</div>`;
+                    return;
+                }
+
                 if (mode === 'users') {
-                    if (data.ok && data.users && data.users.length > 0) {
+                    if (data.users && data.users.length > 0) {
                         list.innerHTML = '';
                         const medals = ['🥇', '🥈', '🥉'];
                         data.users.forEach((u, idx) => {
@@ -645,6 +657,7 @@
 
         // 2. CARGA DE MIS MENSAJES EN EL SERVIDOR
         async function loadMyMessages(guildId) {
+            const thisLoadId = ++currentGuildLoadId;
             const list = document.getElementById('my-messages-list');
             hideFooter();
             list.innerHTML = `
@@ -654,6 +667,11 @@
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${guildId}/my-messages`, { credentials: 'include' });
                 const data = await res.json();
+
+                if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
+                    return;
+                }
+
                 if (data.ok) {
                     document.getElementById('my-total-skulls').textContent = data.total_skulls || 0;
                     document.getElementById('my-total-messages').textContent = data.total_messages || 0;
@@ -683,9 +701,9 @@
                             }
                             let chanLabel = '';
                             if (chanName) {
-                                chanLabel = `#${escapeHtml(chanName)} · ${escapeHtml(dateStr)}`;
+                                chanLabel = `#${escapeHtml(chanName)} ${dateStr ? '· ' + escapeHtml(dateStr) : ''}`;
                             } else if (m.channel_id) {
-                                chanLabel = `#${escapeHtml(m.channel_id)} · ${escapeHtml(dateStr)}`;
+                                chanLabel = `#${escapeHtml(m.channel_id)} ${dateStr ? '· ' + escapeHtml(dateStr) : ''}`;
                             } else {
                                 chanLabel = `${escapeHtml(dateStr)}`;
                             }
@@ -727,15 +745,54 @@
                     } else {
                         list.innerHTML = '<div style="text-align:center; padding:30px; color:var(--ink-soft);">No tienes mensajes destacados en este servidor todavía.</div>';
                     }
+                } else {
+                    list.innerHTML = `<div style="text-align:center; padding:24px; color:var(--bad);">${escapeHtml(data.error || 'Error al cargar tus mensajes.')}</div>`;
                 }
             } catch (e) {
+                if (thisLoadId !== currentGuildLoadId) return;
                 list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar tus mensajes.</div>';
             } finally {
-                showFooter();
+                if (thisLoadId === currentGuildLoadId) showFooter();
             }
         }
 
         let currentGuildChannels = [];
+
+        function setSettingsFormState({ loading = false, error = null }) {
+            const btnSave = document.getElementById('btn-save-cfg');
+            const skullsInput = document.getElementById('cfg-skulls');
+            const pinInput = document.getElementById('cfg-pin');
+            const prefixInput = document.getElementById('cfg-prefix');
+            const channelTrigger = document.getElementById('channel-trigger');
+            const statusEl = document.getElementById('cfg-save-status');
+
+            if (btnSave) btnSave.disabled = loading;
+            if (skullsInput) skullsInput.disabled = loading;
+            if (pinInput) pinInput.disabled = loading;
+            if (prefixInput) prefixInput.disabled = loading;
+            if (channelTrigger) {
+                if (loading) {
+                    channelTrigger.setAttribute('disabled', 'true');
+                    channelTrigger.style.pointerEvents = 'none';
+                    channelTrigger.style.opacity = '0.6';
+                } else {
+                    channelTrigger.removeAttribute('disabled');
+                    channelTrigger.style.pointerEvents = '';
+                    channelTrigger.style.opacity = '';
+                }
+            }
+            if (statusEl) {
+                if (loading) {
+                    statusEl.textContent = 'Cargando ajustes…';
+                    statusEl.style.color = 'var(--ink-soft)';
+                } else if (error) {
+                    statusEl.textContent = error;
+                    statusEl.style.color = 'var(--bad)';
+                } else {
+                    statusEl.textContent = '';
+                }
+            }
+        }
 
         function renderChannelOptions(channelsToRender, query = '') {
             const container = document.getElementById('channel-options-container');
@@ -744,18 +801,28 @@
             const selectedId = document.getElementById('cfg-channel').value;
 
             if (channelsToRender.length === 0) {
-                if (query.trim()) {
+                const trimmedQ = query.trim();
+                if (trimmedQ && /^[0-9]{17,21}$/.test(trimmedQ)) {
                     const manualRow = document.createElement('div');
                     manualRow.className = 'channel-option';
-                    manualRow.innerHTML = `<span class="channel-opt-hash">#</span> <span class="channel-opt-name">Usar ID manual: <strong>${escapeHtml(query.trim())}</strong></span>`;
-                    manualRow.addEventListener('click', () => {
-                        setChannelSelected(query.trim(), query.trim());
+                    manualRow.setAttribute('role', 'option');
+                    manualRow.setAttribute('tabindex', '0');
+                    manualRow.innerHTML = `<span class="channel-opt-hash">#</span> <span class="channel-opt-name">Usar ID numérico manual: <strong>${escapeHtml(trimmedQ)}</strong></span>`;
+                    const selectManual = () => {
+                        setChannelSelected(trimmedQ, trimmedQ);
                         closeChannelDropdown();
+                    };
+                    manualRow.addEventListener('click', selectManual);
+                    manualRow.addEventListener('keydown', (e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            selectManual();
+                        }
                     });
                     container.appendChild(manualRow);
                     return;
                 }
-                container.innerHTML = '<div class="channel-option-empty">No se encontraron canales</div>';
+                container.innerHTML = '<div class="channel-option-empty">No se encontraron canales (escribe un Snowflake de 17-21 dígitos para ID manual)</div>';
                 return;
             }
 
@@ -763,15 +830,24 @@
                 const item = document.createElement('div');
                 item.className = 'channel-option' + (String(c.id) === String(selectedId) ? ' selected' : '');
                 item.dataset.id = c.id;
+                item.setAttribute('role', 'option');
+                item.setAttribute('tabindex', '0');
                 const cleanOptName = escapeHtml(String(c.name).replace(/^#\s*/, ''));
                 item.innerHTML = `
                     <span class="channel-opt-hash">#</span>
                     <span class="channel-opt-name">${cleanOptName}</span>
                     ${String(c.id) === String(selectedId) ? '<span class="channel-opt-check">✓</span>' : ''}
                 `;
-                item.addEventListener('click', () => {
+                const selectThis = () => {
                     setChannelSelected(c.id, c.name);
                     closeChannelDropdown();
+                };
+                item.addEventListener('click', selectThis);
+                item.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        selectThis();
+                    }
                 });
                 container.appendChild(item);
             });
@@ -826,13 +902,18 @@
 
         // 3. CARGA DE CONFIGURACIÓN (SOLO ADMINS)
         async function loadGuildConfig(guildId) {
+            const thisLoadId = ++currentGuildLoadId;
             hideFooter();
+            setSettingsFormState({ loading: true });
             const container = document.getElementById('channel-options-container');
             if (container) container.innerHTML = '<div class="channel-option-loading">Cargando canales…</div>';
 
             try {
                 const chanRes = await fetch(`${API_BASE}/api/guild/${guildId}/channels`, { credentials: 'include' });
                 const chanData = await chanRes.json();
+                if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
+                    return;
+                }
                 if (chanData.ok && chanData.channels && chanData.channels.length > 0) {
                     currentGuildChannels = chanData.channels;
                     renderChannelOptions(currentGuildChannels);
@@ -840,12 +921,16 @@
                     if (container) container.innerHTML = '<div class="channel-option-empty">(Canales no disponibles)</div>';
                 }
             } catch (e) {
+                if (thisLoadId !== currentGuildLoadId) return;
                 if (container) container.innerHTML = '<div class="channel-option-empty">(Error al cargar canales)</div>';
             }
 
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${guildId}/config`, { credentials: 'include' });
                 const data = await res.json();
+                if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
+                    return;
+                }
                 if (data.ok && data.config) {
                     const cfg = data.config;
                     const chanId = cfg.skullboard_channel_id ? String(cfg.skullboard_channel_id) : '';
@@ -862,17 +947,26 @@
                     document.getElementById('cfg-pin').value = pinVal;
                     const pinNum = document.getElementById('cfg-pin-num');
                     if (pinNum) pinNum.value = pinVal;
+                    setSettingsFormState({ loading: false });
+                } else {
+                    setSettingsFormState({ loading: false, error: data.error || 'Error al cargar ajustes' });
+                    showToast(data.error || 'Error al cargar ajustes', '✕');
                 }
             } catch (e) {
+                if (thisLoadId !== currentGuildLoadId) return;
+                setSettingsFormState({ loading: false, error: 'Error de conexión con el servidor' });
                 showToast('Error cargando ajustes', '✕');
             } finally {
-                showFooter();
+                if (thisLoadId === currentGuildLoadId) showFooter();
             }
         }
 
         // Vistas y Navegación de Servidores
         function showServersView() {
             activeGuild = null;
+            currentGuildLoadId++;
+            const searchInput = document.getElementById('guild-search-input');
+            if (searchInput) searchInput.value = '';
             document.getElementById('view-loading').style.display = 'none';
             document.getElementById('view-dashboard').style.display = 'none';
             document.getElementById('view-servers').style.display = 'block';
@@ -908,18 +1002,21 @@
                 const li = document.createElement('li');
                 li.className = `guild-card${g.has_bot ? '' : ' inactive'}`;
 
+                const safeName = escapeHtml(g.name || 'Servidor');
+                const safeInitial = escapeHtml((g.name || 'S').charAt(0).toUpperCase());
+
                 const iconHtml = g.icon
-                    ? `<img class="guild-card-icon" src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png" alt="Icono de ${g.name}">`
-                    : `<span class="guild-card-icon-fallback">${(g.name || 'S').charAt(0).toUpperCase()}</span>`;
+                    ? `<img class="guild-card-icon" src="https://cdn.discordapp.com/icons/${escapeHtml(g.id)}/${escapeHtml(g.icon)}.png" alt="Icono de ${safeName}">`
+                    : `<span class="guild-card-icon-fallback">${safeInitial}</span>`;
 
                 const subText = g.has_bot
                     ? (g.is_admin ? 'Configura o revisa la leaderboard de este servidor' : 'Revisa tus estadísticas y mensajes destacados')
                     : 'Añade el bot para empezar a registrar calaveras';
 
-                const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${g.id}&disable_guild_select=true`;
+                const inviteUrl = `https://discord.com/oauth2/authorize?client_id=${CLIENT_ID}&permissions=277025508352&scope=bot+applications.commands&guild_id=${escapeHtml(g.id)}&disable_guild_select=true`;
 
                 const ctaHtml = g.has_bot
-                    ? `<button type="button" class="btn btn-primary btn-enter-guild" data-gid="${g.id}">Entrar →</button>`
+                    ? `<button type="button" class="btn btn-primary btn-enter-guild" data-gid="${escapeHtml(g.id)}">Entrar →</button>`
                     : `<a href="${inviteUrl}" target="_blank" class="btn btn-ghost" style="border:1px solid var(--border);">➕ Añadir bot</a>`;
 
                 li.innerHTML = `
@@ -927,7 +1024,7 @@
                         <div class="guild-card-top">
                             ${iconHtml}
                         </div>
-                        <h3 class="guild-card-name" title="${g.name}">${g.name}</h3>
+                        <h3 class="guild-card-name" title="${safeName}">${safeName}</h3>
                         <p class="guild-card-sub">${subText}</p>
                     </div>
                     <div class="guild-card-cta">
@@ -966,6 +1063,7 @@
         // Selección y Apertura de un Servidor
         function selectGuild(guild, saveToStorage = true) {
             activeGuild = guild;
+            currentGuildLoadId++;
             if (saveToStorage) {
                 localStorage.setItem('skb_last_guild_id', guild.id);
             }
@@ -1207,17 +1305,25 @@
                     localStorage.removeItem('skb_cached_user');
                     localStorage.removeItem('skb_cached_guilds');
                     localStorage.removeItem('skb_last_guild_id');
-                    document.getElementById('view-loading').innerHTML = `
-                        <div class="emblem">🔒</div>
-                        <h2 style="margin-top:16px;">Sesión Expirada</h2>
-                        <p style="color:var(--ink-soft); max-width:440px; margin:8px auto 20px;">
-                            Tu sesión con Discord ha caducado. Vuelve a iniciar sesión para continuar.
-                        </p>
-                        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
-                            <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Iniciar Sesión con Discord</button>
-                            <a href="/" class="btn btn-ghost btn-sm">Volver al inicio</a>
-                        </div>
-                    `;
+                    const viewServers = document.getElementById('view-servers');
+                    const viewDash = document.getElementById('view-dashboard');
+                    const viewLoading = document.getElementById('view-loading');
+                    if (viewServers) viewServers.style.display = 'none';
+                    if (viewDash) viewDash.style.display = 'none';
+                    if (viewLoading) {
+                        viewLoading.style.display = 'block';
+                        viewLoading.innerHTML = `
+                            <div class="emblem">🔒</div>
+                            <h2 style="margin-top:16px;">Sesión Expirada</h2>
+                            <p style="color:var(--ink-soft); max-width:440px; margin:8px auto 20px;">
+                                Tu sesión con Discord ha caducado. Vuelve a iniciar sesión para continuar.
+                            </p>
+                            <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
+                                <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Iniciar Sesión con Discord</button>
+                                <a href="/" class="btn btn-ghost btn-sm">Volver al inicio</a>
+                            </div>
+                        `;
+                    }
                     showFooter();
                     return;
                 }
@@ -1314,6 +1420,14 @@
                 if (e.target === statusOverlay) statusOverlay.classList.remove('active');
             });
         }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (statusOverlay && statusOverlay.classList.contains('active')) {
+                    statusOverlay.classList.remove('active');
+                }
+                closeChannelDropdown();
+            }
+        });
         // Función de salto nativo a Discord con fallback web
         function openDiscordJump(e, appUrl, webUrl) {
             e.preventDefault();

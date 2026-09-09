@@ -428,7 +428,7 @@ def api_auth_token():
         session_id = _new_session(access_token)
         response = make_response(_cors(jsonify(ok=True, user=user_info)))
         response.set_cookie(SESSION_COOKIE, session_id, max_age=SESSION_TTL, httponly=True,
-                            secure=True, samesite="Lax", path="/")
+                            secure=True, samesite="None", path="/")
         return response
     except (requests.RequestException, ValueError):
         return _cors(jsonify(ok=False, error="Error al autenticar con Discord")), 502
@@ -449,7 +449,7 @@ def api_auth_logout():
     with _session_lock:
         _sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
     response = make_response(_cors(jsonify(ok=True)))
-    response.delete_cookie(SESSION_COOKIE, path="/")
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="None", secure=True)
     return response
 
 @app.route('/api/auth/guilds', methods=["GET", "OPTIONS"])
@@ -650,7 +650,12 @@ def api_guild_config(guild_id: str):
             return _cors(jsonify(ok=False, error="Configuración numérica inválida")), 400
         prefix = re.sub(r'[\r\n\s]+', '', str(body.get("prefix", "sk!")))[:10] or "sk!"
         channel_id_raw = str(body.get("skullboard_channel_id") or "0").strip()
-        channel_id = int(channel_id_raw) if channel_id_raw.isdigit() else 0
+        if channel_id_raw in ("", "0"):
+            channel_id = 0
+        elif re.match(r'^[0-9]{17,21}$', channel_id_raw):
+            channel_id = int(channel_id_raw)
+        else:
+            return _cors(jsonify(ok=False, error="ID de canal inválido. Debe ser un Snowflake numérico de Discord (17-21 dígitos).")), 400
 
         payload = {
             "guild_id": str(guild_id),

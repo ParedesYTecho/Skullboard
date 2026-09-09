@@ -3558,4 +3558,59 @@ input[type="number"] {
     display: block;
 }
 
+/* Modo Claro: Desplegable de Canales y Opciones */
+[data-theme="light"] .channel-combobox-dropdown {
+    background: #ffffff;
+    border-color: var(--border-strong);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(0, 0, 0, 0.06);
+}
+[data-theme="light"] .channel-search-header {
+    background: rgba(0, 0, 0, 0.02);
+    border-bottom: 1px solid var(--border);
+}
+[data-theme="light"] .channel-options-container::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+}
+[data-theme="light"] .channel-option {
+    color: var(--ink);
+}
+[data-theme="light"] .channel-option:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--ink);
+}
+[data-theme="light"] .channel-option.selected {
+    background: rgba(168, 85, 247, 0.12);
+    color: var(--primary-dark, #7e22ce);
+}
+
+/* Estabilidad en Dashboard: eliminar salto de hover en tarjetas de configuración y listados */
+.dashboard-layout .bento-card:hover {
+    transform: none !important;
+}
+
+/* Números tabulares para evitar saltos métricos */
+.stat-metric-val,
+.lb-skull-record,
+.cfg-number-input,
+.stat-card-val {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Contraste en Modo Claro para el gradiente del autor */
+[data-theme="light"] .gradient-author {
+    background: linear-gradient(180deg, #0f172a 0%, #334155 70%, #475569 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: none;
+}
+
+/* Ajuste responsive de padding en móvil para Dashboard */
+@media (max-width: 680px) {
+    .dashboard-layout {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
+}
+
+
 
