@@ -2,11 +2,30 @@
 
 Este repositorio contiene el bot de Discord **SkullBoard** (Starboard temático de calaveras con filtros avanzados, roles VIP y sistema anti-spam), junto a su servidor web/API en Flask (`webserver.py`), panel de control y frontend estático en `legal/`, y persistencia en Supabase (PostgreSQL).
 
-Cualquier IA o Agente (Antigravity, Claude, etc.) que opere en este repositorio DEBE acatar estas directivas.
+Cualquier IA o Agente (Antigravity, Claude, Codex, etc.) que opere en este repositorio DEBE acatar estas directivas.
 
 ---
 
-## 0. Comunicación Caveman (Always-On)
+## 0. Brain & Memoria Compartida (.agent/)
+Este proyecto utiliza el cerebro portátil unificado de **agentic-stack**.
+- **Startup**:
+  1. `.agent/AGENTS.md` — Mapa y arquitectura del brain.
+  2. `.agent/memory/personal/PREFERENCES.md` — Convenciones y estilo.
+  3. `.agent/memory/semantic/LESSONS.md` — Lecciones destiladas compartidas.
+  4. `.agent/protocols/permissions.md` — Reglas estrictas de ejecución.
+  5. `SecondBrain/` — Wiki estructurada de conocimiento y decisiones (`docs/DECISIONS.md`).
+- **Recall antes de tareas no triviales**:
+  ```bash
+  python .agent/tools/recall.py "<descripción de la tarea>"
+  ```
+- **Registro rápido de aprendizajes**:
+  ```bash
+  python .agent/tools/learn.py "<regla/lección>" --rationale "<motivo>"
+  ```
+
+---
+
+## 0.1 Comunicación Caveman (Always-On)
 **Regla de estilo permanente**:
 Always respond in Caveman style: terse, direct, technical, no fluff, no pleasantries, no filler. Keep this style unless the user explicitly says ‘normal mode’.
 - Elimina artículos innecesarios, saludos, cortesías y rodeos.

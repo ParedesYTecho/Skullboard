@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "agentic_stack_version": "0.19.1",
+  "abs_target": "C:\\Users\\Fer\\Desktop\\BOT_DC\\Skullboard",
+  "installed_at": "2026-09-09T17:48:15Z",
+  "adapters": {
+    "antigravity": {
+      "installed_at": "2026-09-09T17:48:09Z",
+      "files_written": [
+        "ANTIGRAVITY.md"
+      ],
+      "files_overwritten": [],
+      "files_alerted": [],
+      "file_results": [
+        {
+          "dst": "ANTIGRAVITY.md",
+          "result": "written_new"
+        }
+      ],
+      "post_install_results": []
+    },
+    "codex": {
+      "installed_at": "2026-09-09T17:48:15Z",
+      "files_written": [],
+      "files_overwritten": [],
+      "files_alerted": [
+        "AGENTS.md"
+      ],
+      "file_results": [
+        {
+          "dst": "AGENTS.md",
+          "result": "merge_alert"
+        }
+      ],
+      "post_install_results": [],
+      "skills_link": {
+        "target": ".agent/skills",
+        "dst": ".agents/skills",
+        "fallback": "rsync_with_delete"
+      },
+      "skills_link_pre_existed": true
+    }
+  }
+}

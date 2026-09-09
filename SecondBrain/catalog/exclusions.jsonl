@@ -1,0 +1,5 @@
+﻿{"pattern":"*.env*","reason":"credentials and secret keys"}
+{"pattern":".git/*","reason":"internal git repository metadata"}
+{"pattern":"*.log","reason":"unfiltered runtime logs"}
+{"pattern":"node_modules/*","reason":"dependencies"}
+{"pattern":"__pycache__/*","reason":"bytecode cache"}

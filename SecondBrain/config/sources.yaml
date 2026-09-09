@@ -1,0 +1,26 @@
+﻿version: 1
+sources:
+  - id: src_skullboard_core_docs
+    title: "Skullboard Core System Documentation"
+    type: document
+    path: "docs/SYSTEM_CONTEXT.md"
+    scope: project
+    approved: true
+    approved_date: "2026-09-09"
+    sanitized: true
+  - id: src_skullboard_decisions
+    title: "Skullboard Architectural Decisions Log"
+    type: document
+    path: "docs/DECISIONS.md"
+    scope: project
+    approved: true
+    approved_date: "2026-09-09"
+    sanitized: true
+  - id: src_agentic_stack_config
+    title: "Agentic Stack Local Brain Config"
+    type: document
+    path: ".agent/install.json"
+    scope: project
+    approved: true
+    approved_date: "2026-09-09"
+    sanitized: true

@@ -1,0 +1,10 @@
+﻿version: 1
+projects:
+  - id: skullboard
+    name: "Skullboard Discord Bot & Web API"
+    root: "c:\Users\Fer\Desktop\BOT_DC\Skullboard"
+    description: "Starboard bot for Discord with custom reactions, Flask web dashboard, Supabase PostgreSQL, and strict admin security."
+    active: true
+    harnesses:
+      - antigravity
+      - codex

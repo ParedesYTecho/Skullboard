@@ -1,0 +1,8 @@
+﻿version: 1
+routing:
+  decisions: "wiki/decisions/"
+  architecture: "wiki/projects/"
+  troubleshooting: "wiki/lessons/"
+  workflows: "wiki/workflows/"
+  preferences: "wiki/preferences/"
+  rules: "wiki/rules/"

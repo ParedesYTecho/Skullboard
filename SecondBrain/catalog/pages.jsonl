@@ -1,0 +1,3 @@
+﻿{"id":"page_project_skullboard","title":"Skullboard Project Overview","type":"project","path":"wiki/projects/skullboard.md","scope":"skullboard","sources":["src_skullboard_core_docs"],"updated":"2026-09-09"}
+{"id":"page_adr_001_agentic_stack","title":"ADR-001: Agentic Stack & Shared Memory Setup","type":"decision","path":"wiki/decisions/001-agentic-stack-setup.md","scope":"skullboard","sources":["src_skullboard_decisions","src_agentic_stack_config"],"updated":"2026-09-09"}
+{"id":"page_workflow_token_efficient_audit","title":"Workflow: Token-Efficient Auditing","type":"workflow","path":"wiki/workflows/token-efficient-audit.md","scope":"skullboard","sources":["src_skullboard_decisions"],"updated":"2026-09-09"}
