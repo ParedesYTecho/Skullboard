@@ -103,8 +103,8 @@ graph TD
     
     Client -->|Navega a skullboard.vercel.app| VercelCDN
     VercelCDN --> DashboardUI
-    DashboardUI -->|GET /api/stats (AbortController 8s)| FlaskServer
-    DashboardUI -->|POST /api/contact (AbortController 12s)| FlaskServer
+    DashboardUI -->|same-origin /api requests| VercelCDN
+    VercelCDN -->|Rewrite /api/*| FlaskServer
     FlaskServer -->|Envío de Email| ResendAPI
     FlaskServer -->|Consulta periódica de conteos| SupabasePostgres
 ```
@@ -282,15 +282,17 @@ erDiagram
 | `/api/contact` | `POST` | 1 req / 30s por IP (LRU)<br>10 req / min global | Recibe formulario de contacto, sanitiza CRLF/XSS y despacha email vía Resend. |
 | `/verify` | `GET` | Discord OAuth2 | Inicia el flujo de verificación de rol (`identify`, `role_connections.write`) con `state` anti-CSRF. |
 | `/callback` | `GET` | Validación de State TTL | Finaliza OAuth2 de Linked Role y asigna la metadata `is_owner` si el ID coincide con `BOT_OWNER_ID`. |
-| `/api/auth/token` | `POST` | Público | Intercambia el Authorization Code de Discord OAuth2 por un Access Token seguro (`client_secret`). |
-| `/api/auth/me` | `GET` | Bearer Token | Retorna el objeto de usuario de Discord (`/users/@me`) autenticado. |
-| `/api/auth/guilds` | `GET` | Bearer Token | Retorna servidores del usuario con bandera `is_admin` (`0x8`) y estado de SkullBoard (`has_bot`, `config`). |
-| `/api/guild/<guild_id>/channels` | `GET` | Bearer Token (Admin `0x8`) | Lista canales de texto (tipo 0) y anuncios (tipo 5) del servidor para el selector de configuración. |
-| `/api/guild/<guild_id>/config` | `GET`, `POST` | Bearer Token (Admin `0x8`) | `GET`: Consulta configuración del servidor.<br>`POST`: Guarda `min_skulls`, `prefix`, `channel_id`, `pin_threshold`. |
+| `/api/auth/start` | `GET` | Público | Genera `state` aleatorio de un solo uso, persiste su HMAC y devuelve URL Discord con solo `identify guilds`. |
+| `/api/auth/token` | `POST` | Público + Origin permitido + `state` válido | Intercambia el Authorization Code y crea sesión persistente; el navegador recibe solo cookie opaca. |
+| `/api/auth/me` | `GET` | Cookie HttpOnly | Valida/renueva sesión y retorna perfil mínimo más CSRF efímero para escrituras. |
+| `/api/auth/guilds` | `GET` | Cookie HttpOnly | Retorna servidores del usuario con bandera `is_admin` (`0x8`) y estado de SkullBoard (`has_bot`, `config`). |
+| `/api/auth/logout` | `POST` | Cookie HttpOnly + Origin + CSRF | Elimina sesión persistida, revoca token cuando Discord lo acepta y limpia cookie. |
+| `/api/guild/<guild_id>/channels` | `GET` | Cookie HttpOnly (Admin `0x8`) | Lista canales de texto (tipo 0) y anuncios (tipo 5) del servidor para el selector de configuración. |
+| `/api/guild/<guild_id>/config` | `GET`, `POST` | Cookie HttpOnly (Admin `0x8`); POST exige Origin + CSRF | `GET`: Consulta configuración del servidor.<br>`POST`: Guarda `min_skulls`, `prefix`, `channel_id`, `pin_threshold`. |
 | `/api/guild/<guild_id>/leaderboard/public` | `GET` | Público | Retorna los 25 mensajes con más calaveras de un servidor sin requerir login. |
 | `/api/guild/<guild_id>/leaderboard/users` | `GET` | Público | Retorna el ranking de miembros únicos con calaveras totales acumuladas (RPC `get_guild_leaderboard`). |
-| `/api/guild/<guild_id>/leaderboard` | `GET` | Bearer Token | Retorna los 50 mensajes con más calaveras para miembros autenticados del servidor. |
-| `/api/guild/<guild_id>/my-messages` | `GET` | Bearer Token | Retorna mensajes destacados del usuario autenticado con conteos exactos de BD. |
+| `/api/guild/<guild_id>/leaderboard` | `GET` | Cookie HttpOnly | Retorna los 50 mensajes con más calaveras para miembros autenticados del servidor. |
+| `/api/guild/<guild_id>/my-messages` | `GET` | Cookie HttpOnly + miembro del servidor | Retorna mensajes destacados del usuario autenticado con conteos exactos de BD. |
 | `/api/og` | `GET` | Público (Cache 120s) | Genera dinámicamente la tarjeta vectorial SVG OpenGraph con métricas en vivo. |
 
 ---
@@ -316,12 +318,12 @@ erDiagram
 | :--- | :--- | :--- |
 | `DISCORD_TOKEN` | Render / Local | Token secreto del bot de Discord para autenticación en Gateway y REST API. |
 | `SUPABASE_URL` | Render / Local | URL del proyecto Supabase (ej. `https://tjmcclgyirqjatezkqgr.supabase.co`). |
-| `SUPABASE_KEY` / `SUPABASE_SERVICE_ROLE_KEY` | Render / Local | API Key de servicio de Supabase (Service Role / Anon). |
+| `SUPABASE_SERVICE_ROLE_KEY` | Render / Local | API Key service role de Supabase; solo backend. |
 | `APPLICATION_ID` / `DISCORD_APPLICATION_ID` | Render / Local | ID de la aplicación de Discord (`1367463352774955059`). |
 | `DISCORD_CLIENT_SECRET`| Render / Local | Secreto OAuth2 para el intercambio de tokens en el Dashboard y Linked Roles. |
 | `DISCORD_REDIRECT_URI` | Render / Local | URI de redirección OAuth2 para Linked Roles (ej. `https://skullboard-fqf1.onrender.com/callback`). |
 | `SKULLBOARD_SESSION_ENCRYPTION_KEY` | Render / Local | Clave Fernet estable para cifrar bundles OAuth; obligatoria en producción y nunca se guarda en Supabase/frontend. |
-| `SKULLBOARD_ENV` | Render / Local | `production` activa cookie Secure y fallo cerrado de clave; otros valores sirven desarrollo local. |
+| `SKULLBOARD_ENV` | Render / Local | `production` activa fallo cerrado de clave y cookie `__Host-` Secure; loopback usa cookie local sin Secure. |
 | `SKULLBOARD_DASHBOARD_REDIRECT_URI` | Render / Local | URI exacta del dashboard para OAuth; producción usa `https://skullboard.vercel.app/dashboard` por defecto. |
 | `DISCORD_ALERTS_WEBHOOK_URL` | Render / Local | URL del webhook de Discord para observabilidad, errores críticos (`send_system_alert`) y desconexiones de shards. |
 | `BOT_OWNER_ID` | Render / Local | Snowflake ID del propietario (`561225979389804544`) para control de acceso, comandos de administración y verificación de roles. |

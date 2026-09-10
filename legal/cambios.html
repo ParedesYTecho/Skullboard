@@ -9,7 +9,7 @@
     <meta property="og:url" content="https://skullboard.vercel.app/cambios">
     <meta property="og:title" content="SkullBoard · Historial de Cambios">
     <meta property="og:description" content="Todas las novedades, mejoras y correcciones de SkullBoard.">
-    <meta property="og:image" content="https://skullboard-fqf1.onrender.com/api/og">
+    <meta property="og:image" content="/api/og">
     <meta property="og:type" content="website">
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0b0a10">
@@ -550,8 +550,8 @@
     </div>
 
     <!-- MODAL DE ESTADO DEL SISTEMA -->
-    <div id="status-modal-overlay" class="status-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="status-modal-title">
-        <div class="status-modal-card">
+    <div id="status-modal-overlay" class="status-modal-overlay" role="presentation">
+        <div class="status-modal-card" role="dialog" aria-modal="true" aria-labelledby="status-modal-title" tabindex="-1">
             <div class="status-modal-head">
                 <h3 id="status-modal-title">
                     <span class="status-dot"></span> Estado de la Infraestructura
@@ -562,7 +562,7 @@
                 <div class="status-card-item">
                     <div class="status-card-top">
                         <span class="status-card-title">Bot Discord</span>
-                        <span class="pill ok" id="status-bot-badge">● Online</span>
+                        <span class="pill unknown" id="status-bot-badge">● Comprobando</span>
                     </div>
                     <div class="status-card-val" id="status-bot-ping">-- ms</div>
                     <div class="status-card-sub" id="status-bot-shards">1 Shard · Gateway activo</div>
@@ -570,7 +570,7 @@
                 <div class="status-card-item">
                     <div class="status-card-top">
                         <span class="status-card-title">Base de Datos</span>
-                        <span class="pill ok" id="status-db-badge">● Operacional</span>
+                        <span class="pill unknown" id="status-db-badge">● Comprobando</span>
                     </div>
                     <div class="status-card-val" id="status-db-ping">-- ms</div>
                     <div class="status-card-sub">Supabase PostgreSQL</div>
@@ -578,15 +578,15 @@
                 <div class="status-card-item">
                     <div class="status-card-top">
                         <span class="status-card-title">API Web REST</span>
-                        <span class="pill ok">● Operacional</span>
+                        <span class="pill unknown" id="status-api-badge">● Comprobando</span>
                     </div>
-                    <div class="status-card-val">OK 200</div>
+                    <div class="status-card-val" id="status-api-val">--</div>
                     <div class="status-card-sub">Flask Multi-threaded Engine</div>
                 </div>
                 <div class="status-card-item">
                     <div class="status-card-top">
                         <span class="status-card-title">Tiempo Activo</span>
-                        <span class="pill ok">● 99.9%</span>
+                        <span class="pill unknown" id="status-uptime-badge">● No disponible</span>
                     </div>
                     <div class="status-card-val" id="status-uptime-val">--</div>
                     <div class="status-card-sub">Uptime continuo de sesión</div>
@@ -596,9 +596,9 @@
     </div>
 
     <script>
-        const API_BASE = window.location.hostname.includes('localhost') 
-            ? 'http://localhost:8080' 
-            : 'https://skullboard-fqf1.onrender.com';
+        const API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+            ? window.location.origin
+            : '';
 
         // Toggle claro/oscuro
         const themeBtn = document.getElementById('theme-toggle');
@@ -611,19 +611,37 @@
         }
 
         // Estado del sistema (Status API & Modal)
+        function setStatusBadge(id, status, labels) {
+            const badge = document.getElementById(id);
+            if (!badge) return;
+            const safeStatus = ['operational', 'degraded', 'unknown'].includes(status) ? status : 'unknown';
+            badge.className = `pill ${safeStatus === 'operational' ? 'ok' : safeStatus}`;
+            badge.textContent = `● ${labels[safeStatus]}`;
+        }
+
         async function fetchSystemStatus() {
             try {
                 const res = await fetch(`${API_BASE}/api/status`);
                 const data = await res.json();
                 if (data.ok) {
+                    const botStatus = data.bot?.status || 'unknown';
+                    const dbStatus = data.database?.status || 'unknown';
+                    const apiStatus = data.api?.status || 'unknown';
+                    const labels = { operational: 'Operacional', degraded: 'Degradado', unknown: 'No disponible' };
+                    setStatusBadge('status-bot-badge', botStatus, labels);
+                    setStatusBadge('status-db-badge', dbStatus, labels);
+                    setStatusBadge('status-api-badge', apiStatus, labels);
+                    setStatusBadge('status-uptime-badge', botStatus, { operational: 'En línea', degraded: 'Degradado', unknown: 'No disponible' });
                     const botPing = document.getElementById('status-bot-ping');
-                    if (botPing) botPing.textContent = `${data.bot.latency_ms} ms`;
+                    if (botPing) botPing.textContent = data.bot.latency_ms == null ? '—' : `${data.bot.latency_ms} ms`;
                     const botShards = document.getElementById('status-bot-shards');
-                    if (botShards) botShards.textContent = `${data.bot.shards} Shard${data.bot.shards > 1 ? 's' : ''} · ${data.bot.guilds || 0} servidores`;
+                    if (botShards) botShards.textContent = data.bot.shards == null ? 'Proveedor de estado no conectado' : `${data.bot.shards} Shard${data.bot.shards > 1 ? 's' : ''} · ${data.bot.guilds || 0} servidores`;
                     const dbPing = document.getElementById('status-db-ping');
-                    if (dbPing) dbPing.textContent = `${data.database.latency_ms} ms`;
+                    if (dbPing) dbPing.textContent = data.database.latency_ms == null ? '—' : `${data.database.latency_ms} ms`;
+                    const apiVal = document.getElementById('status-api-val');
+                    if (apiVal) apiVal.textContent = apiStatus === 'operational' ? 'OK 200' : 'Respuesta no verificada';
                     const uptimeVal = document.getElementById('status-uptime-val');
-                    if (uptimeVal) uptimeVal.textContent = data.bot.uptime_formatted || 'Online';
+                    if (uptimeVal) uptimeVal.textContent = data.bot.uptime_formatted || 'No disponible';
                     
                     document.querySelectorAll('.status-pill-text').forEach(el => {
                         el.textContent = data.all_operational ? 'Sistemas OK' : 'Degradado';
@@ -635,24 +653,36 @@
         }
 
         const statusOverlay = document.getElementById('status-modal-overlay');
+        const statusCard = statusOverlay?.querySelector('.status-modal-card');
+        let statusReturnFocus = null;
+        function closeStatusModal() {
+            if (!statusOverlay) return;
+            statusOverlay.classList.remove('active');
+            statusReturnFocus?.focus();
+            statusReturnFocus = null;
+        }
         document.querySelectorAll('.open-status-modal').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (statusOverlay) {
-                    statusOverlay.classList.add('active');
-                    fetchSystemStatus();
-                }
+                if (!statusOverlay) return;
+                statusReturnFocus = e.currentTarget;
+                statusOverlay.classList.add('active');
+                statusCard?.focus();
+                fetchSystemStatus();
             });
         });
         const btnCloseModal = document.getElementById('btn-close-status-modal');
         if (btnCloseModal && statusOverlay) {
-            btnCloseModal.addEventListener('click', () => statusOverlay.classList.remove('active'));
+            btnCloseModal.addEventListener('click', closeStatusModal);
         }
         if (statusOverlay) {
             statusOverlay.addEventListener('click', (e) => {
-                if (e.target === statusOverlay) statusOverlay.classList.remove('active');
+                if (e.target === statusOverlay) closeStatusModal();
             });
         }
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && statusOverlay?.classList.contains('active')) closeStatusModal();
+        });
         // Smart Sticky Navbar (Hide on scroll down, reveal on scroll up - Sapphire Style)
         let lastScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
         const mainNav = document.querySelector('.nav');

@@ -46,7 +46,7 @@ flowchart TD
             Flask["Flask App (port 8080)"]
             StatsCache["_stats_cache (TTL: 60s)"]
             ContactThrottle["_contact_last (IP Throttling)"]
-            OAuthStates["_oauth_states (Anti-CSRF Tokens, TTL: 600s)"]
+            OAuthStates["dashboard_oauth_states (HMAC state hashes, TTL: 600s)"]
         end
     end
 
@@ -72,7 +72,7 @@ flowchart TD
     ResyncLimiter -->|Reconciliation| REST
     ResyncLimiter -->|Upsert / Delete| SupaClient
 
-    ClientUser -->|HTTP GET /verify /callback| Flask
+    ClientUser -->|HTTP GET /verify /callback /dashboard| Flask
     Flask -->|OAuth2 Token Exchange| REST
     Flask -->|REST Count Queries| Postgres
     SupaClient <--> Postgres
@@ -168,7 +168,49 @@ El comando `/resync` escanea el canal configurado del skullboard para corregir i
      - Si difiere, edita el repost con el conteo actualizado y ejecuta un `db_upsert` en `tracked_messages`.
 6. **Reporte:** Emite un embed con el resumen detallado de mensajes sincronizados, duplicados eliminados y huérfanos purgados.
 
-### 4.3. Flujo OAuth2 y Linked Roles de Discord
+### 4.3. Flujo OAuth2 del dashboard
+
+El dashboard usa `dashboard_oauth_states` para guardar los HMAC del `state` y del
+nonce HttpOnly del navegador, con consumo de un solo uso. El navegador recibe una
+cookie temporal por flujo OAuth y, tras completar login, la cookie opaca
+`__Host-skullboard_session`; el bundle OAuth se cifra antes de persistirse en
+`dashboard_sessions`. La renovación usa un lock persistido para evitar carreras entre
+workers. El frontend nunca recibe tokens de Discord.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Usuario
+    participant Web as Navegador
+    participant Vercel as Vercel /api rewrite
+    participant Flask as Flask
+    participant Supa as Supabase
+    participant Discord as Discord OAuth2/REST
+
+    User->>Web: Pulsa iniciar sesión
+    Web->>Vercel: GET /api/auth/start
+    Vercel->>Flask: Proxy same-origin
+    Flask->>Supa: Inserta HMAC(state + nonce), expiración 10 min
+    Flask-->>Web: URL OAuth + cookie nonce HttpOnly
+    Web->>Discord: Autoriza OAuth2
+    Discord-->>Web: /dashboard?code=...&state=...
+    Web->>Vercel: POST /api/auth/token
+    Vercel->>Flask: Proxy cookie y body
+    Flask->>Supa: Consume HMAC(state) una sola vez
+    Flask->>Discord: Intercambia code y valida usuario
+    Flask->>Supa: Guarda bundle cifrado + hash de sesión
+    Flask-->>Web: Cookie HttpOnly Secure SameSite=Lax
+    Web->>Vercel: GET /api/auth/me
+    Flask->>Supa: Valida sesión y renueva si procede
+    Flask-->>Web: Usuario público + CSRF en memoria
+    User->>Web: Logout
+    Web->>Vercel: POST /api/auth/logout (Origin + CSRF)
+    Flask->>Supa: Borra sesión persistida
+    Flask->>Discord: Revoca access token (best effort)
+    Flask-->>Web: Limpia cookie y cachés
+```
+
+### 4.4. Flujo OAuth2 y Linked Roles de Discord
 ```mermaid
 sequenceDiagram
     autonumber

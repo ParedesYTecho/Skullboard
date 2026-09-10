@@ -16,6 +16,7 @@ class SessionSecurityError(Exception):
 
 
 SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]{32,128}$")
+STATE_RE = SESSION_ID_RE
 
 
 class SessionCipher:
@@ -36,13 +37,20 @@ class SessionCipher:
             raise SessionSecurityError("session id invalid")
         return hmac.new(self._hash_key, session_id.encode(), hashlib.sha256).hexdigest()
 
+    def hash_state(self, state: str) -> str:
+        if not STATE_RE.fullmatch(state or ""):
+            raise SessionSecurityError("oauth state invalid")
+        return hmac.new(self._hash_key, state.encode(), hashlib.sha256).hexdigest()
+
     def encrypt(self, bundle: dict) -> str:
         return self._fernet.encrypt(json.dumps(bundle, separators=(",", ":")).encode()).decode()
 
     def decrypt(self, value: str) -> dict:
+        if not isinstance(value, str):
+            raise SessionSecurityError("session bundle invalid")
         try:
             data = json.loads(self._fernet.decrypt(value.encode(), ttl=None))
-        except (InvalidToken, ValueError, TypeError, UnicodeError, json.JSONDecodeError):
+        except (InvalidToken, ValueError, TypeError, UnicodeError, AttributeError, json.JSONDecodeError):
             raise SessionSecurityError("session bundle invalid") from None
         if not isinstance(data, dict) or not data.get("access_token") or not data.get("discord_user_id"):
             raise SessionSecurityError("session bundle incomplete")
@@ -52,20 +60,28 @@ class SessionCipher:
 def new_session(cipher: SessionCipher, user_id: str, access_token: str, refresh_token: str,
                 expires_at: datetime, csrf_token: str) -> tuple[str, dict]:
     session_id = secrets.token_urlsafe(32)
+    session_hash = cipher.hash_id(session_id)
+    expires_iso = expires_at.astimezone(timezone.utc).isoformat()
     bundle = {
+        "version": 1,
+        "session_hash": session_hash,
         "discord_user_id": str(user_id),
         "access_token": access_token,
         "refresh_token": refresh_token,
         "csrf_token": csrf_token,
-        "token_expires_at": expires_at.astimezone(timezone.utc).isoformat(),
+        "scopes": ["identify", "guilds"],
+        "token_expires_at": expires_iso,
     }
     return session_id, {
-        "session_hash": cipher.hash_id(session_id),
+        "session_hash": session_hash,
         "discord_user_id": str(user_id),
         "token_bundle": cipher.encrypt(bundle),
         "token_expires_at": bundle["token_expires_at"],
-        "expires_at": expires_at.astimezone(timezone.utc).isoformat(),
+        "expires_at": expires_iso,
         "revoked_at": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "last_seen_at": datetime.now(timezone.utc).isoformat(),
+        "refresh_lock_id": None,
+        "refresh_lock_until": None,
+        "token_version": 0,
     }

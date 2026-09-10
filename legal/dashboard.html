@@ -12,7 +12,7 @@
     <meta name="theme-color" content="#0b0a10">
     <meta property="og:title" content="Panel de Control · SkullBoard">
     <meta property="og:description" content="Configura el Starboard de tus servidores y consulta rankings en vivo.">
-    <meta property="og:image" content="https://skullboard-fqf1.onrender.com/api/og">
+    <meta property="og:image" content="/api/og">
     <link rel="icon" type="image/png" href="skullboard_icon.png">
 
     <!-- Google Fonts -->
@@ -20,7 +20,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
-    <script>document.documentElement.dataset.theme = localStorage.getItem('skb-theme') || 'dark';</script>
+    <script>try { document.documentElement.dataset.theme = localStorage.getItem('skb-theme') || 'dark'; } catch (_) { document.documentElement.dataset.theme = 'dark'; }</script>
 </head>
 <body>
     <!-- SVG sprite -->
@@ -291,8 +291,8 @@
     </div>
 
     <!-- MODAL DE ESTADO DEL SISTEMA -->
-    <div id="status-modal-overlay" class="status-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="status-modal-title">
-        <div class="status-modal-card">
+    <div id="status-modal-overlay" class="status-modal-overlay" role="presentation">
+        <div class="status-modal-card" role="dialog" aria-modal="true" aria-labelledby="status-modal-title" tabindex="-1">
             <div class="status-modal-head">
                 <h3 id="status-modal-title">
                     <span class="status-dot"></span> Estado de la Infraestructura
@@ -303,7 +303,7 @@
                 <div class="status-card-item">
                     <div class="status-card-top">
                         <span class="status-card-title">Bot Discord</span>
-                        <span class="pill ok" id="status-bot-badge">● Online</span>
+                        <span class="pill unknown" id="status-bot-badge">● Comprobando</span>
                     </div>
                     <div class="status-card-val" id="status-bot-ping">-- ms</div>
                     <div class="status-card-sub" id="status-bot-shards">1 Shard · Gateway activo</div>
@@ -311,7 +311,7 @@
                 <div class="status-card-item">
                     <div class="status-card-top">
                         <span class="status-card-title">Base de Datos</span>
-                        <span class="pill ok" id="status-db-badge">● Operacional</span>
+                        <span class="pill unknown" id="status-db-badge">● Comprobando</span>
                     </div>
                     <div class="status-card-val" id="status-db-ping">-- ms</div>
                     <div class="status-card-sub">Supabase PostgreSQL</div>
@@ -319,15 +319,15 @@
                 <div class="status-card-item">
                     <div class="status-card-top">
                         <span class="status-card-title">API Web REST</span>
-                        <span class="pill ok">● Operacional</span>
+                        <span class="pill unknown" id="status-api-badge">● Comprobando</span>
                     </div>
-                    <div class="status-card-val">OK 200</div>
+                    <div class="status-card-val" id="status-api-val">--</div>
                     <div class="status-card-sub">Flask Multi-threaded Engine</div>
                 </div>
                 <div class="status-card-item">
                     <div class="status-card-top">
                         <span class="status-card-title">Tiempo Activo</span>
-                        <span class="pill ok">● 99.9%</span>
+                        <span class="pill unknown" id="status-uptime-badge">● No disponible</span>
                     </div>
                     <div class="status-card-val" id="status-uptime-val">--</div>
                     <div class="status-card-sub">Uptime continuo de sesión</div>
@@ -339,7 +339,7 @@
     <!-- Scripts -->
     <script>
         const API_BASE = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
-            ? 'http://127.0.0.1:8080'
+            ? window.location.origin
             : '';
         
         const CLIENT_ID = '1367463352774955059';
@@ -358,11 +358,6 @@
         function showFooter() {
             const f = document.getElementById('site-footer');
             if (f) f.style.display = 'block';
-        }
-
-        function hideFooter() {
-            const f = document.getElementById('site-footer');
-            if (f) f.style.display = 'none';
         }
 
         const toastContainer = document.createElement('div');
@@ -385,21 +380,63 @@
             }, 2800);
         }
 
+        function storageGet(storageName, key) {
+            try { return window[storageName].getItem(key); } catch (_) { return null; }
+        }
+
+        function storageSet(storageName, key, value) {
+            try { window[storageName].setItem(key, value); return true; } catch (_) { return false; }
+        }
+
+        function storageRemove(storageName, key) {
+            try { window[storageName].removeItem(key); } catch (_) { /* storage is optional */ }
+        }
+
         // Toggle claro/oscuro (silencioso sin toast)
         document.getElementById('theme-toggle').addEventListener('click', () => {
             const next = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
             document.documentElement.dataset.theme = next;
-            localStorage.setItem('skb-theme', next);
+            storageSet('localStorage', 'skb-theme', next);
         });
 
         let csrfToken = '';
+        const OAUTH_STATE_KEY = 'skb_oauth_states';
+        let authInProgress = false;
+
+        function oauthStates() {
+            try {
+                const states = JSON.parse(storageGet('sessionStorage', OAUTH_STATE_KEY) || '[]');
+                return Array.isArray(states) ? states.filter(state => typeof state === 'string') : [];
+            } catch (_) { return []; }
+        }
+
+        function rememberOAuthState(state) {
+            const states = oauthStates().filter(item => item !== state);
+            states.push(state);
+            return storageSet('sessionStorage', OAUTH_STATE_KEY, JSON.stringify(states.slice(-4)));
+        }
+
+        function forgetOAuthState(state) {
+            if (!state) return;
+            const states = oauthStates().filter(item => item !== state);
+            storageSet('sessionStorage', OAUTH_STATE_KEY, JSON.stringify(states));
+        }
+
         async function triggerDiscordAuth() {
+            if (authInProgress) return;
+            authInProgress = true;
             try {
                 const res = await fetch(`${API_BASE}/api/auth/start`, { credentials: 'include' });
                 const data = await res.json();
-                if (res.ok && data.ok && data.auth_url) window.location.assign(data.auth_url);
-                else showToast('No se pudo iniciar sesión.', '❌');
-            } catch (e) { showToast('Servicio temporalmente no disponible.', '❌'); }
+                if (res.ok && data.ok && data.auth_url) {
+                    const authUrl = new URL(data.auth_url);
+                    const state = authUrl.searchParams.get('state');
+                    if (!state) throw new Error();
+                    if (!rememberOAuthState(state)) throw new Error();
+                    window.location.assign(authUrl.href);
+                }
+                else { authInProgress = false; showToast('No se pudo iniciar sesión.', '❌'); }
+            } catch (e) { authInProgress = false; showToast('Servicio temporalmente no disponible.', '❌'); }
         }
 
         // El token Discord queda en servidor; navegador solo recibe cookie HttpOnly.
@@ -407,10 +444,17 @@
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
-            if (code || state) {
+            const hasOAuthResponse = code || state || urlParams.get('error');
+            const pendingStates = oauthStates();
+            if (hasOAuthResponse) {
                 window.history.replaceState(null, null, window.location.pathname);
             }
-            if (code) {
+            if (hasOAuthResponse && (!code || !state || !pendingStates.includes(state))) {
+                forgetOAuthState(state);
+                return false;
+            }
+            if (code && state) {
+                forgetOAuthState(state);
                 try {
                     const res = await fetch(`${API_BASE}/api/auth/token`, {
                         method: 'POST',
@@ -457,7 +501,9 @@
 
         let currentGuildLoadId = 0;
         let currentLbMode = 'users';
-        let requestSerial = 0;
+        let leaderboardRequestSerial = 0;
+        let messagesRequestSerial = 0;
+        let configRequestSerial = 0;
 
         // Listeners para el sub-selector de Leaderboard (Top Usuarios vs Mensajes Legendarios)
         const lbSubBtnUsers = document.getElementById('lb-sub-btn-users');
@@ -475,9 +521,9 @@
 
         // 1. CARGA DEL LEADERBOARD DEL SERVIDOR (RANKING DE USUARIOS O MENSAJES LEGENDARIOS)
         async function loadGuildLeaderboard(guildId, mode = currentLbMode) {
-            const requestId = ++requestSerial;
+            const requestId = ++leaderboardRequestSerial;
             currentLbMode = mode;
-            const thisLoadId = ++currentGuildLoadId;
+            const thisLoadId = currentGuildLoadId;
             const list = document.getElementById('guild-lb-list');
             const iconEl = document.getElementById('lb-view-icon');
             const titleEl = document.getElementById('lb-view-title');
@@ -505,7 +551,6 @@
                 }
             }
 
-            hideFooter();
             list.innerHTML = `
                 <div class="skeleton" style="height:68px; opacity:0.8; margin-bottom:12px; border-radius:16px;"></div>
                 <div class="skeleton" style="height:68px; opacity:0.5; margin-bottom:12px; border-radius:16px;"></div>
@@ -518,7 +563,7 @@
 
                 const res = await fetch(endpoint);
                 const data = await res.json();
-                if (requestId !== requestSerial || activeGuild?.id !== guildId) return;
+                if (requestId !== leaderboardRequestSerial || activeGuild?.id !== guildId) return;
 
                 if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
                     return;
@@ -619,14 +664,14 @@
                             const sbAppJumpUrl = m.app_skullboard_jump_url || m.app_jump_url || '';
 
                             const jumpBtnHtml = sbJumpUrl
-                                ? `<a href="${sbJumpUrl}" onclick="openDiscordJump(event, '${sbAppJumpUrl}', '${sbJumpUrl}')" class="btn-jump-discord" title="Abrir mensaje en el canal de Skullboard">
+                                ? `<a href="${escapeHtml(sbJumpUrl)}" data-app-url="${escapeHtml(sbAppJumpUrl)}" data-web-url="${escapeHtml(sbJumpUrl)}" class="btn-jump-discord" title="Abrir mensaje en el canal de Skullboard">
                                     <span>Ver en Skullboard 💀</span>
                                     <svg style="width:13px;height:13px;"><use href="#i-link"/></svg>
                                    </a>`
                                 : '';
 
                             const origBtnHtml = (m.original_jump_url && m.original_jump_url !== sbJumpUrl)
-                                ? `<a href="${m.original_jump_url}" onclick="openDiscordJump(event, '${m.app_original_jump_url || ''}', '${m.original_jump_url}')" class="btn-orig-jump" title="Abrir mensaje original donde se escribió">
+                                ? `<a href="${escapeHtml(m.original_jump_url)}" data-app-url="${escapeHtml(m.app_original_jump_url || '')}" data-web-url="${escapeHtml(m.original_jump_url)}" class="btn-orig-jump" title="Abrir mensaje original donde se escribió">
                                     <span>Original ↗</span>
                                    </a>`
                                 : '';
@@ -660,18 +705,18 @@
                     }
                 }
             } catch (e) {
+                if (requestId !== leaderboardRequestSerial || thisLoadId !== currentGuildLoadId || String(activeGuild?.id) !== String(guildId)) return;
                 list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar el Leaderboard.</div>';
             } finally {
-                showFooter();
+                if (requestId === leaderboardRequestSerial && thisLoadId === currentGuildLoadId) showFooter();
             }
         }
 
         // 2. CARGA DE MIS MENSAJES EN EL SERVIDOR
         async function loadMyMessages(guildId) {
-            const requestId = ++requestSerial;
-            const thisLoadId = ++currentGuildLoadId;
+            const requestId = ++messagesRequestSerial;
+            const thisLoadId = currentGuildLoadId;
             const list = document.getElementById('my-messages-list');
-            hideFooter();
             list.innerHTML = `
                 <div class="skeleton" style="height:68px; opacity:0.8; margin-bottom:12px; border-radius:16px;"></div>
                 <div class="skeleton" style="height:68px; opacity:0.5; margin-bottom:12px; border-radius:16px;"></div>
@@ -679,7 +724,7 @@
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${guildId}/my-messages`, { credentials: 'include' });
                 const data = await res.json();
-                if (requestId !== requestSerial || activeGuild?.id !== guildId) return;
+                if (requestId !== messagesRequestSerial || activeGuild?.id !== guildId) return;
 
                 if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) return;
 
@@ -723,14 +768,14 @@
                             const sbAppJumpUrl = m.app_skullboard_jump_url || m.app_jump_url || '';
 
                             const jumpBtnHtml = sbJumpUrl
-                                ? `<a href="${sbJumpUrl}" onclick="openDiscordJump(event, '${sbAppJumpUrl}', '${sbJumpUrl}')" class="btn-jump-discord" title="Abrir mensaje en el canal de Skullboard">
+                                ? `<a href="${escapeHtml(sbJumpUrl)}" data-app-url="${escapeHtml(sbAppJumpUrl)}" data-web-url="${escapeHtml(sbJumpUrl)}" class="btn-jump-discord" title="Abrir mensaje en el canal de Skullboard">
                                     <span>Ver en Skullboard 💀</span>
                                     <svg style="width:13px;height:13px;"><use href="#i-link"/></svg>
                                    </a>`
                                 : '';
 
                             const origBtnHtml = (m.original_jump_url && m.original_jump_url !== sbJumpUrl)
-                                ? `<a href="${m.original_jump_url}" onclick="openDiscordJump(event, '${m.app_original_jump_url || ''}', '${m.original_jump_url}')" class="btn-orig-jump" title="Abrir mensaje original donde se escribió">
+                                ? `<a href="${escapeHtml(m.original_jump_url)}" data-app-url="${escapeHtml(m.app_original_jump_url || '')}" data-web-url="${escapeHtml(m.original_jump_url)}" class="btn-orig-jump" title="Abrir mensaje original donde se escribió">
                                     <span>Original ↗</span>
                                    </a>`
                                 : '';
@@ -760,16 +805,18 @@
                     list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--bad);">Error al cargar tus mensajes.</div>';
                 }
             } catch (e) {
-                if (thisLoadId !== currentGuildLoadId) return;
+                if (requestId !== messagesRequestSerial || thisLoadId !== currentGuildLoadId || String(activeGuild?.id) !== String(guildId)) return;
                 list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar tus mensajes.</div>';
             } finally {
-                if (thisLoadId === currentGuildLoadId) showFooter();
+                if (requestId === messagesRequestSerial && thisLoadId === currentGuildLoadId) showFooter();
             }
         }
 
         let currentGuildChannels = [];
+        let settingsReady = false;
 
-        function setSettingsFormState({ loading = false, error = null }) {
+        function setSettingsFormState({ loading = false, error = null, ready = false }) {
+            settingsReady = !loading && !error && ready;
             const btnSave = document.getElementById('btn-save-cfg');
             const skullsInput = document.getElementById('cfg-skulls');
             const pinInput = document.getElementById('cfg-pin');
@@ -777,7 +824,7 @@
             const channelTrigger = document.getElementById('channel-trigger');
             const statusEl = document.getElementById('cfg-save-status');
 
-            if (btnSave) btnSave.disabled = loading;
+            if (btnSave) btnSave.disabled = loading || !settingsReady;
             if (skullsInput) skullsInput.disabled = loading;
             if (pinInput) pinInput.disabled = loading;
             if (prefixInput) prefixInput.disabled = loading;
@@ -913,8 +960,9 @@
 
         // 3. CARGA DE CONFIGURACIÓN (SOLO ADMINS)
         async function loadGuildConfig(guildId) {
-            const thisLoadId = ++currentGuildLoadId;
-            hideFooter();
+            const requestId = ++configRequestSerial;
+            const thisLoadId = currentGuildLoadId;
+            let channelsLoadFailed = false;
             setSettingsFormState({ loading: true });
             const container = document.getElementById('channel-options-container');
             if (container) container.innerHTML = '<div class="channel-option-loading">Cargando canales…</div>';
@@ -922,24 +970,26 @@
             try {
                 const chanRes = await fetch(`${API_BASE}/api/guild/${guildId}/channels`, { credentials: 'include' });
                 const chanData = await chanRes.json();
-                if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
+                if (requestId !== configRequestSerial || thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
                     return;
                 }
                 if (chanData.ok && chanData.channels && chanData.channels.length > 0) {
                     currentGuildChannels = chanData.channels;
                     renderChannelOptions(currentGuildChannels);
                 } else {
+                    channelsLoadFailed = true;
                     if (container) container.innerHTML = '<div class="channel-option-empty">(Canales no disponibles)</div>';
                 }
             } catch (e) {
-                if (thisLoadId !== currentGuildLoadId) return;
+                if (requestId !== configRequestSerial || thisLoadId !== currentGuildLoadId) return;
+                channelsLoadFailed = true;
                 if (container) container.innerHTML = '<div class="channel-option-empty">(Error al cargar canales)</div>';
             }
 
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${guildId}/config`, { credentials: 'include' });
                 const data = await res.json();
-                if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
+                if (requestId !== configRequestSerial || thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
                     return;
                 }
                 if (data.ok && data.config) {
@@ -958,17 +1008,17 @@
                     document.getElementById('cfg-pin').value = pinVal;
                     const pinNum = document.getElementById('cfg-pin-num');
                     if (pinNum) pinNum.value = pinVal;
-                    setSettingsFormState({ loading: false });
+                    setSettingsFormState({ loading: false, ready: !channelsLoadFailed });
                 } else {
                     setSettingsFormState({ loading: false, error: data.error || 'Error al cargar ajustes' });
                     showToast(data.error || 'Error al cargar ajustes', '✕');
                 }
             } catch (e) {
-                if (thisLoadId !== currentGuildLoadId) return;
+                if (requestId !== configRequestSerial || thisLoadId !== currentGuildLoadId) return;
                 setSettingsFormState({ loading: false, error: 'Error de conexión con el servidor' });
                 showToast('Error cargando ajustes', '✕');
             } finally {
-                if (thisLoadId === currentGuildLoadId) showFooter();
+                if (requestId === configRequestSerial && thisLoadId === currentGuildLoadId) showFooter();
             }
         }
 
@@ -976,6 +1026,7 @@
         function showServersView() {
             activeGuild = null;
             currentGuildLoadId++;
+            currentGuildChannels = [];
             const searchInput = document.getElementById('guild-search-input');
             if (searchInput) searchInput.value = '';
             document.getElementById('view-loading').style.display = 'none';
@@ -1067,7 +1118,7 @@
 
         // Botón de retorno al listado de servidores
         document.getElementById('btn-switch-guild').addEventListener('click', () => {
-            localStorage.removeItem('skb_last_guild_id');
+            storageRemove('localStorage', 'skb_last_guild_id');
             showServersView();
         });
 
@@ -1075,8 +1126,9 @@
         function selectGuild(guild, saveToStorage = true) {
             activeGuild = guild;
             currentGuildLoadId++;
+            currentGuildChannels = [];
             if (saveToStorage) {
-                localStorage.setItem('skb_last_guild_id', guild.id);
+                storageSet('localStorage', 'skb_last_guild_id', guild.id);
             }
 
             const iconImg = document.getElementById('current-guild-icon');
@@ -1107,7 +1159,6 @@
             }
 
             // Cambiar vista
-            hideFooter();
             document.getElementById('view-loading').style.display = 'none';
             document.getElementById('view-servers').style.display = 'none';
             document.getElementById('view-dashboard').style.display = 'block';
@@ -1125,7 +1176,9 @@
         // Guardar Cambios
         document.getElementById('guild-config-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            if (!activeGuild) return;
+            if (!activeGuild || !settingsReady) return;
+            const guildId = String(activeGuild.id);
+            const saveGeneration = currentGuildLoadId;
             const btn = document.getElementById('btn-save-cfg');
             const status = document.getElementById('cfg-save-status');
             btn.disabled = true;
@@ -1139,13 +1192,14 @@
             };
 
             try {
-                const res = await fetch(`${API_BASE}/api/guild/${activeGuild.id}/config`, {
+                const res = await fetch(`${API_BASE}/api/guild/${guildId}/config`, {
                     method: 'POST',
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                     body: JSON.stringify(payload)
                 });
                 const data = await res.json();
+                if (saveGeneration !== currentGuildLoadId || String(activeGuild?.id) !== guildId) return;
                 if (res.ok && data.ok) {
                     showToast('¡Ajustes guardados!', '✅');
                     status.textContent = '✅ Guardado';
@@ -1155,10 +1209,13 @@
                     status.textContent = '❌ Error';
                 }
             } catch (err) {
+                if (saveGeneration !== currentGuildLoadId || String(activeGuild?.id) !== guildId) return;
                 showToast('Error de red', '❌');
                 status.textContent = '❌ Error';
             } finally {
-                btn.disabled = false;
+                if (saveGeneration === currentGuildLoadId && String(activeGuild?.id) === guildId) {
+                    btn.disabled = !settingsReady;
+                }
             }
         });
 
@@ -1225,12 +1282,13 @@
             const btnDropdownLogout = document.getElementById('btn-dropdown-logout');
             if (btnDropdownLogout) {
                 btnDropdownLogout.addEventListener('click', async () => {
-                    localStorage.removeItem('skb_last_guild_id');
+                    storageRemove('localStorage', 'skb_last_guild_id');
                     btnDropdownLogout.disabled = true;
                     try {
                         const res = await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': csrfToken } });
                         if (!res.ok) throw new Error();
-                        localStorage.removeItem('skb_last_guild_id');
+                        storageRemove('localStorage', 'skb_last_guild_id');
+                        storageRemove('sessionStorage', OAUTH_STATE_KEY);
                         window.location.href = '/?logged_out=1';
                     } catch (e) {
                         btnDropdownLogout.disabled = false;
@@ -1260,7 +1318,7 @@
             }
 
             // Memoria: si hay un servidor guardado en localStorage, entrar directo
-            const savedGuildId = localStorage.getItem('skb_last_guild_id');
+            const savedGuildId = storageGet('localStorage', 'skb_last_guild_id');
             const savedGuild = userGuilds.find(g => String(g.id) === String(savedGuildId));
 
             if (savedGuild && savedGuild.has_bot) {
@@ -1275,12 +1333,16 @@
             if (!exchanged) return showUnauthenticated('No se pudo validar el inicio de sesión.');
             try {
                 const userRes = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
-                if (userRes.status === 401) return showUnauthenticated('Sesión expirada.');
-                if (!userRes.ok) throw new Error();
                 const userData = await userRes.json();
+                if (userRes.status === 401) {
+                    return showUnauthenticated(userData.error === 'Sesión expirada'
+                        ? 'Sesión expirada. Vuelve a iniciar sesión.'
+                        : 'Inicia sesión con Discord para continuar.');
+                }
+                if (!userRes.ok) throw new Error();
                 csrfToken = userData.csrf_token || '';
                 const guildsRes = await fetch(`${API_BASE}/api/auth/guilds`, { credentials: 'include' });
-                if (guildsRes.status === 401) return showUnauthenticated('Sesión expirada.');
+                if (guildsRes.status === 401) return showUnauthenticated('Sesión expirada. Vuelve a iniciar sesión.');
                 if (!guildsRes.ok) throw new Error();
                 const guildsData = await guildsRes.json();
                 if (!userData.ok || !guildsData.ok) throw new Error();
@@ -1302,19 +1364,37 @@
         init();
 
         // 3. ESTADO DEL SISTEMA (STATUS API & MODAL)
+        function setStatusBadge(id, status, labels) {
+            const badge = document.getElementById(id);
+            if (!badge) return;
+            const safeStatus = ['operational', 'degraded', 'unknown'].includes(status) ? status : 'unknown';
+            badge.className = `pill ${safeStatus === 'operational' ? 'ok' : safeStatus}`;
+            badge.textContent = `● ${labels[safeStatus]}`;
+        }
+
         async function fetchSystemStatus() {
             try {
                 const res = await fetch(`${API_BASE}/api/status`);
                 const data = await res.json();
                 if (data.ok) {
+                    const botStatus = data.bot?.status || 'unknown';
+                    const dbStatus = data.database?.status || 'unknown';
+                    const apiStatus = data.api?.status || 'unknown';
+                    const labels = { operational: 'Operacional', degraded: 'Degradado', unknown: 'No disponible' };
+                    setStatusBadge('status-bot-badge', botStatus, labels);
+                    setStatusBadge('status-db-badge', dbStatus, labels);
+                    setStatusBadge('status-api-badge', apiStatus, labels);
+                    setStatusBadge('status-uptime-badge', botStatus, { operational: 'En línea', degraded: 'Degradado', unknown: 'No disponible' });
                     const botPing = document.getElementById('status-bot-ping');
-                    if (botPing) botPing.textContent = `${data.bot.latency_ms} ms`;
+                    if (botPing) botPing.textContent = data.bot.latency_ms == null ? '—' : `${data.bot.latency_ms} ms`;
                     const botShards = document.getElementById('status-bot-shards');
-                    if (botShards) botShards.textContent = `${data.bot.shards} Shard${data.bot.shards > 1 ? 's' : ''} · ${data.bot.guilds || 0} servidores`;
+                    if (botShards) botShards.textContent = data.bot.shards == null ? 'Proveedor de estado no conectado' : `${data.bot.shards} Shard${data.bot.shards > 1 ? 's' : ''} · ${data.bot.guilds || 0} servidores`;
                     const dbPing = document.getElementById('status-db-ping');
-                    if (dbPing) dbPing.textContent = `${data.database.latency_ms} ms`;
+                    if (dbPing) dbPing.textContent = data.database.latency_ms == null ? '—' : `${data.database.latency_ms} ms`;
+                    const apiVal = document.getElementById('status-api-val');
+                    if (apiVal) apiVal.textContent = apiStatus === 'operational' ? 'OK 200' : 'Respuesta no verificada';
                     const uptimeVal = document.getElementById('status-uptime-val');
-                    if (uptimeVal) uptimeVal.textContent = data.bot.uptime_formatted || 'Online';
+                    if (uptimeVal) uptimeVal.textContent = data.bot.uptime_formatted || 'No disponible';
                     
                     document.querySelectorAll('.status-pill-text').forEach(el => {
                         el.textContent = data.all_operational ? 'Sistemas OK' : 'Degradado';
@@ -1326,28 +1406,37 @@
         }
 
         const statusOverlay = document.getElementById('status-modal-overlay');
+        const statusCard = statusOverlay?.querySelector('.status-modal-card');
+        let statusReturnFocus = null;
+        function closeStatusModal() {
+            if (!statusOverlay) return;
+            statusOverlay.classList.remove('active');
+            statusReturnFocus?.focus();
+            statusReturnFocus = null;
+        }
         document.querySelectorAll('.open-status-modal').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.preventDefault();
-                if (statusOverlay) {
-                    statusOverlay.classList.add('active');
-                    fetchSystemStatus();
-                }
+                if (!statusOverlay) return;
+                statusReturnFocus = e.currentTarget;
+                statusOverlay.classList.add('active');
+                statusCard?.focus();
+                fetchSystemStatus();
             });
         });
         const btnCloseModal = document.getElementById('btn-close-status-modal');
         if (btnCloseModal && statusOverlay) {
-            btnCloseModal.addEventListener('click', () => statusOverlay.classList.remove('active'));
+            btnCloseModal.addEventListener('click', closeStatusModal);
         }
         if (statusOverlay) {
             statusOverlay.addEventListener('click', (e) => {
-                if (e.target === statusOverlay) statusOverlay.classList.remove('active');
+                if (e.target === statusOverlay) closeStatusModal();
             });
         }
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
                 if (statusOverlay && statusOverlay.classList.contains('active')) {
-                    statusOverlay.classList.remove('active');
+                    closeStatusModal();
                 }
                 closeChannelDropdown();
             }
@@ -1355,15 +1444,28 @@
         // Función de salto nativo a Discord con fallback web
         function openDiscordJump(e, appUrl, webUrl) {
             e.preventDefault();
-            if (appUrl) {
+            let safeWebUrl = '';
+            try {
+                const parsed = new URL(webUrl);
+                if (parsed.protocol === 'https:' && parsed.hostname === 'discord.com' && parsed.pathname.startsWith('/channels/')) {
+                    safeWebUrl = parsed.href;
+                }
+            } catch (_) { /* invalid link */ }
+            if (!safeWebUrl) return;
+            if (/^discord:\/\/-\/channels\//.test(appUrl)) {
                 const iframe = document.createElement('iframe');
                 iframe.style.display = 'none';
                 iframe.src = appUrl;
                 document.body.appendChild(iframe);
                 setTimeout(() => iframe.remove(), 800);
             }
-            window.open(webUrl, '_blank', 'noopener,noreferrer');
+            window.open(safeWebUrl, '_blank', 'noopener,noreferrer');
         }
+
+        document.addEventListener('click', (e) => {
+            const link = e.target.closest?.('a[data-web-url]');
+            if (link) openDiscordJump(e, link.dataset.appUrl || '', link.dataset.webUrl || link.href);
+        });
 
         // Listeners para inputs numéricos directos (sin sliders ni flechas)
         const skullsInput = document.getElementById('cfg-skulls');

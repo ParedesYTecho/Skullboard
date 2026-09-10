@@ -137,8 +137,22 @@ BOT_OWNER_ID="561225979389804544"
 SUPABASE_URL="https://tu-proyecto.supabase.co"
 SUPABASE_SERVICE_ROLE_KEY="tu_clave_de_servicio_supabase"
 
+# Dashboard OAuth (solo backend Render/local; nunca Vercel)
+SKULLBOARD_ENV="production"
+SKULLBOARD_SESSION_ENCRYPTION_KEY="tu_clave_fernet_estable"
+SKULLBOARD_DASHBOARD_REDIRECT_URI="https://skullboard.vercel.app/dashboard"
+WEB_ALLOWED_ORIGINS="https://skullboard.vercel.app"
+
 # Webserver & Contact Form (Opcional)
 RESEND_API_KEY="re_tu_clave_de_resend"
+```
+
+`SKULLBOARD_SESSION_ENCRYPTION_KEY` debe ser una clave Fernet estable de 32 bytes en base64 URL-safe. No pongas una clave de Discord, Supabase ni Vercel. Para crearla y guardarla como variable de usuario en Windows sin mostrarla en consola:
+
+```powershell
+$skullboardKey = python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+[Environment]::SetEnvironmentVariable("SKULLBOARD_SESSION_ENCRYPTION_KEY", $skullboardKey, "User")
+Remove-Variable skullboardKey
 ```
 
 ---

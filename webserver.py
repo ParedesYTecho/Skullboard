@@ -17,6 +17,13 @@ from datetime import datetime, timezone
 from dashboard_sessions import SessionCipher, SessionSecurityError, new_session
 
 logger = logging.getLogger("skullboard.webserver")
+_LOG_SECRET_RE = re.compile(
+    r"(?i)(bearer\s+|(?:access[_-]?token|refresh[_-]?token|session[_-]?id|client[_-]?secret|api[_-]?key|authorization|code|state|cookie)\s*[=:]\s*)[^\s&,;]+"
+)
+
+
+def _redact_log(value) -> str:
+    return _LOG_SECRET_RE.sub(lambda match: f"{match.group(1)}[REDACTED]", str(value))
 
 # ─── Serialización y Métricas de Rendimiento ─────────────────────────────────
 try:
@@ -52,14 +59,26 @@ RESEND_API_KEY = os.getenv("RESEND_API_KEY")
 CONTACT_TO   = "globalsupportpyt@gmail.com"
 CONTACT_FROM = "SkullBoard <onboarding@resend.dev>"
 OWNER_ID = str(os.getenv("BOT_OWNER_ID", "561225979389804544"))
-ALLOWED_ORIGINS = {
-    origin.strip().rstrip("/") for origin in os.getenv(
-        "WEB_ALLOWED_ORIGINS", "https://skullboard.vercel.app,http://localhost:8080,http://127.0.0.1:8080"
-    ).split(",") if origin.strip()
-}
-SESSION_COOKIE = "__Host-skullboard_session"
 SESSION_TTL = 30 * 24 * 60 * 60
 APP_ENV = os.getenv("SKULLBOARD_ENV", "development").lower()
+_DEFAULT_ALLOWED_ORIGINS = "https://skullboard.vercel.app" if APP_ENV == "production" else \
+    "https://skullboard.vercel.app,http://localhost:8080,http://127.0.0.1:8080"
+ALLOWED_ORIGINS = {
+    origin.strip().rstrip("/") for origin in os.getenv(
+        "WEB_ALLOWED_ORIGINS", _DEFAULT_ALLOWED_ORIGINS
+    ).split(",") if origin.strip()
+}
+
+
+def _session_cookie_name(env: str | None = None) -> str:
+    return "__Host-skullboard_session" if (env or APP_ENV) == "production" else "skullboard_session"
+
+
+def _session_cookie_secure(env: str | None = None) -> bool:
+    return (env or APP_ENV) == "production"
+
+
+SESSION_COOKIE = _session_cookie_name()
 SESSION_ENCRYPTION_KEY = os.getenv("SKULLBOARD_SESSION_ENCRYPTION_KEY")
 if APP_ENV == "production" and not SESSION_ENCRYPTION_KEY:
     raise RuntimeError("SKULLBOARD_SESSION_ENCRYPTION_KEY is required in production")
@@ -127,11 +146,11 @@ def sync_db_retry(max_retries: int = 3, base_delay: float = 0.3, max_delay: floa
                 except Exception as e:
                     last_exc = e
                     if attempt == max_retries:
-                        print(f"[ERROR] [Sync DB Retry] Fallo tras {max_retries} intentos ({func.__name__}): {e}")
+                        print(f"[ERROR] [Sync DB Retry] Fallo tras {max_retries} intentos ({func.__name__}): {_redact_log(e)}")
                         raise
                     jitter = random.uniform(0.8, 1.2)
                     sleep_time = min(delay * jitter, max_delay)
-                    print(f"[WARN] [Sync DB Retry] Intento {attempt}/{max_retries} en {func.__name__} fallo: {e}. Reintentando en {sleep_time:.2f}s...")
+                    print(f"[WARN] [Sync DB Retry] Intento {attempt}/{max_retries} en {func.__name__} fallo: {_redact_log(e)}. Reintentando en {sleep_time:.2f}s...")
                     time.sleep(sleep_time)
                     delay *= 2
             if last_exc:
@@ -175,18 +194,87 @@ def after_request_cors(response):
     return _cors(response)
 
 def _require_origin():
-    if request.headers.get("Origin", "").rstrip("/") not in ALLOWED_ORIGINS:
+    origin = request.headers.get("Origin", "").rstrip("/")
+    if not origin and request.method == "GET" and request.path == "/api/auth/start":
+        return None
+    if origin not in ALLOWED_ORIGINS:
         return _cors(jsonify(ok=False, error="Origen no permitido")), 403
     return None
+
+
+def _oauth_cookie_name(state: str) -> str | None:
+    if not isinstance(state, str) or not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", state):
+        return None
+    prefix = "__Host-skullboard_oauth_" if _session_cookie_secure() else "skullboard_oauth_"
+    return prefix + hashlib.sha256(state.encode("ascii")).hexdigest()[:24]
+
+
+def _new_dashboard_state() -> tuple[str, str]:
+    if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
+        raise SessionSecurityError("secure session persistence unavailable")
+    state = secrets.token_urlsafe(32)
+    browser_nonce = secrets.token_urlsafe(32)
+    expires_at = datetime.fromtimestamp(time.time() + _OAUTH_STATE_TTL, timezone.utc).isoformat()
+    if not _sb_upsert("dashboard_oauth_states", {
+        "state_hash": _session_cipher.hash_state(state),
+        "browser_hash": _session_cipher.hash_state(browser_nonce),
+        "expires_at": expires_at
+    }):
+        raise SessionSecurityError("oauth state persistence failed")
+    return state, browser_nonce
+
+
+def _consume_dashboard_state(state: str, browser_nonce: str = "") -> bool:
+    try:
+        state_hash = _session_cipher.hash_state(state)
+        browser_hash = _session_cipher.hash_state(browser_nonce)
+    except SessionSecurityError:
+        return False
+    rows = _sb_select_required("dashboard_oauth_states", {
+        "state_hash": f"eq.{state_hash}",
+        "limit": 1
+    })
+    if not rows:
+        return False
+    try:
+        if not hmac.compare_digest(str(rows[0].get("browser_hash", "")), browser_hash):
+            return False
+        expires_at = datetime.fromisoformat(rows[0]["expires_at"].replace("Z", "+00:00"))
+        if expires_at.timestamp() <= time.time():
+            _sb_delete("dashboard_oauth_states", {"state_hash": f"eq.{state_hash}"})
+            return False
+    except (KeyError, ValueError, TypeError, AttributeError, SessionSecurityError):
+        _sb_delete("dashboard_oauth_states", {"state_hash": f"eq.{state_hash}"})
+        return False
+    return _sb_delete("dashboard_oauth_states", {"state_hash": f"eq.{state_hash}"}, require_match=True)
 
 
 def _purge_expired_sessions():
     if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
         return
     try:
-        _sb_delete("dashboard_sessions", {"expires_at": f"lt.{datetime.now(timezone.utc).isoformat()}"})
+        expires_filter = {"expires_at": f"lt.{datetime.now(timezone.utc).isoformat()}"}
+        _sb_delete("dashboard_sessions", expires_filter)
+        _sb_delete("dashboard_oauth_states", expires_filter)
     except Exception:
         logger.warning("No se pudieron limpiar sesiones expiradas")
+
+
+_session_purge_lock = Lock()
+_last_session_purge = 0.0
+_SESSION_PURGE_INTERVAL = 3600
+
+
+def _maybe_purge_expired_sessions():
+    global _last_session_purge
+    now = time.time()
+    if now - _last_session_purge < _SESSION_PURGE_INTERVAL:
+        return
+    with _session_purge_lock:
+        if now - _last_session_purge < _SESSION_PURGE_INTERVAL:
+            return
+        _last_session_purge = now
+    _purge_expired_sessions()
 
 
 def _require_session():
@@ -195,7 +283,11 @@ def _require_session():
     session_id = request.cookies.get(SESSION_COOKIE, "")
     if not session_id:
         return None
-    rows = _sb_select("dashboard_sessions", {"session_hash": f"eq.{_session_cipher.hash_id(session_id)}", "limit": 1})
+    try:
+        session_hash = _session_cipher.hash_id(session_id)
+    except SessionSecurityError:
+        return None
+    rows = _sb_select_required("dashboard_sessions", {"session_hash": f"eq.{session_hash}", "limit": 1})
     if not rows:
         return None
     row = rows[0]
@@ -204,9 +296,71 @@ def _require_session():
         if row.get("revoked_at") or expiry.timestamp() <= time.time():
             return None
         bundle = _session_cipher.decrypt(row["token_bundle"])
-    except (KeyError, ValueError, SessionSecurityError):
+        if (bundle.get("session_hash") != row.get("session_hash") or
+                bundle.get("discord_user_id") != row.get("discord_user_id") or
+                bundle.get("scopes") != ["identify", "guilds"]):
+            return None
+    except (KeyError, ValueError, TypeError, AttributeError, SessionSecurityError):
+        return None
+    touched = _sb_patch("dashboard_sessions", {
+        "session_hash": f"eq.{session_hash}",
+        "revoked_at": "is.null",
+        "expires_at": f"gt.{datetime.now(timezone.utc).isoformat()}"
+    }, {"last_seen_at": datetime.now(timezone.utc).isoformat()})
+    if not touched:
         return None
     return session_id, row, bundle
+
+
+def _invalidate_session(session_hash: str):
+    if not _sb_delete("dashboard_sessions", {"session_hash": f"eq.{session_hash}"}):
+        raise SessionSecurityError("session invalidation failed")
+
+
+def _invalidate_refresh_owned_session(session_hash: str, refresh_lock_id: str, token_version: int) -> bool:
+    return _sb_delete("dashboard_sessions", {
+        "session_hash": f"eq.{session_hash}",
+        "refresh_lock_id": f"eq.{refresh_lock_id}",
+        "token_version": f"eq.{token_version}"
+    }, require_match=True)
+
+
+def _invalidate_request_session():
+    session_id = request.cookies.get(SESSION_COOKIE, "")
+    if not session_id or not _session_cipher:
+        return
+    try:
+        _invalidate_session(_session_cipher.hash_id(session_id))
+    except SessionSecurityError:
+        logger.warning("No se pudo invalidar sesión Discord rechazada")
+
+
+def _refresh_lock_for(session_hash: str) -> Lock:
+    with _session_lock:
+        return _refresh_locks.setdefault(session_hash, Lock())
+
+
+def _claim_refresh_lock(session_hash: str):
+    lock_id = secrets.token_urlsafe(16)
+    now = datetime.now(timezone.utc).isoformat()
+    lock_until = datetime.fromtimestamp(time.time() + 30, timezone.utc).isoformat()
+    rows = _sb_patch("dashboard_sessions", {
+        "session_hash": f"eq.{session_hash}",
+        "revoked_at": "is.null",
+        "expires_at": f"gt.{now}",
+        "or": f"(refresh_lock_id.is.null,refresh_lock_until.lt.{now})"
+    }, {"refresh_lock_id": lock_id, "refresh_lock_until": lock_until})
+    return lock_id if rows else None
+
+
+def _release_refresh_lock(session_hash: str, lock_id: str):
+    try:
+        _sb_patch("dashboard_sessions", {"session_hash": f"eq.{session_hash}", "refresh_lock_id": f"eq.{lock_id}"}, {
+            "refresh_lock_id": None,
+            "refresh_lock_until": None
+        })
+    except SessionSecurityError:
+        logger.warning("No se pudo liberar el bloqueo de renovación")
 
 
 def _session_credentials():
@@ -216,16 +370,19 @@ def _session_credentials():
     session_id, row, bundle = session
     try:
         token_expiry = datetime.fromisoformat(bundle["token_expires_at"].replace("Z", "+00:00")).timestamp()
-    except (KeyError, ValueError):
+    except (KeyError, ValueError, TypeError, AttributeError):
+        _invalidate_session(_session_cipher.hash_id(session_id))
         return None
     if token_expiry - time.time() > 120:
         return bundle
     refresh_token = bundle.get("refresh_token")
-    if not refresh_token or not DISCORD_CLIENT_SECRET:
-        return None
     session_hash = _session_cipher.hash_id(session_id)
-    with _session_lock:
-        lock = _refresh_locks.setdefault(session_hash, Lock())
+    if not refresh_token:
+        _invalidate_session(session_hash)
+        return None
+    if not DISCORD_CLIENT_SECRET:
+        raise SessionSecurityError("oauth refresh unavailable")
+    lock = _refresh_lock_for(session_hash)
     with lock:
         current = _require_session()
         if not current:
@@ -234,32 +391,67 @@ def _session_credentials():
         try:
             if datetime.fromisoformat(current_bundle["token_expires_at"].replace("Z", "+00:00")).timestamp() - time.time() > 120:
                 return current_bundle
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, TypeError, AttributeError):
+            _invalidate_session(session_hash)
             return None
+        refresh_lock_id = _claim_refresh_lock(session_hash)
+        if not refresh_lock_id:
+            # ponytail: short bounded polling, replace with a queue only if refresh volume justifies it.
+            deadline = time.time() + 8
+            while time.time() < deadline:
+                time.sleep(0.25)
+                current = _require_session()
+                if not current:
+                    return None
+                try:
+                    if datetime.fromisoformat(current[2]["token_expires_at"].replace("Z", "+00:00")).timestamp() - time.time() > 120:
+                        return current[2]
+                except (KeyError, ValueError, TypeError, AttributeError):
+                    return None
+            raise SessionSecurityError("oauth refresh busy")
         try:
             response = requests.post("https://discord.com/api/v10/oauth2/token", data={
                 "client_id": APPLICATION_ID, "client_secret": DISCORD_CLIENT_SECRET,
                 "grant_type": "refresh_token", "refresh_token": current_bundle["refresh_token"]
             }, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=8)
+            if response.status_code in (400, 401, 403):
+                if _invalidate_refresh_owned_session(session_hash, refresh_lock_id, int(current_row.get("token_version") or 0)):
+                    return None
+                latest = _require_session()
+                return latest[2] if latest else None
             if response.status_code != 200:
-                _sb_delete("dashboard_sessions", {"session_hash": f"eq.{session_hash}"})
-                return None
+                _release_refresh_lock(session_hash, refresh_lock_id)
+                raise SessionSecurityError("oauth refresh unavailable")
             data = response.json()
             access_token = data.get("access_token")
             if not access_token:
-                return None
+                if _invalidate_refresh_owned_session(session_hash, refresh_lock_id, int(current_row.get("token_version") or 0)):
+                    return None
+                latest = _require_session()
+                return latest[2] if latest else None
             new_expiry = datetime.fromtimestamp(time.time() + max(int(data.get("expires_in", 3600)), 60), timezone.utc)
             current_bundle.update({"access_token": access_token, "token_expires_at": new_expiry.isoformat()})
             if data.get("refresh_token"):
                 current_bundle["refresh_token"] = data["refresh_token"]
-            current_row.update({"token_bundle": _session_cipher.encrypt(current_bundle),
-                                "token_expires_at": new_expiry.isoformat(),
-                                "last_seen_at": datetime.now(timezone.utc).isoformat()})
-            if not _sb_upsert("dashboard_sessions", current_row):
+            updated = _sb_patch("dashboard_sessions", {
+                "session_hash": f"eq.{session_hash}",
+                "refresh_lock_id": f"eq.{refresh_lock_id}",
+                "revoked_at": "is.null",
+                "expires_at": f"gt.{datetime.now(timezone.utc).isoformat()}"
+            }, {
+                "token_bundle": _session_cipher.encrypt(current_bundle),
+                "token_expires_at": new_expiry.isoformat(),
+                "last_seen_at": datetime.now(timezone.utc).isoformat(),
+                "refresh_lock_id": None,
+                "refresh_lock_until": None,
+                "token_version": int(current_row.get("token_version") or 0) + 1
+            })
+            if not updated:
                 return None
             return current_bundle
         except (requests.RequestException, ValueError, TypeError):
-            return None
+            _release_refresh_lock(session_hash, refresh_lock_id)
+            raise SessionSecurityError("oauth refresh unavailable") from None
 
 
 def _session_token():
@@ -290,18 +482,24 @@ def _fetch_discord_user(token: str):
                 return val
     try:
         r = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {token}"}, timeout=6)
-        if r.status_code != 200:
+        if r.status_code in (401, 403):
             logger.warning(f"⚠️ [OAuth @me] Discord API devolvió HTTP {r.status_code}")
             return None
+        if r.status_code != 200:
+            logger.warning(f"⚠️ [OAuth @me] Discord API temporalmente no disponible: HTTP {r.status_code}")
+            raise SessionSecurityError("discord user service unavailable")
         data = r.json()
         with _discord_cache_lock:
             _discord_user_cache[token_hash] = (now, data)
             if len(_discord_user_cache) > 500:
                 _discord_user_cache.pop(next(iter(_discord_user_cache)))
         return data
-    except Exception as e:
-        logger.error(f"❌ [OAuth @me] Error al consultar usuario: {e}")
-        return None
+    except requests.RequestException as e:
+        logger.error(f"❌ [OAuth @me] Error al consultar usuario: {_redact_log(e)}")
+        raise SessionSecurityError("discord user service unavailable") from None
+    except (ValueError, TypeError) as e:
+        logger.error(f"❌ [OAuth @me] Respuesta inválida: {_redact_log(e)}")
+        raise SessionSecurityError("discord user service unavailable") from None
 
 def _fetch_discord_guilds(token: str):
     if not token:
@@ -315,18 +513,41 @@ def _fetch_discord_guilds(token: str):
                 return val
     try:
         r = requests.get("https://discord.com/api/v10/users/@me/guilds", headers={"Authorization": f"Bearer {token}"}, timeout=8)
-        if r.status_code != 200:
+        if r.status_code in (401, 403):
             logger.warning(f"⚠️ [OAuth @me/guilds] Discord API devolvió HTTP {r.status_code}")
             return None
+        if r.status_code != 200:
+            logger.warning(f"⚠️ [OAuth @me/guilds] Discord API temporalmente no disponible: HTTP {r.status_code}")
+            raise SessionSecurityError("discord guild service unavailable")
         data = r.json()
         with _discord_cache_lock:
             _discord_guilds_cache[token_hash] = (now, data)
             if len(_discord_guilds_cache) > 500:
                 _discord_guilds_cache.pop(next(iter(_discord_guilds_cache)))
         return data
-    except Exception as e:
-        logger.error(f"❌ [OAuth @me/guilds] Error al consultar servidores: {e}")
-        return None
+    except requests.RequestException as e:
+        logger.error(f"❌ [OAuth @me/guilds] Error al consultar servidores: {_redact_log(e)}")
+        raise SessionSecurityError("discord guild service unavailable") from None
+    except (ValueError, TypeError) as e:
+        logger.error(f"❌ [OAuth @me/guilds] Respuesta inválida: {_redact_log(e)}")
+        raise SessionSecurityError("discord guild service unavailable") from None
+
+
+def _clear_discord_cache(token: str):
+    if not token:
+        return
+    token_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+    with _discord_cache_lock:
+        _discord_user_cache.pop(token_hash, None)
+        _discord_guilds_cache.pop(token_hash, None)
+
+
+def _public_discord_user(data: dict) -> dict:
+    return {
+        key: data.get(key)
+        for key in ("id", "username", "global_name", "avatar")
+        if data.get(key) is not None
+    }
 
 @sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 def _sb_select(table: str, params: dict):
@@ -347,6 +568,59 @@ def _sb_select(table: str, params: dict):
         return []
 
 @sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
+def _sb_select_required(table: str, params: dict):
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        raise SessionSecurityError("secure session persistence unavailable")
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/{table}",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+            params=params, timeout=6
+        )
+        if r.status_code == 429 or r.status_code >= 500:
+            r.raise_for_status()
+        if r.status_code != 200:
+            raise SessionSecurityError("secure session persistence unavailable")
+        data = r.json()
+        if not isinstance(data, list):
+            raise SessionSecurityError("secure session persistence unavailable")
+        return data
+    except requests.RequestException:
+        raise SessionSecurityError("secure session persistence unavailable") from None
+    except (ValueError, TypeError):
+        raise SessionSecurityError("secure session persistence unavailable") from None
+
+@sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
+def _sb_patch(table: str, params: dict, data: dict):
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        raise SessionSecurityError("secure session persistence unavailable")
+    try:
+        r = requests.patch(
+            f"{SUPABASE_URL}/rest/v1/{table}",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json",
+                "Prefer": "return=representation"
+            },
+            params=params, json=data, timeout=6
+        )
+        if r.status_code == 429 or r.status_code >= 500:
+            r.raise_for_status()
+        if r.status_code not in (200, 204):
+            raise SessionSecurityError("secure session persistence unavailable")
+        if r.status_code == 204:
+            return []
+        result = r.json()
+        if not isinstance(result, list):
+            raise SessionSecurityError("secure session persistence unavailable")
+        return result
+    except requests.RequestException:
+        raise SessionSecurityError("secure session persistence unavailable") from None
+    except (ValueError, TypeError):
+        raise SessionSecurityError("secure session persistence unavailable") from None
+
+@sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
 def _sb_upsert(table: str, data: dict):
     if not (SUPABASE_URL and SUPABASE_KEY):
         return False
@@ -364,23 +638,34 @@ def _sb_upsert(table: str, data: dict):
         if r.status_code == 429 or r.status_code >= 500:
             r.raise_for_status()
         return r.status_code in (200, 201, 204)
-    except (requests.RequestException, TimeoutError) as e:
-        raise e
+    except (requests.RequestException, TimeoutError):
+        return False
     except Exception:
         return False
 
 @sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
-def _sb_delete(table: str, params: dict):
+def _sb_delete(table: str, params: dict, require_match: bool = False):
     if not (SUPABASE_URL and SUPABASE_KEY):
         return False
     try:
         r = requests.delete(
             f"{SUPABASE_URL}/rest/v1/{table}",
-            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                **({"Prefer": "return=representation"} if require_match else {})
+            },
             params=params, timeout=6
         )
-        return r.status_code in (200, 204)
+        if r.status_code not in (200, 204):
+            return False
+        if not require_match:
+            return True
+        deleted = r.json() if r.status_code == 200 else []
+        return isinstance(deleted, list) and bool(deleted)
     except requests.RequestException:
+        return False
+    except (ValueError, TypeError):
         return False
 
 @sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
@@ -405,6 +690,33 @@ def _sb_rpc(function_name: str, payload: dict):
     except Exception:
         return []
 
+@sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
+def _sb_rpc_required(function_name: str, payload: dict):
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        raise SessionSecurityError("secure database unavailable")
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/rpc/{function_name}",
+            headers={
+                "apikey": SUPABASE_KEY,
+                "Authorization": f"Bearer {SUPABASE_KEY}",
+                "Content-Type": "application/json"
+            },
+            json=payload, timeout=6
+        )
+        if r.status_code == 429 or r.status_code >= 500:
+            r.raise_for_status()
+        if r.status_code != 200:
+            raise SessionSecurityError("secure database unavailable")
+        result = r.json()
+        if not isinstance(result, list):
+            raise SessionSecurityError("secure database unavailable")
+        return result
+    except requests.RequestException:
+        raise SessionSecurityError("secure database unavailable") from None
+    except (ValueError, TypeError):
+        raise SessionSecurityError("secure database unavailable") from None
+
 def _get_real_ip() -> str:
     return request.remote_addr or "127.0.0.1"
 
@@ -412,6 +724,7 @@ def _get_real_ip() -> str:
 def enforce_rate_limit():
     if not request.path.startswith("/api/"):
         return None
+    _maybe_purge_expired_sessions()
     limit = 30 if request.path in ("/api/auth/token", "/api/contact") else 120
     now = time.time()
     key = (_get_real_ip(), request.path)
@@ -462,7 +775,7 @@ def api_stats():
                 with _stats_lock:
                     _stats_cache["refreshing"] = False
         except Exception as e:
-            print(f"⚠️ /api/stats error: {e}")
+            print(f"⚠️ /api/stats error: {_redact_log(e)}")
             with _stats_lock:
                 _stats_cache["refreshing"] = False
 
@@ -494,12 +807,19 @@ def api_auth_start():
     if denied:
         return denied
     _purge_expired_sessions()
-    state = _new_state()
+    try:
+        state, browser_nonce = _new_dashboard_state()
+    except SessionSecurityError:
+        logger.error("No se pudo persistir el estado OAuth del dashboard")
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
     origin = request.headers.get("Origin", "").rstrip("/")
     redirect_uri = f"{origin}/dashboard" if APP_ENV != "production" and origin in ALLOWED_ORIGINS else _dashboard_redirect_uri()
     params = urlencode({"client_id": APPLICATION_ID, "redirect_uri": redirect_uri,
                         "response_type": "code", "scope": "identify guilds", "state": state})
-    return _cors(jsonify(ok=True, auth_url=f"https://discord.com/api/oauth2/authorize?{params}"))
+    response = _cors(jsonify(ok=True, auth_url=f"https://discord.com/api/oauth2/authorize?{params}"))
+    response.set_cookie(_oauth_cookie_name(state), browser_nonce, max_age=600, httponly=True,
+                        secure=_session_cookie_secure(), samesite="Lax", path="/")
+    return response
 
 
 @app.route('/api/auth/token', methods=["POST", "OPTIONS"])
@@ -510,16 +830,14 @@ def api_auth_token():
     denied = _require_origin()
     if denied:
         return denied
+    if not request.is_json:
+        return _cors(jsonify(ok=False, error="Solicitud OAuth inválida")), 400
     body = request.get_json(silent=True)
     code = body.get("code") if isinstance(body, dict) else None
     state = body.get("state") if isinstance(body, dict) else None
     redirect_uri = body.get("redirect_uri") if isinstance(body, dict) else None
-    if not isinstance(body, dict) or not isinstance(state, str):
+    if not isinstance(body, dict) or not isinstance(state, str) or not isinstance(redirect_uri, str):
         return _cors(jsonify(ok=False, error="Solicitud OAuth inválida")), 400
-    with _oauth_lock:
-        expiry = _oauth_states.pop(state, None)
-    if expiry is None or expiry < time.time():
-        return _cors(jsonify(ok=False, error="Solicitud OAuth caducada o inválida")), 400
     if redirect_uri not in _dashboard_redirects():
         return _cors(jsonify(ok=False, error="Redirect URI no permitida")), 400
     if not isinstance(code, str) or not (8 <= len(code) <= 512):
@@ -527,6 +845,13 @@ def api_auth_token():
     if not DISCORD_CLIENT_SECRET:
         return _cors(jsonify(ok=False, error="Servicio OAuth no disponible")), 500
     if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
+    try:
+        oauth_cookie = _oauth_cookie_name(state)
+        browser_nonce = request.cookies.get(oauth_cookie, "") if oauth_cookie else ""
+        if not _consume_dashboard_state(state, browser_nonce):
+            return _cors(jsonify(ok=False, error="Solicitud OAuth caducada o inválida")), 400
+    except SessionSecurityError:
         return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
 
     data = {
@@ -542,6 +867,13 @@ def api_auth_token():
         if r.status_code != 200:
             return _cors(jsonify(ok=False, error="Discord rechazó el código de autorización")), 400
         token_data = r.json()
+        granted_scopes = token_data.get("scope", "")
+        if isinstance(granted_scopes, str):
+            granted_scopes = granted_scopes.split()
+        elif not isinstance(granted_scopes, list) or not all(isinstance(scope, str) for scope in granted_scopes):
+            granted_scopes = []
+        if set(granted_scopes or ()) != {"identify", "guilds"}:
+            return _cors(jsonify(ok=False, error="Scopes OAuth no permitidos")), 400
         access_token = token_data.get("access_token")
         if not access_token:
             return _cors(jsonify(ok=False, error="No se pudo obtener la sesión")), 400
@@ -559,9 +891,12 @@ def api_auth_token():
         if not _sb_upsert("dashboard_sessions", session_row):
             logger.error("No se pudo persistir sesión OAuth")
             return _cors(jsonify(ok=False, error="No se pudo guardar la sesión")), 503
-        response = make_response(_cors(jsonify(ok=True, user=user_info)))
+        response = make_response(_cors(jsonify(ok=True, user=_public_discord_user(user_info))))
         response.set_cookie(SESSION_COOKIE, session_id, max_age=SESSION_TTL, httponly=True,
-                            secure=APP_ENV == "production", samesite="Lax", path="/")
+                            secure=_session_cookie_secure(), samesite="Lax", path="/")
+        if oauth_cookie:
+            response.set_cookie(oauth_cookie, "", max_age=0, httponly=True,
+                                secure=_session_cookie_secure(), samesite="Lax", path="/")
         return response
     except (requests.RequestException, ValueError):
         return _cors(jsonify(ok=False, error="Error al autenticar con Discord")), 502
@@ -571,23 +906,41 @@ def api_auth_me():
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
     try:
-        session = _require_session()
+        bundle = _session_credentials()
     except SessionSecurityError:
         return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
-    user = _fetch_discord_user(session[2]["access_token"]) if session else None
+    if not bundle:
+        message = "Sesión expirada" if request.cookies.get(SESSION_COOKIE) else "Inicio de sesión requerido"
+        return _cors(jsonify(ok=False, error=message)), 401
+    try:
+        user = _fetch_discord_user(bundle["access_token"])
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Discord no disponible temporalmente")), 503
     if not user:
+        _invalidate_request_session()
         return _cors(jsonify(ok=False, error="Sesión expirada")), 401
-    return _cors(jsonify(ok=True, user=user, csrf_token=session[2]["csrf_token"]))
+    return _cors(jsonify(ok=True, user=_public_discord_user(user), csrf_token=bundle["csrf_token"]))
 
 @app.route('/api/auth/logout', methods=["POST", "OPTIONS"])
 def api_auth_logout():
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
+    denied = _require_origin()
+    if denied:
+        return denied
     session_id = request.cookies.get(SESSION_COOKIE, "")
     try:
+        session_hash = None
+        if session_id and _session_cipher:
+            try:
+                session_hash = _session_cipher.hash_id(session_id)
+            except SessionSecurityError:
+                session_hash = None
         session = _require_session()
         if session_id and session and not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), session[2]["csrf_token"]):
             return _cors(jsonify(ok=False, error="CSRF inválido")), 403
+        if session_hash:
+            _invalidate_session(session_hash)
         if session and session[2].get("access_token") and DISCORD_CLIENT_SECRET:
             try:
                 requests.post("https://discord.com/api/v10/oauth2/token/revoke", data={
@@ -596,22 +949,30 @@ def api_auth_logout():
                 }, timeout=6)
             except requests.RequestException:
                 pass
-        if session_id and not _sb_delete("dashboard_sessions", {"session_hash": f"eq.{_session_cipher.hash_id(session_id)}"}):
-            return _cors(jsonify(ok=False, error="No se pudo invalidar la sesión")), 503
+            _clear_discord_cache(session[2]["access_token"])
     except SessionSecurityError:
-        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
+        return _cors(jsonify(ok=False, error="No se pudo invalidar la sesión")), 503
     response = make_response(_cors(jsonify(ok=True)))
-    response.delete_cookie(SESSION_COOKIE, path="/", samesite="Lax", secure=APP_ENV == "production")
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="Lax", secure=_session_cookie_secure())
     return response
 
 @app.route('/api/auth/guilds', methods=["GET", "OPTIONS"])
 def api_auth_guilds():
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
-    token = _session_token()
-    guilds = _fetch_discord_guilds(token)
+    try:
+        token = _session_token()
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
+    if not token:
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
+    try:
+        guilds = _fetch_discord_guilds(token)
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Discord no disponible temporalmente")), 503
     if guilds is None:
-        return _cors(jsonify(ok=False, error="Token no válido o expirado")), 401
+        _invalidate_request_session()
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
 
     user_guilds = []
     for g in guilds:
@@ -660,10 +1021,19 @@ def api_guild_channels(guild_id: str):
     
     if not _valid_guild_id(guild_id):
         return _cors(jsonify(ok=False, error="Servidor inválido")), 400
-    token = _session_token()
-    guilds = _fetch_discord_guilds(token)
+    try:
+        token = _session_token()
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
+    if not token:
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
+    try:
+        guilds = _fetch_discord_guilds(token)
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Discord no disponible temporalmente")), 503
     if guilds is None:
-        return _cors(jsonify(ok=False, error="No autorizado")), 401
+        _invalidate_request_session()
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
     
     matching = next((g for g in guilds if str(g.get("id")) == str(guild_id)), None)
     if not matching or not _is_guild_authorized(int(matching.get("permissions", 0)), matching.get("owner", False)):
@@ -777,27 +1147,43 @@ def api_guild_config(guild_id: str):
     
     if not _valid_guild_id(guild_id):
         return _cors(jsonify(ok=False, error="Servidor inválido")), 400
-    token = _session_token()
-    guilds = _fetch_discord_guilds(token)
+    if request.method == "POST":
+        denied = _require_origin()
+        if denied:
+            return denied
+    try:
+        token = _session_token()
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
+    if not token:
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
+    try:
+        guilds = _fetch_discord_guilds(token)
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Discord no disponible temporalmente")), 503
     if guilds is None:
-        return _cors(jsonify(ok=False, error="No autorizado")), 401
+        _invalidate_request_session()
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
     
     matching = next((g for g in guilds if str(g.get("id")) == str(guild_id)), None)
     if not matching or not _is_guild_authorized(int(matching.get("permissions", 0)), matching.get("owner", False)):
         return _cors(jsonify(ok=False, error="Permisos insuficientes en este servidor")), 403
 
     if request.method == "GET":
-        cfg = _sb_select("settings", {"guild_id": f"eq.{guild_id}"})
+        try:
+            cfg = _sb_select_required("settings", {"guild_id": f"eq.{guild_id}"})
+        except SessionSecurityError:
+            return _cors(jsonify(ok=False, error="Base de datos no disponible temporalmente")), 503
         data = cfg[0] if cfg else {"guild_id": guild_id, "skullboard_channel_id": "0", "min_skulls": 1, "prefix": "sk!"}
         if data.get("skullboard_channel_id") is not None:
             data["skullboard_channel_id"] = str(data["skullboard_channel_id"])
         return _cors(jsonify(ok=True, config=data))
 
     if request.method == "POST":
-        denied = _require_origin()
-        if denied:
-            return denied
-        session = _require_session()
+        try:
+            session = _require_session()
+        except SessionSecurityError:
+            return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
         if not session or not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), session[2]["csrf_token"]):
             return _cors(jsonify(ok=False, error="CSRF inválido")), 403
         body = request.get_json(silent=True)
@@ -863,8 +1249,8 @@ def api_status():
     db_ok = False
     try:
         if SUPABASE_URL and SUPABASE_KEY:
-            res = _sb_select("settings", {"limit": 1})
-            db_ok = res is not None
+            _sb_select_required("settings", {"limit": 1})
+            db_ok = True
         db_latency_ms = round((time.time() - db_start) * 1000, 1)
     except Exception:
         db_latency_ms = round((time.time() - db_start) * 1000, 1)
@@ -875,12 +1261,16 @@ def api_status():
         try:
             bot_info = _bot_status_provider()
         except Exception:
-            bot_info = {"online": False, "latency_ms": 0.0, "shards": 1, "uptime_seconds": 0, "guilds": 0}
+            bot_info = {"status": "degraded", "online": False, "latency_ms": None, "shards": None,
+                        "uptime_seconds": None, "guilds": None}
     else:
-        bot_info = {"online": True, "latency_ms": 12.5, "shards": 1, "uptime_seconds": 3600, "guilds": 0}
+        bot_info = {"status": "unknown", "online": False, "latency_ms": None, "shards": None,
+                    "uptime_seconds": None, "guilds": None}
 
     bot_uptime_sec = bot_info.get("uptime_seconds", 0)
-    bot_status_str = "operational" if bot_info.get("online", False) else "degraded"
+    bot_status_str = bot_info.get("status") or ("operational" if bot_info.get("online", False) else "degraded")
+    if bot_status_str not in {"operational", "degraded", "unknown"}:
+        bot_status_str = "unknown"
 
     # 3. API REST
     api_status_str = "operational"
@@ -892,11 +1282,11 @@ def api_status():
         "bot": {
             "status": bot_status_str,
             "online": bot_info.get("online", False),
-            "latency_ms": bot_info.get("latency_ms", 0.0),
-            "shards": bot_info.get("shards", 1),
-            "guilds": bot_info.get("guilds", 0),
+            "latency_ms": bot_info.get("latency_ms"),
+            "shards": bot_info.get("shards"),
+            "guilds": bot_info.get("guilds"),
             "uptime_seconds": bot_uptime_sec,
-            "uptime_formatted": _format_uptime(bot_uptime_sec)
+            "uptime_formatted": _format_uptime(bot_uptime_sec) if isinstance(bot_uptime_sec, (int, float)) else None
         },
         "database": {
             "status": "operational" if db_ok else "degraded",
@@ -1060,28 +1450,46 @@ def api_guild_my_messages(guild_id: str):
     if not _valid_guild_id(guild_id):
         return _cors(jsonify(ok=False, error="Servidor inválido")), 400
 
-    token = _session_token()
-    user = _fetch_discord_user(token)
+    try:
+        token = _session_token()
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
+    if not token:
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
+    try:
+        guilds = _fetch_discord_guilds(token)
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Discord no disponible temporalmente")), 503
+    matching = next((g for g in (guilds or []) if str(g.get("id")) == str(guild_id)), None)
+    if guilds is None:
+        _invalidate_request_session()
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
+    if not matching:
+        return _cors(jsonify(ok=False, error="No perteneces a este servidor")), 403
+    try:
+        user = _fetch_discord_user(token)
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Discord no disponible temporalmente")), 503
     if not user:
-        return _cors(jsonify(ok=False, error="No autorizado")), 401
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
 
     user_id = str(user.get("id"))
 
     try:
-        stats_res = _sb_rpc("get_guild_user_stats", {"p_guild_id": str(guild_id), "p_author_id": user_id})
+        stats_res = _sb_rpc_required("get_guild_user_stats", {"p_guild_id": str(guild_id), "p_author_id": user_id})
         stats = stats_res[0] if (isinstance(stats_res, list) and stats_res) else {"total_messages": 0, "total_skulls": 0}
-    except Exception:
-        stats = {"total_messages": 0, "total_skulls": 0}
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Base de datos no disponible temporalmente")), 503
 
     try:
-        msgs = _sb_select("tracked_messages", {
+        msgs = _sb_select_required("tracked_messages", {
             "guild_id": f"eq.{guild_id}",
             "author_id": f"eq.{user_id}",
             "order": "skull_count.desc",
             "limit": 50
-        }) or []
-    except Exception:
-        msgs = []
+        })
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Base de datos no disponible temporalmente")), 503
 
     starboard_channel_id = ""
     try:
@@ -1265,10 +1673,10 @@ def api_contact():
             timeout=8
         )
         if r.status_code >= 300:
-            print(f"⚠️ Resend error {r.status_code}: {r.text}")
+            print(f"⚠️ Resend error HTTP {r.status_code}")
             return _cors(jsonify(ok=False, error="No se pudo enviar el mensaje.")), 502
     except requests.RequestException as e:
-        print(f"⚠️ /api/contact red: {e}")
+        print(f"⚠️ /api/contact red: {_redact_log(e)}")
         return _cors(jsonify(ok=False, error="No se pudo contactar con el servidor de correo.")), 502
 
     return _cors(jsonify(ok=True))
@@ -1363,7 +1771,7 @@ def callback():
             return "❌ Error al obtener la información de usuario de Discord.", 400
         user_info = user_res.json()
     except (requests.RequestException, ValueError, Exception) as e:
-        print(f"⚠️ Error de red OAuth2: {e}")
+        print(f"⚠️ Error de red OAuth2: {_redact_log(e)}")
         return "❌ Error al contactar con Discord. Inténtalo más tarde.", 502
 
     if str(user_info.get("id")) != OWNER_ID:
@@ -1384,7 +1792,7 @@ def callback():
         if assign_res.status_code in (200, 204):
             return "✅ Rol vinculado correctamente. Ya puedes cerrar esta ventana."
     except requests.RequestException as e:
-        print(f"⚠️ Error asignando rol: {e}")
+        print(f"⚠️ Error asignando rol: {_redact_log(e)}")
         return "❌ Error al contactar con Discord. Inténtalo más tarde.", 502
 
     return "❌ No se pudo vincular el rol.", 400
@@ -1407,18 +1815,18 @@ def register_metadata():
         response = requests.put(url, headers=headers, json=body, timeout=8)
         print("📌 Metadata registrada:", response.status_code)
     except Exception as e:
-        print(f"⚠️ Error registrando metadata: {e}")
+        print(f"⚠️ Error registrando metadata: {_redact_log(e)}")
 
 def run():
     try:
         register_metadata()
     except Exception as e:
-        print(f"⚠️ Error al registrar metadata: {e}")
+        print(f"⚠️ Error al registrar metadata: {_redact_log(e)}")
     try:
         port = int(os.getenv("PORT", "8080"))
         app.run(host='0.0.0.0', port=port, threaded=True)
     except Exception as e:
-        print(f"❌ Error al iniciar el servidor: {e}")
+        print(f"❌ Error al iniciar el servidor: {_redact_log(e)}")
 
 def keep_alive():
     server = Thread(target=run, daemon=True)

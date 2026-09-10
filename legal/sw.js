@@ -26,7 +26,7 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         keys.map((key) => {
           if (key !== CACHE_NAME) {
-            return caches.delete(key);
+            return key.startsWith('skb-') ? caches.delete(key) : undefined;
           }
         })
       );
@@ -37,15 +37,16 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
-  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/') ||
-      url.searchParams.has('code') || url.searchParams.has('state') ||
+  if (event.request.method !== 'GET' || url.pathname === '/api' || url.pathname.startsWith('/api/') ||
+      url.searchParams.has('code') || url.searchParams.has('state') || url.searchParams.has('error') ||
       url.pathname === '/callback') {
     return;
   }
   event.respondWith(
     fetch(event.request)
       .then((networkResponse) => {
-        if (networkResponse && networkResponse.status === 200) {
+        const cacheControl = networkResponse?.headers.get('cache-control') || '';
+        if (networkResponse && networkResponse.status === 200 && !/no-store/i.test(cacheControl)) {
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);

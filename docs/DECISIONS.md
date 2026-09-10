@@ -48,3 +48,21 @@ Al implementar cambios arquitectónicos, nuevas dependencias, mutaciones de base
 - **Contexto & Decisión**: Reemplazar sesiones process-locales y credenciales legibles por `dashboard_sessions`, HMAC del identificador, bundle OAuth Fernet cifrado, state de un solo uso y CSRF en escrituras.
 - **Archivos Clave**: `webserver.py`, `dashboard_sessions.py`, `legal/dashboard.html`, `legal/sw.js`, `supabase/migrations/20260910_*sessions*.sql`
 - **Impacto / Lección para futuros agentes**: Producción exige `SKULLBOARD_SESSION_ENCRYPTION_KEY`; migración remota y limpieza de `web_sessions` legado siguen pendientes de aprobación e inventario.
+
+### [2026-09-10] Estado OAuth persistente y renovación distribuida
+- **Herramienta / Agente**: Codex
+- **Contexto & Decisión**: El estado OAuth del dashboard pasa a `dashboard_oauth_states` con HMAC y consumo confirmado de un solo uso. La renovación usa reserva condicional en `dashboard_sessions` y nunca hace upsert tras logout.
+- **Archivos Clave**: `webserver.py`, `dashboard_sessions.py`, `legal/dashboard.html`, `legal/sw.js`, `supabase/migrations/20260910_dashboard_sessions_transition.sql`
+
+### 2026-09-10 — Estado OAuth ligado al navegador
+
+- **Decisión**: Cada state OAuth se liga a un nonce HttpOnly por flujo (`browser_hash` en Supabase) y el frontend conserva solo una lista limitada para validar el callback. La cookie de sesión sigue siendo la única cookie persistente.
+- **Motivo**: `sessionStorage` evita callbacks ajenos en el navegador, pero el backend también debe rechazar un state presentado sin el nonce que inició el flujo.
+- **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `supabase/migrations/20260910_*.sql`
+- **Impacto / Lección para futuros agentes**: Producción usa cookies `__Host-` con `Secure`; desarrollo loopback usa variante no-Secure. Las cookies OAuth expiran en 600 s y se eliminan al crear sesión. Vercel no recibe la clave Fernet. Las dos tablas siguen pendientes de aplicar en producción.
+
+### [2026-09-10] Estado operativo honesto y cargas de dashboard aisladas
+- **Herramienta / Agente**: Codex
+- **Contexto & Decisión**: El endpoint de estado informa `unknown` cuando ningún proveedor del bot está registrado; modal de estado deja de afirmar uptime/SLA inventados. Dashboard mantiene generaciones separadas para leaderboard, mensajes y ajustes; errores tardíos no pisan otro servidor ni habilitan guardado tras carga fallida.
+- **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `legal/styles.css`, cinco páginas públicas y `scripts/test_dashboard_auth.py`
+- **Impacto / Lección para futuros agentes**: Los estados visuales deben representar evidencia real; el footer permanece estable durante cargas y el foco del modal vuelve a su disparador.
