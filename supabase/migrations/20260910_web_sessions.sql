@@ -23,11 +23,9 @@ grant all on table public.dashboard_sessions to service_role;
 
 create table if not exists public.dashboard_oauth_states (
     state_hash text primary key,
-    browser_hash text,
     expires_at timestamptz not null,
     created_at timestamptz not null default now()
 );
-alter table public.dashboard_oauth_states add column if not exists browser_hash text;
 
 create index if not exists dashboard_oauth_states_expires_at_idx
     on public.dashboard_oauth_states (expires_at);

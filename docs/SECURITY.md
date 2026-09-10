@@ -3,7 +3,7 @@
 ## Runtime
 
 - Secrets exist only in deployment environment variables: `DISCORD_TOKEN`, `DISCORD_CLIENT_SECRET`, `SUPABASE_SERVICE_ROLE_KEY`, `SKULLBOARD_SESSION_ENCRYPTION_KEY`, `RESEND_API_KEY`.
-- Browser receives only opaque session cookies. Production uses `__Host-skullboard_session` with `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, without `Domain`; loopback development uses `skullboard_session` without `Secure` so HTTP testing works. Discord tokens never enter JSON, `localStorage`, or `sessionStorage`; each pending OAuth state is bound to an HttpOnly per-flow nonce cookie and mirrored transiently in `sessionStorage` for callback UX.
+- Browser receives only one opaque session cookie. Production uses `__Host-skullboard_session` with `HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, without `Domain`; loopback development uses `skullboard_session` without `Secure` so HTTP testing works. Discord tokens never enter JSON, `localStorage`, or `sessionStorage`; pending OAuth states are stored server-side as HMACs and mirrored transiently in `sessionStorage` for callback UX.
 - `SKULLBOARD_SESSION_ENCRYPTION_KEY` is a stable Fernet key held only by Render (and local backend development when explicitly configured). Vercel never receives it. Production fails closed when missing. Session IDs and OAuth states use HMAC hashes; OAuth bundles stay encrypted in `dashboard_sessions`.
 - `WEB_ALLOWED_ORIGINS` must contain only deployed frontend origins, comma-separated. Default: `https://skullboard.vercel.app`.
 - Supabase `service_role` is server-only. Never expose it as `VITE_*`, `NEXT_PUBLIC_*`, or frontend configuration.

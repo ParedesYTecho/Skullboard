@@ -202,32 +202,22 @@ def _require_origin():
     return None
 
 
-def _oauth_cookie_name(state: str) -> str | None:
-    if not isinstance(state, str) or not re.fullmatch(r"[A-Za-z0-9_-]{32,128}", state):
-        return None
-    prefix = "__Host-skullboard_oauth_" if _session_cookie_secure() else "skullboard_oauth_"
-    return prefix + hashlib.sha256(state.encode("ascii")).hexdigest()[:24]
-
-
-def _new_dashboard_state() -> tuple[str, str]:
+def _new_dashboard_state() -> str:
     if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
         raise SessionSecurityError("secure session persistence unavailable")
     state = secrets.token_urlsafe(32)
-    browser_nonce = secrets.token_urlsafe(32)
     expires_at = datetime.fromtimestamp(time.time() + _OAUTH_STATE_TTL, timezone.utc).isoformat()
     if not _sb_upsert("dashboard_oauth_states", {
         "state_hash": _session_cipher.hash_state(state),
-        "browser_hash": _session_cipher.hash_state(browser_nonce),
         "expires_at": expires_at
     }):
         raise SessionSecurityError("oauth state persistence failed")
-    return state, browser_nonce
+    return state
 
 
-def _consume_dashboard_state(state: str, browser_nonce: str = "") -> bool:
+def _consume_dashboard_state(state: str) -> bool:
     try:
         state_hash = _session_cipher.hash_state(state)
-        browser_hash = _session_cipher.hash_state(browser_nonce)
     except SessionSecurityError:
         return False
     rows = _sb_select_required("dashboard_oauth_states", {
@@ -237,8 +227,6 @@ def _consume_dashboard_state(state: str, browser_nonce: str = "") -> bool:
     if not rows:
         return False
     try:
-        if not hmac.compare_digest(str(rows[0].get("browser_hash", "")), browser_hash):
-            return False
         expires_at = datetime.fromisoformat(rows[0]["expires_at"].replace("Z", "+00:00"))
         if expires_at.timestamp() <= time.time():
             _sb_delete("dashboard_oauth_states", {"state_hash": f"eq.{state_hash}"})
@@ -808,7 +796,7 @@ def api_auth_start():
         return denied
     _purge_expired_sessions()
     try:
-        state, browser_nonce = _new_dashboard_state()
+        state = _new_dashboard_state()
     except SessionSecurityError:
         logger.error("No se pudo persistir el estado OAuth del dashboard")
         return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
@@ -816,10 +804,7 @@ def api_auth_start():
     redirect_uri = f"{origin}/dashboard" if APP_ENV != "production" and origin in ALLOWED_ORIGINS else _dashboard_redirect_uri()
     params = urlencode({"client_id": APPLICATION_ID, "redirect_uri": redirect_uri,
                         "response_type": "code", "scope": "identify guilds", "state": state})
-    response = _cors(jsonify(ok=True, auth_url=f"https://discord.com/api/oauth2/authorize?{params}"))
-    response.set_cookie(_oauth_cookie_name(state), browser_nonce, max_age=600, httponly=True,
-                        secure=_session_cookie_secure(), samesite="Lax", path="/")
-    return response
+    return _cors(jsonify(ok=True, auth_url=f"https://discord.com/api/oauth2/authorize?{params}"))
 
 
 @app.route('/api/auth/token', methods=["POST", "OPTIONS"])
@@ -847,9 +832,7 @@ def api_auth_token():
     if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
         return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
     try:
-        oauth_cookie = _oauth_cookie_name(state)
-        browser_nonce = request.cookies.get(oauth_cookie, "") if oauth_cookie else ""
-        if not _consume_dashboard_state(state, browser_nonce):
+        if not _consume_dashboard_state(state):
             return _cors(jsonify(ok=False, error="Solicitud OAuth caducada o inválida")), 400
     except SessionSecurityError:
         return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
@@ -894,9 +877,6 @@ def api_auth_token():
         response = make_response(_cors(jsonify(ok=True, user=_public_discord_user(user_info))))
         response.set_cookie(SESSION_COOKIE, session_id, max_age=SESSION_TTL, httponly=True,
                             secure=_session_cookie_secure(), samesite="Lax", path="/")
-        if oauth_cookie:
-            response.set_cookie(oauth_cookie, "", max_age=0, httponly=True,
-                                secure=_session_cookie_secure(), samesite="Lax", path="/")
         return response
     except (requests.RequestException, ValueError):
         return _cors(jsonify(ok=False, error="Error al autenticar con Discord")), 502

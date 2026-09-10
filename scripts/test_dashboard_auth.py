@@ -31,8 +31,8 @@ class DashboardAuthTests(unittest.TestCase):
         self.assertIn('__Host-skullboard_session', source)
         self.assertIn('samesite="Lax"', source)
         self.assertIn('X-CSRF-Token', source)
-        self.assertIn('_oauth_cookie_name', source)
-        self.assertIn('browser_hash', source)
+        self.assertNotIn('_oauth_cookie_name', source)
+        self.assertNotIn('browser_hash', source)
         self.assertNotIn('Sec-Fetch-Site', source)
         self.assertNotIn('skb_cached_user', frontend)
         self.assertNotIn('skb_cached_guilds', frontend)
@@ -81,34 +81,13 @@ class DashboardAuthTests(unittest.TestCase):
         state = "s" * 43
         row = {
             "state_hash": cipher.hash_state(state),
-            "browser_hash": cipher.hash_state("n" * 43),
             "expires_at": "2099-01-01T00:00:00+00:00",
         }
         with patch.object(webserver, "_session_cipher", cipher), \
              patch.object(webserver, "_sb_select_required", side_effect=[[row], []]), \
              patch.object(webserver, "_sb_delete", return_value=True) as delete_mock:
-            self.assertTrue(webserver._consume_dashboard_state(state, "n" * 43))
-            self.assertFalse(webserver._consume_dashboard_state(state, "n" * 43))
-        delete_mock.assert_called_once()
-
-    def test_oauth_state_is_bound_to_browser_nonce(self):
-        import webserver
-
-        cipher = SessionCipher(Fernet.generate_key().decode())
-        state = "s" * 43
-        right_nonce = "r" * 43
-        wrong_nonce = "w" * 43
-        row = {
-            "state_hash": cipher.hash_state(state),
-            "browser_hash": cipher.hash_state(right_nonce),
-            "expires_at": "2099-01-01T00:00:00+00:00",
-        }
-        with patch.object(webserver, "_session_cipher", cipher), \
-             patch.object(webserver, "_sb_select_required", return_value=[row]), \
-             patch.object(webserver, "_sb_delete", return_value=True) as delete_mock:
-            self.assertFalse(webserver._consume_dashboard_state(state, wrong_nonce))
-            delete_mock.assert_not_called()
-            self.assertTrue(webserver._consume_dashboard_state(state, right_nonce))
+            self.assertTrue(webserver._consume_dashboard_state(state))
+            self.assertFalse(webserver._consume_dashboard_state(state))
         delete_mock.assert_called_once()
 
     def test_auth_start_persists_hashed_state_without_origin_header(self):
@@ -123,11 +102,10 @@ class DashboardAuthTests(unittest.TestCase):
             with webserver.app.test_client() as client:
                 response = client.get("/api/auth/start")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("Set-Cookie", response.headers)
+        self.assertNotIn("Set-Cookie", response.headers)
         state = response.get_json()["auth_url"].split("state=", 1)[1]
         self.assertNotEqual(persisted["state_hash"], state)
         self.assertEqual(persisted["state_hash"], cipher.hash_state(state))
-        self.assertEqual(persisted["browser_hash"], cipher.hash_state(response.headers["Set-Cookie"].split("=", 1)[1].split(";", 1)[0]))
 
     def test_refresh_rotates_access_and_refresh_tokens_in_encrypted_bundle(self):
         import webserver
@@ -192,15 +170,14 @@ class DashboardAuthTests(unittest.TestCase):
                 }, headers={"Origin": "http://localhost:8080"})
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.headers.getlist("Set-Cookie")), 2)
-        cookie = response.headers.getlist("Set-Cookie")[0]
+        self.assertEqual(len(response.headers.getlist("Set-Cookie")), 1)
+        cookie = response.headers["Set-Cookie"]
         self.assertIn(f"{webserver.SESSION_COOKIE}=", cookie)
         self.assertIn("HttpOnly", cookie)
         self.assertIn("Secure", cookie)
         self.assertIn("SameSite=Lax", cookie)
         self.assertIn("Path=/", cookie)
         self.assertNotIn("Domain=", cookie)
-        self.assertIn("Max-Age=0", response.headers.getlist("Set-Cookie")[1])
         response_text = response.get_data(as_text=True)
         self.assertNotIn("access-secret", response_text)
         self.assertNotIn("refresh-secret", response_text)

@@ -170,12 +170,11 @@ El comando `/resync` escanea el canal configurado del skullboard para corregir i
 
 ### 4.3. Flujo OAuth2 del dashboard
 
-El dashboard usa `dashboard_oauth_states` para guardar los HMAC del `state` y del
-nonce HttpOnly del navegador, con consumo de un solo uso. El navegador recibe una
-cookie temporal por flujo OAuth y, tras completar login, la cookie opaca
-`__Host-skullboard_session`; el bundle OAuth se cifra antes de persistirse en
-`dashboard_sessions`. La renovación usa un lock persistido para evitar carreras entre
-workers. El frontend nunca recibe tokens de Discord.
+El dashboard usa `dashboard_oauth_states` para guardar el HMAC del `state`, con
+consumo de un solo uso. Tras completar login, el navegador recibe únicamente la
+cookie opaca `__Host-skullboard_session`; el bundle OAuth se cifra antes de
+persistirse en `dashboard_sessions`. La renovación usa un lock persistido para
+evitar carreras entre workers. El frontend nunca recibe tokens de Discord.
 
 ```mermaid
 sequenceDiagram
@@ -190,8 +189,8 @@ sequenceDiagram
     User->>Web: Pulsa iniciar sesión
     Web->>Vercel: GET /api/auth/start
     Vercel->>Flask: Proxy same-origin
-    Flask->>Supa: Inserta HMAC(state + nonce), expiración 10 min
-    Flask-->>Web: URL OAuth + cookie nonce HttpOnly
+    Flask->>Supa: Inserta HMAC(state), expiración 10 min
+    Flask-->>Web: URL OAuth
     Web->>Discord: Autoriza OAuth2
     Discord-->>Web: /dashboard?code=...&state=...
     Web->>Vercel: POST /api/auth/token

@@ -54,12 +54,13 @@ Al implementar cambios arquitectónicos, nuevas dependencias, mutaciones de base
 - **Contexto & Decisión**: El estado OAuth del dashboard pasa a `dashboard_oauth_states` con HMAC y consumo confirmado de un solo uso. La renovación usa reserva condicional en `dashboard_sessions` y nunca hace upsert tras logout.
 - **Archivos Clave**: `webserver.py`, `dashboard_sessions.py`, `legal/dashboard.html`, `legal/sw.js`, `supabase/migrations/20260910_dashboard_sessions_transition.sql`
 
-### 2026-09-10 — Estado OAuth ligado al navegador
+### 2026-09-10 — Estado OAuth ligado al navegador (supersedida)
 
-- **Decisión**: Cada state OAuth se liga a un nonce HttpOnly por flujo (`browser_hash` en Supabase) y el frontend conserva solo una lista limitada para validar el callback. La cookie de sesión sigue siendo la única cookie persistente.
-- **Motivo**: `sessionStorage` evita callbacks ajenos en el navegador, pero el backend también debe rechazar un state presentado sin el nonce que inició el flujo.
+- **Decisión anterior**: Se propuso ligar cada state a un nonce HttpOnly por flujo (`browser_hash` en Supabase).
+- **Estado actual**: Supersedida por el requisito de que el navegador reciba una sola cookie. El backend persiste únicamente el HMAC del state y lo consume una vez; el frontend conserva solo una lista limitada de states transitorios en `sessionStorage`.
+- **Motivo**: Mantener una única cookie opaca de sesión y evitar cualquier cookie OAuth adicional. El state sigue siendo aleatorio, persistente, de un solo uso y no contiene tokens.
 - **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `supabase/migrations/20260910_*.sql`
-- **Impacto / Lección para futuros agentes**: Producción usa cookies `__Host-` con `Secure`; desarrollo loopback usa variante no-Secure. Las cookies OAuth expiran en 600 s y se eliminan al crear sesión. Vercel no recibe la clave Fernet. Las dos tablas siguen pendientes de aplicar en producción.
+- **Impacto / Lección para futuros agentes**: Producción usa `__Host-skullboard_session` con `Secure`; desarrollo loopback usa variante no-Secure. La clave Fernet nunca llega a Vercel. Las tablas siguen pendientes de aplicar en producción.
 
 ### [2026-09-10] Estado operativo honesto y cargas de dashboard aisladas
 - **Herramienta / Agente**: Codex
