@@ -895,7 +895,7 @@ def api_auth_token():
             granted_scopes = granted_scopes.replace(",", " ").split()
         elif not isinstance(granted_scopes, list) or not all(isinstance(scope, str) for scope in granted_scopes):
             granted_scopes = []
-        granted_set = set(granted_scopes or ())
+        granted_set = {s.strip().lower() for s in granted_scopes if isinstance(s, str) and s.strip()}
         if not {"identify", "guilds"}.issubset(granted_set):
             safe_scopes = ",".join(sorted(granted_set)) or "none"
             logger.warning("OAuth dashboard rejected: missing required scopes (%s)", safe_scopes)

@@ -500,11 +500,12 @@
                     if (!(res.ok && data.ok)) {
                         return { ok: false, message: data.error || 'No se pudo completar el inicio de sesión.' };
                     }
+                    return { ok: true, exchanged: true };
                 } catch (e) {
                     return { ok: false, message: 'Error de conexión con Discord.' };
                 }
             }
-            return { ok: true };
+            return { ok: true, exchanged: false };
         }
 
         window.addEventListener('pageshow', () => {
@@ -1493,12 +1494,15 @@
             const urlParams = new URLSearchParams(window.location.search);
             const isExplicitLogout = urlParams.has('logged_out');
             const authResult = await getOrExchangeAuthToken();
-            if (!authResult.ok) return showUnauthenticated(authResult.message);
-            if (isExplicitLogout) return showUnauthenticated('Has cerrado sesión correctamente.');
+            if (!authResult.ok) return showUnauthenticated(authResult.message, 'Error de autenticación');
+            if (isExplicitLogout) return showUnauthenticated('Has cerrado sesión correctamente.', 'Sesión cerrada');
             try {
                 const userRes = await fetchWithTimeout(`${API_BASE}/api/auth/me`, { credentials: 'include' });
                 const userData = await userRes.json();
                 if (userRes.status === 401) {
+                    if (authResult.exchanged) {
+                        return showUnauthenticated('No se pudo validar la sesión tras autenticar con Discord. Comprueba que las cookies no estén bloqueadas.', 'Error de sesión');
+                    }
                     return triggerDiscordAuth();
                 }
                 if (!userRes.ok) throw new Error();
@@ -1515,9 +1519,18 @@
             }
         }
 
-        function showUnauthenticated(message) {
+        function showUnauthenticated(message, title = 'Inicia sesión con Discord') {
             authInProgress = false;
-            setAuthButtonState('Iniciar Sesión con Discord', false);
+            const heading = document.querySelector('#view-unauthenticated h1');
+            if (heading) heading.textContent = title;
+            const btn = document.querySelector('#view-unauthenticated button[data-auth-trigger]');
+            if (btn) {
+                const span = btn.querySelector('span');
+                const label = title.toLowerCase().includes('error') ? 'Reintentar con Discord' : 'Iniciar Sesión con Discord';
+                if (span) span.textContent = label;
+                else btn.textContent = label;
+            }
+            setAuthButtonState(title.toLowerCase().includes('error') ? 'Reintentar con Discord' : 'Iniciar Sesión con Discord', false);
             document.getElementById('view-loading').style.display = 'none';
             document.getElementById('view-unauthenticated').style.display = 'block';
             document.querySelector('#view-unauthenticated p').textContent = message;

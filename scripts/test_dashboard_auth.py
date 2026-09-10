@@ -203,7 +203,7 @@ class DashboardAuthTests(unittest.TestCase):
 
         cipher = SessionCipher(Fernet.generate_key().decode())
 
-        # 1. Superset with role_connections.write should be accepted
+        # 1. Superset with role_connections.write should be accepted (even uppercase/whitespace)
         with patch.object(webserver, "_session_cipher", cipher), \
              patch.object(webserver, "SUPABASE_URL", "https://db.invalid"), \
              patch.object(webserver, "SUPABASE_KEY", "service-role-placeholder"), \
@@ -216,7 +216,7 @@ class DashboardAuthTests(unittest.TestCase):
                  "access_token": "access-secret",
                  "refresh_token": "refresh-secret",
                  "expires_in": 3600,
-                 "scope": "identify guilds role_connections.write"
+                 "scope": " IDENTIFY  guilds role_connections.write "
              })), \
              patch.object(webserver.requests, "get", return_value=FakeResponse({"id": "123", "username": "tester"})):
             with webserver.app.test_client() as client:
@@ -405,6 +405,8 @@ class DashboardAuthTests(unittest.TestCase):
         self.assertIn("userRes.status === 401", frontend)
         self.assertIn("triggerDiscordAuth()", frontend)
         self.assertIn("urlParams.has('logged_out')", frontend)
+        self.assertIn("authResult.exchanged", frontend)
+        self.assertIn("heading.textContent = title", frontend)
 
 
 if __name__ == "__main__":
