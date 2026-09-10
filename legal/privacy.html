@@ -55,7 +55,7 @@
                 <div class="emoji">🔒</div>
                 <div>
                     <h1>Política de Privacidad</h1>
-                    <div class="meta">SkullBoard · Actualizado en Agosto 2026</div>
+                    <div class="meta">SkullBoard · Actualizado el 10 de septiembre de 2026</div>
                 </div>
             </div>
         </div>
@@ -67,14 +67,14 @@
 
             <section class="doc-card">
                 <h2>1. Datos que Tratamos y Almacenamos</h2>
-                <p>SkullBoard únicamente guarda los identificadores numéricos públicos de Discord indispensables para su funcionamiento como Starboard:</p>
+                <p>SkullBoard guarda los identificadores públicos de Discord necesarios para el bot y, cuando usas el dashboard, una sesión técnica limitada para mantener tu acceso:</p>
                 <div class="boxes">
                     <div class="box nostore">
                         <h3>❌ Lo que NUNCA guardamos</h3>
                         <ul>
                             <li>Contenido de mensajes de texto en base de datos.</li>
                             <li>Mensajes directos privados (DMs).</li>
-                            <li>Correos personales, contraseñas o datos de pago.</li>
+                            <li>Contraseñas, datos de pago ni contenido de mensajes privados.</li>
                             <li>Ubicaciones, IPs de usuarios de Discord o datos de voz.</li>
                         </ul>
                     </div>
@@ -86,6 +86,7 @@
                             <li>ID de mensaje y autor de publicaciones destacadas.</li>
                             <li>Número total de reacciones 💀 recibidas.</li>
                             <li>Preferencia de notificaciones por usuario (activado/desactivado).</li>
+                            <li>Para el dashboard: ID de usuario, caducidad, revocación y un bundle OAuth cifrado; nunca tokens en texto plano.</li>
                         </ul>
                     </div>
                 </div>
@@ -102,12 +103,13 @@
                     <li>Prevenir publicaciones duplicadas en el servidor.</li>
                     <li>Generar las clasificaciones y métricas comunitarias (<code>/leaderboard</code>, <code>/server_stats</code>).</li>
                     <li>Permitir a los usuarios silenciar las notificaciones directas del bot (<code>/notify</code>).</li>
+                    <li>Autenticar el dashboard, mostrar tus servidores autorizados y conservar tu sesión sin exponer tokens al navegador.</li>
                 </ul>
             </section>
 
             <section class="doc-card">
                 <h2>3. Seguridad y Almacenamiento</h2>
-                <p>Los datos se encuentran alojados en una base de datos PostgreSQL en <strong>Supabase</strong> con cifrado en reposo y conexiones seguras (TLS/HTTPS). El acceso a la base de datos está estrictamente restringido al administrador de la infraestructura.</p>
+                <p>Los datos se encuentran alojados en una base de datos PostgreSQL en <strong>Supabase</strong> con cifrado en reposo y conexiones seguras (TLS/HTTPS). Los tokens OAuth del dashboard se guardan únicamente dentro de un bundle cifrado con una clave separada, mantenida en el backend de Render; el navegador solo recibe una cookie de sesión opaca.</p>
             </section>
 
             <section class="doc-card">
@@ -116,6 +118,7 @@
                     <li><strong>Borrado automático:</strong> Si un mensaje original se elimina en Discord, su registro en SkullBoard se borra automáticamente.</li>
                     <li><strong>Purga por administradores:</strong> El propietario de un servidor puede eliminar todos los registros de su comunidad ejecutando <code>/reset</code>.</li>
                     <li><strong>Derecho de supresión:</strong> Cualquier usuario puede solicitar la eliminación completa de los datos vinculados a su ID de Discord escribiendo a nuestro correo de contacto.</li>
+                    <li><strong>Sesiones del dashboard:</strong> se eliminan al cerrar sesión, al revocar el acceso o al caducar; las sesiones activas tienen una duración máxima configurada de 30 días.</li>
                 </ul>
             </section>
 
