@@ -180,6 +180,15 @@ def _require_origin():
     return None
 
 
+def _purge_expired_sessions():
+    if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
+        return
+    try:
+        _sb_delete("dashboard_sessions", {"expires_at": f"lt.{datetime.now(timezone.utc).isoformat()}"})
+    except Exception:
+        logger.warning("No se pudieron limpiar sesiones expiradas")
+
+
 def _require_session():
     if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
         raise SessionSecurityError("secure session persistence unavailable")
@@ -484,6 +493,7 @@ def api_auth_start():
     denied = _require_origin()
     if denied:
         return denied
+    _purge_expired_sessions()
     state = _new_state()
     origin = request.headers.get("Origin", "").rstrip("/")
     redirect_uri = f"{origin}/dashboard" if APP_ENV != "production" and origin in ALLOWED_ORIGINS else _dashboard_redirect_uri()
