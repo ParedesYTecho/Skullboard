@@ -530,6 +530,40 @@ def _clear_discord_cache(token: str):
         _discord_guilds_cache.pop(token_hash, None)
 
 
+def _fetch_bot_channels(guild_id: str) -> list[dict]:
+    """Return writable channel candidates visible to SkullBoard's bot."""
+    if not DISCORD_BOT_TOKEN:
+        raise SessionSecurityError("discord channel service unavailable")
+    try:
+        response = requests.get(
+            f"https://discord.com/api/v10/guilds/{guild_id}/channels",
+            headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"},
+            timeout=6,
+        )
+        if response.status_code in (401, 403):
+            raise SessionSecurityError("discord channel service unavailable")
+        if response.status_code != 200:
+            raise SessionSecurityError("discord channel service unavailable")
+        payload = response.json()
+        if not isinstance(payload, list):
+            raise SessionSecurityError("discord channel service unavailable")
+        return [
+            {"id": str(channel.get("id")), "name": str(channel.get("name") or ""), "type": channel.get("type")}
+            for channel in payload
+            if channel.get("type") in (0, 5) and _valid_guild_id(str(channel.get("id") or ""))
+        ]
+    except SessionSecurityError:
+        raise
+    except (requests.RequestException, ValueError, TypeError):
+        raise SessionSecurityError("discord channel service unavailable") from None
+
+
+def _channel_is_available_to_bot(guild_id: str, channel_id: int) -> bool:
+    if channel_id == 0:
+        return True
+    return any(channel["id"] == str(channel_id) for channel in _fetch_bot_channels(guild_id))
+
+
 def _public_discord_user(data: dict) -> dict:
     return {
         key: data.get(key)
@@ -816,16 +850,20 @@ def api_auth_token():
     if denied:
         return denied
     if not request.is_json:
+        logger.warning("OAuth dashboard rejected: invalid request content type")
         return _cors(jsonify(ok=False, error="Solicitud OAuth inválida")), 400
     body = request.get_json(silent=True)
     code = body.get("code") if isinstance(body, dict) else None
     state = body.get("state") if isinstance(body, dict) else None
     redirect_uri = body.get("redirect_uri") if isinstance(body, dict) else None
     if not isinstance(body, dict) or not isinstance(state, str) or not isinstance(redirect_uri, str):
+        logger.warning("OAuth dashboard rejected: missing request fields")
         return _cors(jsonify(ok=False, error="Solicitud OAuth inválida")), 400
     if redirect_uri not in _dashboard_redirects():
+        logger.warning("OAuth dashboard rejected: redirect URI mismatch")
         return _cors(jsonify(ok=False, error="Redirect URI no permitida")), 400
     if not isinstance(code, str) or not (8 <= len(code) <= 512):
+        logger.warning("OAuth dashboard rejected: authorization code format")
         return _cors(jsonify(ok=False, error="Código de autorización faltante")), 400
     if not DISCORD_CLIENT_SECRET:
         return _cors(jsonify(ok=False, error="Servicio OAuth no disponible")), 500
@@ -833,6 +871,7 @@ def api_auth_token():
         return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
     try:
         if not _consume_dashboard_state(state):
+            logger.warning("OAuth dashboard rejected: state invalid or already consumed")
             return _cors(jsonify(ok=False, error="Solicitud OAuth caducada o inválida")), 400
     except SessionSecurityError:
         return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
@@ -848,6 +887,7 @@ def api_auth_token():
     try:
         r = requests.post("https://discord.com/api/v10/oauth2/token", data=data, headers=headers, timeout=8)
         if r.status_code != 200:
+            logger.warning("OAuth dashboard rejected by Discord token endpoint: status %s", r.status_code)
             return _cors(jsonify(ok=False, error="Discord rechazó el código de autorización")), 400
         token_data = r.json()
         granted_scopes = token_data.get("scope", "")
@@ -856,9 +896,11 @@ def api_auth_token():
         elif not isinstance(granted_scopes, list) or not all(isinstance(scope, str) for scope in granted_scopes):
             granted_scopes = []
         if set(granted_scopes or ()) != {"identify", "guilds"}:
+            logger.warning("OAuth dashboard rejected: unexpected scopes")
             return _cors(jsonify(ok=False, error="Scopes OAuth no permitidos")), 400
         access_token = token_data.get("access_token")
         if not access_token:
+            logger.warning("OAuth dashboard rejected: Discord response without access token")
             return _cors(jsonify(ok=False, error="No se pudo obtener la sesión")), 400
         user_res = requests.get("https://discord.com/api/v10/users/@me", headers={"Authorization": f"Bearer {access_token}"}, timeout=6)
         user_info = user_res.json() if user_res.status_code == 200 else {}
@@ -866,6 +908,7 @@ def api_auth_token():
             return _cors(jsonify(ok=False, error="No se pudo validar la sesión")), 401
         refresh_token = token_data.get("refresh_token") or ""
         if not refresh_token:
+            logger.warning("OAuth dashboard rejected: Discord response without refresh token")
             return _cors(jsonify(ok=False, error="Discord no devolvió renovación segura")), 502
         expires_at = datetime.fromtimestamp(time.time() + max(int(token_data.get("expires_in", 3600)), 60), timezone.utc)
         csrf_token = secrets.token_urlsafe(32)
@@ -879,6 +922,7 @@ def api_auth_token():
                             secure=_session_cookie_secure(), samesite="Lax", path="/")
         return response
     except (requests.RequestException, ValueError):
+        logger.warning("OAuth dashboard failed while contacting Discord")
         return _cors(jsonify(ok=False, error="Error al autenticar con Discord")), 502
 
 @app.route('/api/auth/me', methods=["GET", "OPTIONS"])
@@ -1019,23 +1063,10 @@ def api_guild_channels(guild_id: str):
     if not matching or not _is_guild_authorized(int(matching.get("permissions", 0)), matching.get("owner", False)):
         return _cors(jsonify(ok=False, error="Permisos insuficientes")), 403
 
-    channels = []
-    if DISCORD_BOT_TOKEN:
-        try:
-            r = requests.get(
-                f"https://discord.com/api/v10/guilds/{guild_id}/channels",
-                headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"},
-                timeout=6
-            )
-            if r.status_code == 200:
-                raw_chans = r.json()
-                channels = [
-                    {"id": str(c["id"]), "name": c["name"], "type": c["type"]}
-                    for c in raw_chans
-                    if c.get("type") in (0, 5) # 0 = Texto, 5 = Anuncios
-                ]
-        except Exception:
-            pass
+    try:
+        channels = _fetch_bot_channels(guild_id)
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Canales de Discord no disponibles temporalmente")), 503
 
     return _cors(jsonify(ok=True, channels=channels))
             
@@ -1182,6 +1213,12 @@ def api_guild_config(guild_id: str):
             channel_id = int(channel_id_raw)
         else:
             return _cors(jsonify(ok=False, error="ID de canal inválido. Debe ser un Snowflake numérico de Discord (17-21 dígitos).")), 400
+
+        try:
+            if not _channel_is_available_to_bot(guild_id, channel_id):
+                return _cors(jsonify(ok=False, error="El bot no puede publicar en ese canal")), 400
+        except SessionSecurityError:
+            return _cors(jsonify(ok=False, error="Canales de Discord no disponibles temporalmente")), 503
 
         payload = {
             "guild_id": str(guild_id),
