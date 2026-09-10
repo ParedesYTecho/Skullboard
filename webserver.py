@@ -896,7 +896,8 @@ def api_auth_token():
         elif not isinstance(granted_scopes, list) or not all(isinstance(scope, str) for scope in granted_scopes):
             granted_scopes = []
         if set(granted_scopes or ()) != {"identify", "guilds"}:
-            logger.warning("OAuth dashboard rejected: unexpected scopes")
+            safe_scopes = ",".join(sorted(set(granted_scopes or ()))) or "none"
+            logger.warning("OAuth dashboard rejected: unexpected scopes (%s)", safe_scopes)
             return _cors(jsonify(ok=False, error="Scopes OAuth no permitidos")), 400
         access_token = token_data.get("access_token")
         if not access_token:
