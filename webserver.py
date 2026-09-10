@@ -11,8 +11,10 @@ import html
 import random
 import functools
 import hashlib
+import hmac
 import logging
 from datetime import datetime, timezone
+from dashboard_sessions import SessionCipher, SessionSecurityError, new_session
 
 logger = logging.getLogger("skullboard.webserver")
 
@@ -55,11 +57,28 @@ ALLOWED_ORIGINS = {
         "WEB_ALLOWED_ORIGINS", "https://skullboard.vercel.app,http://localhost:8080,http://127.0.0.1:8080"
     ).split(",") if origin.strip()
 }
-SESSION_COOKIE = "skb_session"
-SESSION_TTL = 3600
+SESSION_COOKIE = "__Host-skullboard_session"
+SESSION_TTL = 30 * 24 * 60 * 60
+APP_ENV = os.getenv("SKULLBOARD_ENV", "development").lower()
+SESSION_ENCRYPTION_KEY = os.getenv("SKULLBOARD_SESSION_ENCRYPTION_KEY")
+if APP_ENV == "production" and not SESSION_ENCRYPTION_KEY:
+    raise RuntimeError("SKULLBOARD_SESSION_ENCRYPTION_KEY is required in production")
+_session_cipher = SessionCipher(SESSION_ENCRYPTION_KEY) if SESSION_ENCRYPTION_KEY else None
 _session_lock = Lock()
-# ponytail: process-local sessions; use Redis/shared session store when running multiple workers.
-_sessions: OrderedDict[str, tuple[float, str]] = OrderedDict()
+_refresh_locks: dict[str, Lock] = {}
+
+
+def _dashboard_redirect_uri() -> str:
+    configured = os.getenv("SKULLBOARD_DASHBOARD_REDIRECT_URI")
+    if configured:
+        return configured
+    return "http://localhost:8080/dashboard" if APP_ENV != "production" else "https://skullboard.vercel.app/dashboard"
+
+
+def _dashboard_redirects() -> set[str]:
+    if APP_ENV == "production":
+        return {_dashboard_redirect_uri()}
+    return {_dashboard_redirect_uri(), "http://127.0.0.1:8080/dashboard", "http://localhost:8080/dashboard"}
 _rate_lock = Lock()
 _rate_buckets: OrderedDict[tuple[str, str], list[float]] = OrderedDict()
 
@@ -74,6 +93,8 @@ def set_security_headers(response):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+    if request.path.startswith("/api/") or request.path in ("/dashboard", "/callback"):
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 # ─── Thread-Safe Caches ───────────────────────────────────────────────────────
@@ -146,52 +167,95 @@ def _cors(resp):
         resp.headers["Access-Control-Allow-Credentials"] = "true"
         resp.headers["Vary"] = "Origin"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-CSRF-Token"
     return resp
 
 @app.after_request
 def after_request_cors(response):
     return _cors(response)
 
-def _extract_bearer(req) -> str:
-    auth = req.headers.get("Authorization", "")
-    if auth.startswith("Bearer "):
-        return auth[7:].strip()
-    return ""
+def _require_origin():
+    if request.headers.get("Origin", "").rstrip("/") not in ALLOWED_ORIGINS:
+        return _cors(jsonify(ok=False, error="Origen no permitido")), 403
+    return None
 
-def _new_session(discord_token: str) -> str:
-    session_id = secrets.token_urlsafe(32)
-    expires_at = time.time() + SESSION_TTL
-    if _sb_upsert("web_sessions", {"session_id": session_id, "discord_token": discord_token,
-                                    "expires_at": datetime.fromtimestamp(expires_at, timezone.utc).isoformat()}):
-        return session_id
-    with _session_lock:
-        _sessions[session_id] = (expires_at, discord_token)
-        while len(_sessions) > 5000:
-            _sessions.popitem(last=False)
-    return session_id
 
-def _session_token() -> str:
+def _require_session():
+    if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
+        raise SessionSecurityError("secure session persistence unavailable")
     session_id = request.cookies.get(SESSION_COOKIE, "")
-    if session_id:
-        rows = _sb_select("web_sessions", {"session_id": f"eq.{session_id}", "limit": 1})
-        if rows:
-            row = rows[0]
-            try:
-                if datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00")).timestamp() > time.time():
-                    return row["discord_token"]
-            except (KeyError, ValueError):
-                pass
+    if not session_id:
+        return None
+    rows = _sb_select("dashboard_sessions", {"session_hash": f"eq.{_session_cipher.hash_id(session_id)}", "limit": 1})
+    if not rows:
+        return None
+    row = rows[0]
+    try:
+        expiry = datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00"))
+        if row.get("revoked_at") or expiry.timestamp() <= time.time():
+            return None
+        bundle = _session_cipher.decrypt(row["token_bundle"])
+    except (KeyError, ValueError, SessionSecurityError):
+        return None
+    return session_id, row, bundle
+
+
+def _session_credentials():
+    session = _require_session()
+    if not session:
+        return None
+    session_id, row, bundle = session
+    try:
+        token_expiry = datetime.fromisoformat(bundle["token_expires_at"].replace("Z", "+00:00")).timestamp()
+    except (KeyError, ValueError):
+        return None
+    if token_expiry - time.time() > 120:
+        return bundle
+    refresh_token = bundle.get("refresh_token")
+    if not refresh_token or not DISCORD_CLIENT_SECRET:
+        return None
+    session_hash = _session_cipher.hash_id(session_id)
     with _session_lock:
-        session = _sessions.get(session_id)
-        if not session:
-            return ""
-        expiry, token = session
-        if expiry <= time.time():
-            _sessions.pop(session_id, None)
-            return ""
-        _sessions.move_to_end(session_id)
-        return token
+        lock = _refresh_locks.setdefault(session_hash, Lock())
+    with lock:
+        current = _require_session()
+        if not current:
+            return None
+        _, current_row, current_bundle = current
+        try:
+            if datetime.fromisoformat(current_bundle["token_expires_at"].replace("Z", "+00:00")).timestamp() - time.time() > 120:
+                return current_bundle
+        except (KeyError, ValueError):
+            return None
+        try:
+            response = requests.post("https://discord.com/api/v10/oauth2/token", data={
+                "client_id": APPLICATION_ID, "client_secret": DISCORD_CLIENT_SECRET,
+                "grant_type": "refresh_token", "refresh_token": current_bundle["refresh_token"]
+            }, headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=8)
+            if response.status_code != 200:
+                _sb_delete("dashboard_sessions", {"session_hash": f"eq.{session_hash}"})
+                return None
+            data = response.json()
+            access_token = data.get("access_token")
+            if not access_token:
+                return None
+            new_expiry = datetime.fromtimestamp(time.time() + max(int(data.get("expires_in", 3600)), 60), timezone.utc)
+            current_bundle.update({"access_token": access_token, "token_expires_at": new_expiry.isoformat()})
+            if data.get("refresh_token"):
+                current_bundle["refresh_token"] = data["refresh_token"]
+            current_row.update({"token_bundle": _session_cipher.encrypt(current_bundle),
+                                "token_expires_at": new_expiry.isoformat(),
+                                "last_seen_at": datetime.now(timezone.utc).isoformat()})
+            if not _sb_upsert("dashboard_sessions", current_row):
+                return None
+            return current_bundle
+        except (requests.RequestException, ValueError, TypeError):
+            return None
+
+
+def _session_token():
+    bundle = _session_credentials()
+    return bundle["access_token"] if bundle else ""
 
 def _session_user():
     token = _session_token()
@@ -413,33 +477,47 @@ def _is_guild_authorized(perms_int: int, is_owner: bool) -> bool:
     return bool(perms_int & 0x8) or bool(is_owner)
 
 # ─── Dashboard API Endpoints (Discord OAuth2 Secured) ────────────────────────
-@app.route('/api/auth/token', methods=["POST", "OPTIONS"])
-def api_auth_token():
-    """Intercambia OAuth code por sesión opaca; el token Discord queda en servidor."""
+@app.route('/api/auth/start', methods=["GET", "OPTIONS"])
+def api_auth_start():
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
-    if request.headers.get("Origin", "").rstrip("/") not in ALLOWED_ORIGINS:
-        return _cors(jsonify(ok=False, error="Origen no permitido")), 403
-    
-    body = request.get_json(silent=True) or {}
-    code = body.get("code")
-    redirect_uri = body.get("redirect_uri", "https://skullboard.vercel.app/dashboard")
-    
+    denied = _require_origin()
+    if denied:
+        return denied
+    state = _new_state()
+    origin = request.headers.get("Origin", "").rstrip("/")
+    redirect_uri = f"{origin}/dashboard" if APP_ENV != "production" and origin in ALLOWED_ORIGINS else _dashboard_redirect_uri()
+    params = urlencode({"client_id": APPLICATION_ID, "redirect_uri": redirect_uri,
+                        "response_type": "code", "scope": "identify guilds", "state": state})
+    return _cors(jsonify(ok=True, auth_url=f"https://discord.com/api/oauth2/authorize?{params}"))
+
+
+@app.route('/api/auth/token', methods=["POST", "OPTIONS"])
+def api_auth_token():
+    """Intercambia code validado por sesión opaca; navegador nunca recibe OAuth token."""
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    denied = _require_origin()
+    if denied:
+        return denied
+    body = request.get_json(silent=True)
+    code = body.get("code") if isinstance(body, dict) else None
+    state = body.get("state") if isinstance(body, dict) else None
+    redirect_uri = body.get("redirect_uri") if isinstance(body, dict) else None
+    if not isinstance(body, dict) or not isinstance(state, str):
+        return _cors(jsonify(ok=False, error="Solicitud OAuth inválida")), 400
+    with _oauth_lock:
+        expiry = _oauth_states.pop(state, None)
+    if expiry is None or expiry < time.time():
+        return _cors(jsonify(ok=False, error="Solicitud OAuth caducada o inválida")), 400
+    if redirect_uri not in _dashboard_redirects():
+        return _cors(jsonify(ok=False, error="Redirect URI no permitida")), 400
     if not isinstance(code, str) or not (8 <= len(code) <= 512):
         return _cors(jsonify(ok=False, error="Código de autorización faltante")), 400
-    valid_redirects = {
-        "https://skullboard.vercel.app/dashboard",
-        "https://skullboard.vercel.app/dashboard/",
-        "http://localhost:8080/dashboard",
-        "http://localhost:8080/dashboard/",
-        "http://127.0.0.1:8080/dashboard",
-        "http://127.0.0.1:8080/dashboard/",
-    }
-    if redirect_uri not in valid_redirects:
-        return _cors(jsonify(ok=False, error="Redirect URI no permitida")), 400
-    
     if not DISCORD_CLIENT_SECRET:
-        return _cors(jsonify(ok=False, error="DISCORD_CLIENT_SECRET no configurado en el servidor")), 500
+        return _cors(jsonify(ok=False, error="Servicio OAuth no disponible")), 500
+    if not _session_cipher or not SUPABASE_URL or not SUPABASE_KEY:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
 
     data = {
         "client_id": APPLICATION_ID,
@@ -461,10 +539,19 @@ def api_auth_token():
         user_info = user_res.json() if user_res.status_code == 200 else {}
         if not user_info.get("id"):
             return _cors(jsonify(ok=False, error="No se pudo validar la sesión")), 401
-        session_id = _new_session(access_token)
+        refresh_token = token_data.get("refresh_token") or ""
+        if not refresh_token:
+            return _cors(jsonify(ok=False, error="Discord no devolvió renovación segura")), 502
+        expires_at = datetime.fromtimestamp(time.time() + max(int(token_data.get("expires_in", 3600)), 60), timezone.utc)
+        csrf_token = secrets.token_urlsafe(32)
+        session_id, session_row = new_session(_session_cipher, user_info["id"], access_token,
+                                              refresh_token, expires_at, csrf_token)
+        if not _sb_upsert("dashboard_sessions", session_row):
+            logger.error("No se pudo persistir sesión OAuth")
+            return _cors(jsonify(ok=False, error="No se pudo guardar la sesión")), 503
         response = make_response(_cors(jsonify(ok=True, user=user_info)))
         response.set_cookie(SESSION_COOKIE, session_id, max_age=SESSION_TTL, httponly=True,
-                            secure=True, samesite="None", path="/")
+                            secure=APP_ENV == "production", samesite="Lax", path="/")
         return response
     except (requests.RequestException, ValueError):
         return _cors(jsonify(ok=False, error="Error al autenticar con Discord")), 502
@@ -473,22 +560,38 @@ def api_auth_token():
 def api_auth_me():
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
-    user = _session_user()
+    try:
+        session = _require_session()
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
+    user = _fetch_discord_user(session[2]["access_token"]) if session else None
     if not user:
-        return _cors(jsonify(ok=False, error="Token no válido o expirado")), 401
-    return _cors(jsonify(ok=True, user=user))
+        return _cors(jsonify(ok=False, error="Sesión expirada")), 401
+    return _cors(jsonify(ok=True, user=user, csrf_token=session[2]["csrf_token"]))
 
 @app.route('/api/auth/logout', methods=["POST", "OPTIONS"])
 def api_auth_logout():
     if request.method == "OPTIONS":
         return _cors(app.response_class(status=204))
-    with _session_lock:
-        _sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
     session_id = request.cookies.get(SESSION_COOKIE, "")
-    if session_id:
-        _sb_delete("web_sessions", {"session_id": f"eq.{session_id}"})
+    try:
+        session = _require_session()
+        if session_id and session and not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), session[2]["csrf_token"]):
+            return _cors(jsonify(ok=False, error="CSRF inválido")), 403
+        if session and session[2].get("access_token") and DISCORD_CLIENT_SECRET:
+            try:
+                requests.post("https://discord.com/api/v10/oauth2/token/revoke", data={
+                    "client_id": APPLICATION_ID, "client_secret": DISCORD_CLIENT_SECRET,
+                    "token": session[2]["access_token"]
+                }, timeout=6)
+            except requests.RequestException:
+                pass
+        if session_id and not _sb_delete("dashboard_sessions", {"session_hash": f"eq.{_session_cipher.hash_id(session_id)}"}):
+            return _cors(jsonify(ok=False, error="No se pudo invalidar la sesión")), 503
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
     response = make_response(_cors(jsonify(ok=True)))
-    response.delete_cookie(SESSION_COOKIE, path="/", samesite="None", secure=True)
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="Lax", secure=APP_ENV == "production")
     return response
 
 @app.route('/api/auth/guilds', methods=["GET", "OPTIONS"])
@@ -681,7 +784,15 @@ def api_guild_config(guild_id: str):
         return _cors(jsonify(ok=True, config=data))
 
     if request.method == "POST":
-        body = request.get_json(silent=True) or {}
+        denied = _require_origin()
+        if denied:
+            return denied
+        session = _require_session()
+        if not session or not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), session[2]["csrf_token"]):
+            return _cors(jsonify(ok=False, error="CSRF inválido")), 403
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict):
+            return _cors(jsonify(ok=False, error="JSON inválido")), 400
         try:
             min_skulls = max(1, min(int(body.get("min_skulls", 1)), 50))
             pin_threshold = max(0, min(int(body.get("pin_threshold", 0)), 50))

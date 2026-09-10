@@ -392,37 +392,43 @@
             localStorage.setItem('skb-theme', next);
         });
 
-        // Redirección directa a Discord OAuth2 (sin prompt=consent para inicio inmediato)
-        function triggerDiscordAuth() {
-            const authUrl = `https://discord.com/api/oauth2/authorize?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&response_type=code&scope=identify%20guilds`;
-            window.location.href = authUrl;
+        let csrfToken = '';
+        async function triggerDiscordAuth() {
+            try {
+                const res = await fetch(`${API_BASE}/api/auth/start`, { credentials: 'include' });
+                const data = await res.json();
+                if (res.ok && data.ok && data.auth_url) window.location.assign(data.auth_url);
+                else showToast('No se pudo iniciar sesión.', '❌');
+            } catch (e) { showToast('Servicio temporalmente no disponible.', '❌'); }
         }
 
         // El token Discord queda en servidor; navegador solo recibe cookie HttpOnly.
         async function getOrExchangeAuthToken() {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
+            const state = urlParams.get('state');
+            if (code || state) {
+                window.history.replaceState(null, null, window.location.pathname);
+            }
             if (code) {
                 try {
                     const res = await fetch(`${API_BASE}/api/auth/token`, {
                         method: 'POST',
                         credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ code, redirect_uri: REDIRECT_URI })
+                        body: JSON.stringify({ code, state, redirect_uri: REDIRECT_URI })
                     });
                     const data = await res.json();
-                    if (res.ok && data.ok) authToken = 'server-session';
+                    if (!(res.ok && data.ok)) return false;
                 } catch (e) {
-                    console.error('Error al intercambiar token:', e);
+                    return false;
                 }
-                window.history.replaceState(null, null, window.location.pathname);
             }
-            return authToken;
+            return true;
         }
 
         let userGuilds = [];
         let activeGuild = null;
-        let authToken = null;
 
         // Pestañas
         const tabBtnLb = document.getElementById('tab-btn-leaderboard');
@@ -675,9 +681,7 @@
                 const data = await res.json();
                 if (requestId !== requestSerial || activeGuild?.id !== guildId) return;
 
-                if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
-                    return;
-                } else { throw new Error(data.error || 'Messages unavailable'); }
+                if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) return;
 
                 if (data.ok) {
                     document.getElementById('my-total-skulls').textContent = data.total_skulls || 0;
@@ -753,7 +757,7 @@
                         list.innerHTML = '<div style="text-align:center; padding:30px; color:var(--ink-soft);">No tienes mensajes destacados en este servidor todavía.</div>';
                     }
                 } else {
-                    list.innerHTML = `<div style="text-align:center; padding:24px; color:var(--bad);">${escapeHtml(data.error || 'Error al cargar tus mensajes.')}</div>`;
+                    list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--bad);">Error al cargar tus mensajes.</div>';
                 }
             } catch (e) {
                 if (thisLoadId !== currentGuildLoadId) return;
@@ -1138,7 +1142,7 @@
                 const res = await fetch(`${API_BASE}/api/guild/${activeGuild.id}/config`, {
                     method: 'POST',
                     credentials: 'include',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
                     body: JSON.stringify(payload)
                 });
                 const data = await res.json();
@@ -1220,12 +1224,18 @@
 
             const btnDropdownLogout = document.getElementById('btn-dropdown-logout');
             if (btnDropdownLogout) {
-                btnDropdownLogout.addEventListener('click', () => {
-                    localStorage.removeItem('skb_cached_user');
-                    localStorage.removeItem('skb_cached_guilds');
+                btnDropdownLogout.addEventListener('click', async () => {
                     localStorage.removeItem('skb_last_guild_id');
-                    fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
-                    window.location.href = '/?logged_out=1';
+                    btnDropdownLogout.disabled = true;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: { 'X-CSRF-Token': csrfToken } });
+                        if (!res.ok) throw new Error();
+                        localStorage.removeItem('skb_last_guild_id');
+                        window.location.href = '/?logged_out=1';
+                    } catch (e) {
+                        btnDropdownLogout.disabled = false;
+                        showToast('No se pudo cerrar sesión. Inténtalo de nuevo.', '❌');
+                    }
                 });
             }
         }
@@ -1260,144 +1270,33 @@
             }
         }
 
-        // INICIALIZACIÓN ULTRARRÁPIDA (CON CACHÉ INSTANTÁNEO Y SIN BUCLES DE ERROR - ESTILO WEREWOLF)
         async function init() {
-            authToken = await getOrExchangeAuthToken();
-            if (!authToken) {
-                // Modo Werewolf: si no hay token, no forzar redirección en bucle.
-                // Mostrar vista no autenticada limpia y botón en la barra superior.
-                document.getElementById('view-loading').style.display = 'none';
-                const unauthView = document.getElementById('view-unauthenticated');
-                if (unauthView) unauthView.style.display = 'block';
-                const slot = document.getElementById('auth-nav-slot');
-                if (slot) {
-                    slot.innerHTML = `
-                        <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm" style="font-size:0.84rem; padding:7px 15px;">
-                            <svg style="width:16px;height:16px;fill:currentColor;stroke:none;"><use href="#i-discord"/></svg>
-                            <span>Entrar</span>
-                        </button>
-                    `;
-                }
-                showFooter();
-                return;
-            }
-
-            // 1. Renderizado instantáneo desde memoria (0 ms)
-            let hasRenderedCached = false;
+            const exchanged = await getOrExchangeAuthToken();
+            if (!exchanged) return showUnauthenticated('No se pudo validar el inicio de sesión.');
             try {
-                const cachedUserStr = localStorage.getItem('skb_cached_user');
-                const cachedGuildsStr = localStorage.getItem('skb_cached_guilds');
-                if (cachedUserStr && cachedGuildsStr) {
-                    const cachedUser = JSON.parse(cachedUserStr);
-                    const cachedGuilds = JSON.parse(cachedGuildsStr);
-                    if (cachedUser && cachedGuilds && cachedGuilds.length > 0) {
-                        renderNavUserProfile(cachedUser);
-                        processAndApplyGuilds(cachedGuilds);
-                        hasRenderedCached = true;
-                    }
-                }
+                const userRes = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+                if (userRes.status === 401) return showUnauthenticated('Sesión expirada.');
+                if (!userRes.ok) throw new Error();
+                const userData = await userRes.json();
+                csrfToken = userData.csrf_token || '';
+                const guildsRes = await fetch(`${API_BASE}/api/auth/guilds`, { credentials: 'include' });
+                if (guildsRes.status === 401) return showUnauthenticated('Sesión expirada.');
+                if (!guildsRes.ok) throw new Error();
+                const guildsData = await guildsRes.json();
+                if (!userData.ok || !guildsData.ok) throw new Error();
+                renderNavUserProfile(userData.user);
+                processAndApplyGuilds(guildsData.guilds || []);
             } catch (e) {
-                console.warn('Fallo de lectura de caché local:', e);
+                document.getElementById('view-loading').innerHTML = '<div class="emblem">📡</div><h2 style="margin-top:16px;">Servicio temporalmente no disponible</h2><p style="color:var(--ink-soft);">Reintenta en unos segundos.</p><button onclick="window.location.reload();" class="btn btn-ghost btn-sm">Reintentar</button>';
             }
+        }
 
-            // 2. Sincronización en segundo plano con la API
-            try {
-                const [userRes, guildsRes] = await Promise.all([
-                    fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' }),
-                    fetch(`${API_BASE}/api/auth/guilds`, { credentials: 'include' })
-                ]);
-
-                // Si Discord rechaza el token con 401 o 403 se limpia la sesión
-                if (userRes.status === 401 || userRes.status === 403 || guildsRes.status === 401 || guildsRes.status === 403) {
-                    localStorage.removeItem('skb_cached_user');
-                    localStorage.removeItem('skb_cached_guilds');
-                    localStorage.removeItem('skb_last_guild_id');
-                    const viewServers = document.getElementById('view-servers');
-                    const viewDash = document.getElementById('view-dashboard');
-                    const viewLoading = document.getElementById('view-loading');
-                    const unauthView = document.getElementById('view-unauthenticated');
-                    if (viewServers) viewServers.style.display = 'none';
-                    if (viewDash) viewDash.style.display = 'none';
-                    if (viewLoading) viewLoading.style.display = 'none';
-
-                    if (!hasRenderedCached) {
-                        // Modo bienvenida / login limpio para primera visita
-                        if (unauthView) unauthView.style.display = 'block';
-                    } else {
-                        // Sesión activa que acaba de expirar
-                        if (viewLoading) {
-                            viewLoading.style.display = 'block';
-                            viewLoading.innerHTML = `
-                                <div class="emblem">🔒</div>
-                                <h2 style="margin-top:16px;">Sesión Expirada</h2>
-                                <p style="color:var(--ink-soft); max-width:440px; margin:8px auto 20px;">
-                                    Tu sesión con Discord ha caducado. Vuelve a iniciar sesión para continuar.
-                                </p>
-                                <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
-                                    <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Iniciar Sesión con Discord</button>
-                                    <a href="/" class="btn btn-ghost btn-sm">Volver al inicio</a>
-                                </div>
-                            `;
-                        }
-                    }
-                    const slot = document.getElementById('auth-nav-slot');
-                    if (slot) {
-                        slot.innerHTML = `
-                            <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm" style="font-size:0.84rem; padding:7px 15px;">
-                                <svg style="width:16px;height:16px;fill:currentColor;stroke:none;"><use href="#i-discord"/></svg>
-                                <span>Entrar</span>
-                            </button>
-                        `;
-                    }
-                    showFooter();
-                    return;
-                }
-
-                if (userRes.ok && guildsRes.ok) {
-                    const [userData, guildsData] = await Promise.all([userRes.json(), guildsRes.json()]);
-                    if (userData.ok && userData.user && guildsData.ok && guildsData.guilds) {
-                        localStorage.setItem('skb_cached_user', JSON.stringify(userData.user));
-                        localStorage.setItem('skb_cached_guilds', JSON.stringify(guildsData.guilds));
-                        try {
-                            renderNavUserProfile(userData.user);
-                        } catch (e) {
-                            console.error('Error renderNavUserProfile:', e);
-                        }
-                        try {
-                            processAndApplyGuilds(guildsData.guilds);
-                        } catch (e) {
-                            console.error('Error processAndApplyGuilds:', e);
-                        }
-                    }
-                } else if (!hasRenderedCached) {
-                    document.getElementById('view-loading').innerHTML = `
-                        <div class="emblem">⏳</div>
-                        <h2 style="margin-top:16px;">Conectando con el servidor…</h2>
-                        <p style="color:var(--ink-soft); max-width:420px; margin:8px auto 20px;">
-                            El servicio web se está iniciando (arranque de contenedor).
-                        </p>
-                        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
-                            <button onclick="window.location.reload();" class="btn btn-ghost btn-sm">Reintentar conexión</button>
-                            <button onclick="localStorage.removeItem('skb_cached_user'); localStorage.removeItem('skb_cached_guilds'); localStorage.removeItem('skb_last_guild_id'); triggerDiscordAuth();" class="btn btn-primary btn-sm">Reconectar con Discord</button>
-                        </div>
-                    `;
-                }
-            } catch (err) {
-                console.error('Error al sincronizar datos de autenticación:', err);
-                if (!hasRenderedCached) {
-                    document.getElementById('view-loading').innerHTML = `
-                        <div class="emblem">📡</div>
-                        <h2 style="margin-top:16px;">Reconectando…</h2>
-                        <p style="color:var(--ink-soft); max-width:420px; margin:8px auto 20px;">
-                            Verificando disponibilidad del servicio web o sesión expirada.
-                        </p>
-                        <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
-                            <button onclick="window.location.reload();" class="btn btn-ghost btn-sm">Reintentar</button>
-                            <button onclick="localStorage.removeItem('skb_cached_user'); localStorage.removeItem('skb_cached_guilds'); localStorage.removeItem('skb_last_guild_id'); triggerDiscordAuth();" class="btn btn-primary btn-sm">Reconectar con Discord</button>
-                        </div>
-                    `;
-                }
-            }
+        function showUnauthenticated(message) {
+            document.getElementById('view-loading').style.display = 'none';
+            document.getElementById('view-unauthenticated').style.display = 'block';
+            document.querySelector('#view-unauthenticated p').textContent = message;
+            document.getElementById('auth-nav-slot').innerHTML = '<button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Entrar</button>';
+            showFooter();
         }
 
         init();

@@ -42,3 +42,9 @@ Al implementar cambios arquitectónicos, nuevas dependencias, mutaciones de base
 - **Contexto & Decisión**: Aislar ahorro de tokens por proyecto sin alterar configuración global: root Luna `max`, subagentes Luna `medium`, reviewer Astra `low` solo bajo riesgo material, máximo 3 hilos.
 - **Archivos Clave**: `.codex/config.toml`, `.codex/agents/*.toml`, `AGENTS.md`
 - **Impacto / Lección para futuros agentes**: Tareas pequeñas siguen `root-only`/`routine`; Graphify, Change Awareness, pruebas obligatorias y confirmación explícita para mutaciones Supabase permanecen intactos.
+
+### [2026-09-10] Sesiones persistentes cifradas de dashboard
+- **Herramienta / Agente**: Codex
+- **Contexto & Decisión**: Reemplazar sesiones process-locales y credenciales legibles por `dashboard_sessions`, HMAC del identificador, bundle OAuth Fernet cifrado, state de un solo uso y CSRF en escrituras.
+- **Archivos Clave**: `webserver.py`, `dashboard_sessions.py`, `legal/dashboard.html`, `legal/sw.js`, `supabase/migrations/20260910_*sessions*.sql`
+- **Impacto / Lección para futuros agentes**: Producción exige `SKULLBOARD_SESSION_ENCRYPTION_KEY`; migración remota y limpieza de `web_sessions` legado siguen pendientes de aprobación e inventario.

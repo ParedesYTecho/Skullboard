@@ -4,16 +4,17 @@
 > this file after 2 days of inactivity — don't keep long-lived notes here.
 
 ## Current task
-_none_
+Secure persistent dashboard Discord OAuth sessions.
 
 ## Open files
-- _(none)_
+- `webserver.py`, `dashboard_sessions.py`, `legal/dashboard.html`, `legal/sw.js`, Vercel config, migrations
 
 ## Active hypotheses
-- _(none)_
+- Supabase production migration status unavailable locally; no remote mutation executed.
 
 ## Checkpoints
-- [ ] _(none)_
+- [x] Backend/session/frontend implementation and local checks
+- [ ] Migration approval and production verification
 
 ## Next step
-_(what would you do if interrupted and resumed tomorrow?)_
+Request approval before applying migration or cleaning legacy `web_sessions`; then verify Render secret and browser flow.

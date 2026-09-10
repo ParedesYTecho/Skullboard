@@ -320,6 +320,9 @@ erDiagram
 | `APPLICATION_ID` / `DISCORD_APPLICATION_ID` | Render / Local | ID de la aplicación de Discord (`1367463352774955059`). |
 | `DISCORD_CLIENT_SECRET`| Render / Local | Secreto OAuth2 para el intercambio de tokens en el Dashboard y Linked Roles. |
 | `DISCORD_REDIRECT_URI` | Render / Local | URI de redirección OAuth2 para Linked Roles (ej. `https://skullboard-fqf1.onrender.com/callback`). |
+| `SKULLBOARD_SESSION_ENCRYPTION_KEY` | Render / Local | Clave Fernet estable para cifrar bundles OAuth; obligatoria en producción y nunca se guarda en Supabase/frontend. |
+| `SKULLBOARD_ENV` | Render / Local | `production` activa cookie Secure y fallo cerrado de clave; otros valores sirven desarrollo local. |
+| `SKULLBOARD_DASHBOARD_REDIRECT_URI` | Render / Local | URI exacta del dashboard para OAuth; producción usa `https://skullboard.vercel.app/dashboard` por defecto. |
 | `DISCORD_ALERTS_WEBHOOK_URL` | Render / Local | URL del webhook de Discord para observabilidad, errores críticos (`send_system_alert`) y desconexiones de shards. |
 | `BOT_OWNER_ID` | Render / Local | Snowflake ID del propietario (`561225979389804544`) para control de acceso, comandos de administración y verificación de roles. |
 | `RESEND_API_KEY` | Render / Local | Clave de API de Resend para el despacho de correos en `/api/contact`. |

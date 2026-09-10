@@ -36,7 +36,10 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || event.request.url.includes('/api/')) {
+  const url = new URL(event.request.url);
+  if (event.request.method !== 'GET' || url.pathname.startsWith('/api/') ||
+      url.searchParams.has('code') || url.searchParams.has('state') ||
+      url.pathname === '/callback') {
     return;
   }
   event.respondWith(
