@@ -125,7 +125,7 @@
             </div>
 
             <!-- PESTAÑA 1: 👑 LEADERBOARD DEL SERVIDOR -->
-            <section id="panel-leaderboard">
+            <section id="panel-leaderboard" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-leaderboard">
                 <div class="bento-card" style="padding:28px; border-radius:20px;">
                     <div class="lb-header-wrap">
                         <div>
@@ -153,7 +153,7 @@
             </section>
 
             <!-- PESTAÑA 2: 💀 MIS MENSAJES EN ESTE SERVIDOR -->
-            <section id="panel-my-messages" style="display:none;">
+            <section id="panel-my-messages" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-my-messages" style="display:none;">
                 <div class="stat-grid-2">
                     <div class="stat-metric-card">
                         <div class="stat-metric-icon">💀</div>
@@ -182,7 +182,7 @@
             </section>
 
             <!-- PESTAÑA 3: ⚙️ AJUSTES DEL SERVIDOR (SOLO ADMINS) -->
-            <section id="panel-config" style="display:none;">
+            <section id="panel-config" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-config" style="display:none;">
                 <div class="bento-card" style="padding:28px; border-radius:20px;">
                     <div style="margin-bottom:22px;">
                         <h3 style="font-size:1.25rem; font-weight:800; margin-bottom:4px;">⚙️ Configuración del Servidor</h3>
@@ -372,7 +372,7 @@
         function showToast(message, icon = '✓') {
             const toast = document.createElement('div');
             toast.className = 'toast';
-            toast.innerHTML = `<span class="toast-icon">${icon}</span><span>${message}</span>`;
+            toast.innerHTML = `<span class="toast-icon">${escapeHtml(icon)}</span><span>${escapeHtml(message)}</span>`;
             toastContainer.appendChild(toast);
             requestAnimationFrame(() => {
                 requestAnimationFrame(() => toast.classList.add('show'));
@@ -450,6 +450,7 @@
 
         let currentGuildLoadId = 0;
         let currentLbMode = 'users';
+        let requestSerial = 0;
 
         // Listeners para el sub-selector de Leaderboard (Top Usuarios vs Mensajes Legendarios)
         const lbSubBtnUsers = document.getElementById('lb-sub-btn-users');
@@ -467,6 +468,7 @@
 
         // 1. CARGA DEL LEADERBOARD DEL SERVIDOR (RANKING DE USUARIOS O MENSAJES LEGENDARIOS)
         async function loadGuildLeaderboard(guildId, mode = currentLbMode) {
+            const requestId = ++requestSerial;
             currentLbMode = mode;
             const thisLoadId = ++currentGuildLoadId;
             const list = document.getElementById('guild-lb-list');
@@ -509,6 +511,7 @@
 
                 const res = await fetch(endpoint);
                 const data = await res.json();
+                if (requestId !== requestSerial || activeGuild?.id !== guildId) return;
 
                 if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
                     return;
@@ -558,8 +561,9 @@
                             `;
                             list.appendChild(row);
                         });
-                    } else {
+                    } else if (data.ok) {
                         list.innerHTML = '<div style="text-align:center; padding:36px; color:var(--ink-soft);">Aún no hay estadísticas de usuarios registradas en este servidor. ¡Reacciona con 💀 en Discord para inaugurar el podio!</div>';
+                    } else { throw new Error(data.error || 'Leaderboard unavailable');
                     }
                 } else {
                     if (data.ok && data.messages && data.messages.length > 0) {
@@ -643,8 +647,9 @@
                             `;
                             list.appendChild(row);
                         });
-                    } else {
+                    } else if (data.ok) {
                         list.innerHTML = '<div style="text-align:center; padding:36px; color:var(--ink-soft);">Aún no hay mensajes destacados registrados en este servidor. ¡Reacciona con 💀 en Discord para inaugurar el podio!</div>';
+                    } else { throw new Error(data.error || 'Leaderboard unavailable');
                     }
                 }
             } catch (e) {
@@ -656,6 +661,7 @@
 
         // 2. CARGA DE MIS MENSAJES EN EL SERVIDOR
         async function loadMyMessages(guildId) {
+            const requestId = ++requestSerial;
             const thisLoadId = ++currentGuildLoadId;
             const list = document.getElementById('my-messages-list');
             hideFooter();
@@ -666,10 +672,11 @@
             try {
                 const res = await fetch(`${API_BASE}/api/guild/${guildId}/my-messages`, { credentials: 'include' });
                 const data = await res.json();
+                if (requestId !== requestSerial || activeGuild?.id !== guildId) return;
 
                 if (thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
                     return;
-                }
+                } else { throw new Error(data.error || 'Messages unavailable'); }
 
                 if (data.ok) {
                     document.getElementById('my-total-skulls').textContent = data.total_skulls || 0;

@@ -42,6 +42,11 @@ body {
     width: 100%;
 }
 
+button, input, select { font: inherit; }
+.stat-metric-val, .lb-skull-record, .lb-msg-count-pill { font-variant-numeric: tabular-nums; }
+.segmented-tab, .lb-sub-tab, .status-modal-close { min-height: 40px; }
+.lb-sub-tab:focus-visible, .segmented-tab:focus-visible { outline: 2px solid var(--violet-2); outline-offset: 2px; }
+
 body::before {
     content: "";
     position: fixed;
@@ -2002,6 +2007,16 @@ footer.site-footer {
     *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
 
+@media (max-width: 540px) {
+    .guild-switcher-bar { padding: 12px; }
+    .guild-switcher-bar > div { width: 100%; }
+    .segmented-tabs { width: 100%; }
+    .segmented-tab { flex: 1; justify-content: center; padding-inline: 6px; }
+    .lb-sub-tabs { width: 100%; }
+    .lb-sub-tab { flex: 1; justify-content: center; padding-inline: 6px; font-size: .78rem; }
+    .bento-card { padding: 20px !important; }
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════════
    🎛️ DASHBOARD UI DESIGN SYSTEM COMPONENTS (ESTILO WEREWOLF)
    ═══════════════════════════════════════════════════════════════════════════════ */
@@ -3611,6 +3626,5 @@ input[type="number"] {
         padding-right: 14px;
     }
 }
-
 
 
