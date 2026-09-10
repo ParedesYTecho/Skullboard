@@ -56,18 +56,19 @@
 
     <div class="container dashboard-layout">
         <!-- ESTADO NO AUTENTICADO (ESTILO WEREWOLF) -->
-        <div id="view-unauthenticated" style="display:none; text-align:center; padding:70px 20px;">
-            <div class="emblem" style="margin:0 auto 20px; font-size:64px;">💀</div>
-            <h1 style="font-size:2rem; font-weight:800; color:var(--ink); margin-bottom:10px;">Inicia sesión con Discord</h1>
-            <p style="color:var(--ink-soft); max-width:480px; margin:0 auto 28px; font-size:0.95rem; line-height:1.5;">
+        <div id="view-unauthenticated" class="auth-state-card" style="display:none;">
+            <div class="auth-state-icon" aria-hidden="true">💀</div>
+            <div class="servers-eyebrow">Acceso seguro</div>
+            <h1>Inicia sesión con Discord</h1>
+            <p>
                 Accede a tu panel para gestionar los ajustes de tu comunidad, consultar los rankings y ver tus estadísticas personales en SkullBoard.
             </p>
-            <div style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
-                <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary" style="padding:12px 28px;">
+            <div class="auth-state-actions">
+                <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary">
                     <svg style="width:20px;height:20px;fill:currentColor;stroke:none;"><use href="#i-discord"/></svg>
                     <span>Iniciar Sesión con Discord</span>
                 </button>
-                <a href="/" class="btn btn-ghost" style="padding:12px 22px;">Volver al inicio</a>
+                <a href="/" class="btn btn-ghost">Volver al inicio</a>
             </div>
         </div>
 
@@ -416,7 +417,7 @@
                 }
                 window.history.replaceState(null, null, window.location.pathname);
             }
-            return authToken || 'server-session';
+            return authToken;
         }
 
         let userGuilds = [];
