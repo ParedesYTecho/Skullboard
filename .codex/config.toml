@@ -1,0 +1,27 @@
+model = "gpt-5.6-luna"
+model_reasoning_effort = "max"
+
+[agents]
+max_concurrent_threads_per_session = 3
+default_subagent_model = "gpt-5.6-luna"
+default_subagent_reasoning_effort = "medium"
+
+[agents.explorer]
+description = "Read-only architecture discovery. Return concise findings, never raw logs."
+config_file = "./agents/explorer.toml"
+
+[agents.worker]
+description = "Scoped implementation work. Own assigned files and return a short report."
+config_file = "./agents/worker.toml"
+
+[agents.tester]
+description = "Run focused verification. Return failures and evidence only."
+config_file = "./agents/tester.toml"
+
+[agents.researcher]
+description = "Targeted research. Return actionable findings with sources, no dump."
+config_file = "./agents/researcher.toml"
+
+[agents.reviewer]
+description = "Independent low-cost review for material risk only. Return blocking findings only."
+config_file = "./agents/reviewer.toml"

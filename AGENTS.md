@@ -119,3 +119,13 @@ Rules:
 - If `graphify-out/wiki/index.md` exists, use it for broad navigation instead of raw source browsing.
 - Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `python -m graphify extract . --code-only` or git commit (git hooks auto-update) to keep the graph current.
+
+## 9. Preset Plus Luna-max y gate de delegación
+- Root/orchestrator: `gpt-5.6-luna` + `max` via `.codex/config.toml`.
+- `explorer`, `worker`, `tester`, `researcher`: `gpt-5.6-luna` + `medium`.
+- `reviewer`: `gpt-6-astra` + `low`; usar solo con riesgo material.
+- Máximo 3 hilos de subagente por sesión. Nunca subir root a Astra.
+- `root-only`/`routine`: tareas pequeñas, bajo riesgo, 1-2 archivos o sin trabajo independiente.
+- `$astra-orchestrator`: usar cuando existan tareas independientes, riesgo o verificación separable; delegar alcance cerrado y pedir reporte corto, nunca logs crudos.
+- Mantener Supabase y Windows Computer Use. No convertir APIs directas en MCP por defecto.
+- Tras cualquier cambio, ejecutar `graphify update .`; mantener Change Awareness y Graphify obligatorios.

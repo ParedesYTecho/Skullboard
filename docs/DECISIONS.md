@@ -36,3 +36,9 @@ Al implementar cambios arquitectónicos, nuevas dependencias, mutaciones de base
 - **Contexto & Decisión**: El access token de Discord deja de viajar al navegador y se guarda solo en una sesión opaca server-side; CORS queda limitado a orígenes permitidos y la API valida IDs/entradas y limita tasa.
 - **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `supabase/migrations/20260909_security_baseline.sql`, `docs/SECURITY.md`
 - **Impacto / Lección para futuros agentes**: RLS queda deny-by-default para clientes públicos. La migración requiere revisión, backup y aprobación antes de ejecutarse en producción. Sesiones actuales son process-locales; usar Redis si se escalan workers.
+
+### [2026-09-10] Preset local Plus Luna-max
+- **Herramienta / Agente**: Codex
+- **Contexto & Decisión**: Aislar ahorro de tokens por proyecto sin alterar configuración global: root Luna `max`, subagentes Luna `medium`, reviewer Astra `low` solo bajo riesgo material, máximo 3 hilos.
+- **Archivos Clave**: `.codex/config.toml`, `.codex/agents/*.toml`, `AGENTS.md`
+- **Impacto / Lección para futuros agentes**: Tareas pequeñas siguen `root-only`/`routine`; Graphify, Change Awareness, pruebas obligatorias y confirmación explícita para mutaciones Supabase permanecen intactos.

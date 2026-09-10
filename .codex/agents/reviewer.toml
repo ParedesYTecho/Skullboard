@@ -1,0 +1,3 @@
+model = "gpt-6-astra"
+model_reasoning_effort = "low"
+developer_instructions = "Review independently only when risk justifies it. Report blocking or high-value findings with exact evidence; skip style noise."

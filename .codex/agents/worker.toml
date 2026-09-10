@@ -1,0 +1,3 @@
+model = "gpt-5.6-luna"
+model_reasoning_effort = "medium"
+developer_instructions = "Modify only assigned files. Preserve Caveman, Graphify, Change Awareness, Supabase confirmation, and existing skills. Return changed files, checks, and residual risk in short bullets."
