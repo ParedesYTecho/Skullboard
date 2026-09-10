@@ -190,6 +190,60 @@ class DashboardAuthTests(unittest.TestCase):
         self.assertNotIn("refresh_token", frontend)
         self.assertNotIn("localStorage.setItem('skb_oauth", frontend)
 
+    def test_oauth_token_accepts_scopes_superset_and_rejects_missing(self):
+        import webserver
+
+        class FakeResponse:
+            def __init__(self, payload, status_code=200):
+                self.payload = payload
+                self.status_code = status_code
+
+            def json(self):
+                return self.payload
+
+        cipher = SessionCipher(Fernet.generate_key().decode())
+
+        # 1. Superset with role_connections.write should be accepted
+        with patch.object(webserver, "_session_cipher", cipher), \
+             patch.object(webserver, "SUPABASE_URL", "https://db.invalid"), \
+             patch.object(webserver, "SUPABASE_KEY", "service-role-placeholder"), \
+             patch.object(webserver, "DISCORD_CLIENT_SECRET", "client-secret-placeholder"), \
+             patch.object(webserver, "SESSION_COOKIE", "__Host-skullboard_session"), \
+             patch.object(webserver, "_session_cookie_secure", return_value=True), \
+             patch.object(webserver, "_consume_dashboard_state", return_value=True), \
+             patch.object(webserver, "_sb_upsert", return_value=True), \
+             patch.object(webserver.requests, "post", return_value=FakeResponse({
+                 "access_token": "access-secret",
+                 "refresh_token": "refresh-secret",
+                 "expires_in": 3600,
+                 "scope": "identify guilds role_connections.write"
+             })), \
+             patch.object(webserver.requests, "get", return_value=FakeResponse({"id": "123", "username": "tester"})):
+            with webserver.app.test_client() as client:
+                response = client.post("/api/auth/token", json={
+                    "code": "safe-code", "state": "s" * 43, "redirect_uri": "http://localhost:8080/dashboard"
+                }, headers={"Origin": "http://localhost:8080"})
+            self.assertEqual(response.status_code, 200)
+
+        # 2. Missing guilds should be rejected
+        with patch.object(webserver, "_session_cipher", cipher), \
+             patch.object(webserver, "SUPABASE_URL", "https://db.invalid"), \
+             patch.object(webserver, "SUPABASE_KEY", "service-role-placeholder"), \
+             patch.object(webserver, "DISCORD_CLIENT_SECRET", "client-secret-placeholder"), \
+             patch.object(webserver, "_consume_dashboard_state", return_value=True), \
+             patch.object(webserver.requests, "post", return_value=FakeResponse({
+                 "access_token": "access-secret",
+                 "refresh_token": "refresh-secret",
+                 "expires_in": 3600,
+                 "scope": "identify"
+             })):
+            with webserver.app.test_client() as client:
+                response = client.post("/api/auth/token", json={
+                    "code": "safe-code", "state": "s" * 43, "redirect_uri": "http://localhost:8080/dashboard"
+                }, headers={"Origin": "http://localhost:8080"})
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(response.get_json()["error"], "Scopes OAuth no permitidos")
+
     def test_csrf_invalid_is_rejected(self):
         import webserver
         with patch.object(webserver, "_session_token", return_value="access-placeholder"), \
@@ -345,6 +399,12 @@ class DashboardAuthTests(unittest.TestCase):
         self.assertEqual(payload["bot"]["status"], "unknown")
         self.assertFalse(payload["bot"]["online"])
         self.assertEqual(payload["bot"]["uptime_seconds"], None)
+
+    def test_frontend_autoredirects_to_discord_oauth_when_unauthenticated(self):
+        frontend = (ROOT / "legal/dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("userRes.status === 401", frontend)
+        self.assertIn("triggerDiscordAuth()", frontend)
+        self.assertIn("urlParams.has('logged_out')", frontend)
 
 
 if __name__ == "__main__":

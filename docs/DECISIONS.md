@@ -1,4 +1,4 @@
-﻿# Registro de Decisiones y Cambios Arquitectónicos (Decisions & Lessons)
+# Registro de Decisiones y Cambios Arquitectónicos (Decisions & Lessons)
 
 Este documento actúa como registro persistente (SecondBrain / Architectural Decision Records) compartido entre todos los agentes de IA (Antigravity, Claude Code, Cursor, Codex, OpenCode, Gemini, etc.) y desarrolladores humanos para rastrear cambios clave en Skullboard.
 
@@ -73,3 +73,9 @@ Al implementar cambios arquitectónicos, nuevas dependencias, mutaciones de base
 - **Contexto & Decisión**: `Cerrar sesión` elimina solo sesión local. `Desconectar Discord` revoca grant OAuth y elimina todas las sesiones persistidas del usuario. La configuración valida que el canal elegido sea visible para el bot antes de escribir.
 - **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `scripts/test_dashboard_auth.py`, `docs/SYSTEM_CONTEXT.md`, `docs/SECURITY.md`
 - **Impacto / Lección para futuros agentes**: No mezclar cierre de sesión con revocación global. Nunca aceptar Snowflake de canal sin comprobarlo contra Discord.
+
+### [2026-09-11] OAuth Scope Superset y Entrada Directa Dashboard (Patrón Werewolf)
+- **Herramienta / Agente**: Antigravity
+- **Contexto & Decisión**: Discord OAuth2 conserva los scopes autorizados previamente por el usuario para el cliente (ej. `role_connections.write` de `/verify`). La verificación estricta `set(scopes) == {"identify", "guilds"}` fallaba con "Scopes OAuth no permitidos". Se ajustó a `{"identify", "guilds"}.issubset(granted)`. Además, en paridad con Werewolf, al acceder a `/dashboard` sin sesión activa se redirige automáticamente al flujo de Discord sin mostrar tarjeta intermedia previa; `#view-unauthenticated` se mantiene para errores explícitos, cancelaciones o tras logout.
+- **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `scripts/test_dashboard_auth.py`, `docs/DECISIONS.md`
+- **Impacto / Lección para futuros agentes**: Nunca asumir que Discord devuelve únicamente los scopes de la petición actual; validar que los requeridos estén presentes. Al entrar al dashboard sin autenticar, redirigir directo salvo logout explícito o error de intercambio.

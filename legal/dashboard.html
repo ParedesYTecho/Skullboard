@@ -457,11 +457,13 @@
                 } else {
                     authInProgress = false;
                     setAuthButtonState('Iniciar Sesión con Discord', false);
+                    showUnauthenticated('No se pudo iniciar sesión con Discord.');
                     showToast('No se pudo iniciar sesión.', '❌');
                 }
             } catch (e) {
                 authInProgress = false;
                 setAuthButtonState('Iniciar Sesión con Discord', false);
+                showUnauthenticated('Servicio temporalmente no disponible.');
                 showToast('Servicio temporalmente no disponible.', '❌');
             }
         }
@@ -1488,20 +1490,21 @@
         }
 
         async function init() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const isExplicitLogout = urlParams.has('logged_out');
             const authResult = await getOrExchangeAuthToken();
             if (!authResult.ok) return showUnauthenticated(authResult.message);
+            if (isExplicitLogout) return showUnauthenticated('Has cerrado sesión correctamente.');
             try {
                 const userRes = await fetchWithTimeout(`${API_BASE}/api/auth/me`, { credentials: 'include' });
                 const userData = await userRes.json();
                 if (userRes.status === 401) {
-                    return showUnauthenticated(userData.error === 'Sesión expirada'
-                        ? 'Sesión expirada. Vuelve a iniciar sesión.'
-                        : 'Inicia sesión con Discord para continuar.');
+                    return triggerDiscordAuth();
                 }
                 if (!userRes.ok) throw new Error();
                 csrfToken = userData.csrf_token || '';
                 const guildsRes = await fetchWithTimeout(`${API_BASE}/api/auth/guilds`, { credentials: 'include' });
-                if (guildsRes.status === 401) return showUnauthenticated('Sesión expirada. Vuelve a iniciar sesión.');
+                if (guildsRes.status === 401) return triggerDiscordAuth();
                 if (!guildsRes.ok) throw new Error();
                 const guildsData = await guildsRes.json();
                 if (!userData.ok || !guildsData.ok) throw new Error();

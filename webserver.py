@@ -892,12 +892,13 @@ def api_auth_token():
         token_data = r.json()
         granted_scopes = token_data.get("scope", "")
         if isinstance(granted_scopes, str):
-            granted_scopes = granted_scopes.split()
+            granted_scopes = granted_scopes.replace(",", " ").split()
         elif not isinstance(granted_scopes, list) or not all(isinstance(scope, str) for scope in granted_scopes):
             granted_scopes = []
-        if set(granted_scopes or ()) != {"identify", "guilds"}:
-            safe_scopes = ",".join(sorted(set(granted_scopes or ()))) or "none"
-            logger.warning("OAuth dashboard rejected: unexpected scopes (%s)", safe_scopes)
+        granted_set = set(granted_scopes or ())
+        if not {"identify", "guilds"}.issubset(granted_set):
+            safe_scopes = ",".join(sorted(granted_set)) or "none"
+            logger.warning("OAuth dashboard rejected: missing required scopes (%s)", safe_scopes)
             return _cors(jsonify(ok=False, error="Scopes OAuth no permitidos")), 400
         access_token = token_data.get("access_token")
         if not access_token:
