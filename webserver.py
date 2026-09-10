@@ -966,17 +966,54 @@ def api_auth_logout():
             return _cors(jsonify(ok=False, error="CSRF inválido")), 403
         if session_hash:
             _invalidate_session(session_hash)
-        if session and session[2].get("access_token") and DISCORD_CLIENT_SECRET:
-            try:
-                requests.post("https://discord.com/api/v10/oauth2/token/revoke", data={
-                    "client_id": APPLICATION_ID, "client_secret": DISCORD_CLIENT_SECRET,
-                    "token": session[2]["access_token"]
-                }, timeout=6)
-            except requests.RequestException:
-                pass
+        if session and session[2].get("access_token"):
             _clear_discord_cache(session[2]["access_token"])
     except SessionSecurityError:
         return _cors(jsonify(ok=False, error="No se pudo invalidar la sesión")), 503
+    response = make_response(_cors(jsonify(ok=True)))
+    response.delete_cookie(SESSION_COOKIE, path="/", samesite="Lax", secure=_session_cookie_secure())
+    return response
+
+
+@app.route('/api/auth/disconnect', methods=["POST", "OPTIONS"])
+def api_auth_disconnect():
+    """Revoke Discord authorization and terminate every dashboard session for the user."""
+    if request.method == "OPTIONS":
+        return _cors(app.response_class(status=204))
+    denied = _require_origin()
+    if denied:
+        return denied
+    try:
+        session = _require_session()
+    except SessionSecurityError:
+        return _cors(jsonify(ok=False, error="Servicio de sesión no disponible")), 503
+    if not session:
+        response = make_response(_cors(jsonify(ok=False, error="Sesión expirada")), 401)
+        response.delete_cookie(SESSION_COOKIE, path="/", samesite="Lax", secure=_session_cookie_secure())
+        return response
+
+    session_id, _, bundle = session
+    if not hmac.compare_digest(request.headers.get("X-CSRF-Token", ""), bundle.get("csrf_token", "")):
+        return _cors(jsonify(ok=False, error="CSRF inválido")), 403
+    if not DISCORD_CLIENT_SECRET:
+        return _cors(jsonify(ok=False, error="Servicio OAuth no disponible")), 503
+
+    try:
+        revoke = requests.post("https://discord.com/api/v10/oauth2/token/revoke", data={
+            "client_id": APPLICATION_ID,
+            "client_secret": DISCORD_CLIENT_SECRET,
+            "token": bundle["access_token"],
+        }, timeout=6)
+        if revoke.status_code not in (200, 204, 400):
+            return _cors(jsonify(ok=False, error="Discord no pudo revocar la autorización")), 503
+        if not _sb_delete("dashboard_sessions", {
+            "discord_user_id": f"eq.{bundle['discord_user_id']}"
+        }, require_match=True):
+            return _cors(jsonify(ok=False, error="No se pudieron cerrar las sesiones")), 503
+    except (requests.RequestException, KeyError):
+        return _cors(jsonify(ok=False, error="Discord no disponible temporalmente")), 503
+
+    _clear_discord_cache(bundle["access_token"])
     response = make_response(_cors(jsonify(ok=True)))
     response.delete_cookie(SESSION_COOKIE, path="/", samesite="Lax", secure=_session_cookie_secure())
     return response

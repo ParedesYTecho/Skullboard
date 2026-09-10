@@ -14,6 +14,10 @@ from cryptography.fernet import Fernet
 
 
 class DashboardAuthTests(unittest.TestCase):
+    def test_malformed_session_key_is_rejected_as_security_error(self):
+        with self.assertRaises(SessionSecurityError):
+            SessionCipher("not-a-fernet-key")
+
     def test_bundle_encrypts_and_rejects_tampering(self):
         from cryptography.fernet import Fernet
         cipher = SessionCipher(Fernet.generate_key().decode())
@@ -197,6 +201,27 @@ class DashboardAuthTests(unittest.TestCase):
                 })
         self.assertEqual(response.status_code, 403)
 
+    def test_config_rejects_channel_the_bot_cannot_access(self):
+        import webserver
+
+        guild_id = "123456789012345"
+        with patch.object(webserver, "_session_token", return_value="access-placeholder"), \
+             patch.object(webserver, "_fetch_discord_guilds", return_value=[{"id": guild_id, "permissions": 8, "owner": False}]), \
+             patch.object(webserver, "_require_session", return_value=("session", {}, {"csrf_token": "valid-csrf"})), \
+             patch.object(webserver, "_fetch_bot_channels", return_value=[{"id": "999999999999999", "type": 0}]), \
+             patch.object(webserver, "_sb_upsert", return_value=True) as upsert_mock:
+            with webserver.app.test_client() as client:
+                response = client.post(f"/api/guild/{guild_id}/config", json={
+                    "skullboard_channel_id": "888888888888888",
+                    "min_skulls": 1,
+                    "pin_threshold": 0,
+                    "prefix": "sk!",
+                }, headers={"Origin": "http://localhost:8080", "X-CSRF-Token": "valid-csrf"})
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("canal", response.get_json()["error"].lower())
+        upsert_mock.assert_not_called()
+
     def test_expired_session_is_rejected_without_fallback(self):
         import webserver
         with patch.object(webserver, "_session_credentials", return_value=None), \
@@ -241,6 +266,31 @@ class DashboardAuthTests(unittest.TestCase):
         delete_mock.assert_called_once()
         self.assertIn("Max-Age=0", response.headers["Set-Cookie"])
 
+    def test_disconnect_revokes_grant_and_removes_all_user_sessions(self):
+        import webserver
+
+        cipher = SessionCipher(Fernet.generate_key().decode())
+        session_id, row = new_session(cipher, "123", "access-secret", "refresh-secret",
+                                      datetime.now(timezone.utc), "valid-csrf")
+        bundle = cipher.decrypt(row["token_bundle"])
+        revoke_response = type("Response", (), {"status_code": 204})()
+        with patch.object(webserver, "_session_cipher", cipher), \
+             patch.object(webserver, "DISCORD_CLIENT_SECRET", "client-secret"), \
+             patch.object(webserver, "_require_session", return_value=(session_id, row, bundle)), \
+             patch.object(webserver, "_sb_delete", return_value=True) as delete_mock, \
+             patch.object(webserver.requests, "post", return_value=revoke_response) as revoke_mock, \
+             patch.object(webserver, "_clear_discord_cache"):
+            with webserver.app.test_client() as client:
+                client.set_cookie(webserver.SESSION_COOKIE, session_id)
+                response = client.post("/api/auth/disconnect", headers={
+                    "Origin": "http://localhost:8080", "X-CSRF-Token": "valid-csrf"
+                })
+
+        self.assertEqual(response.status_code, 200)
+        revoke_mock.assert_called_once()
+        delete_mock.assert_called_once_with("dashboard_sessions", {"discord_user_id": "eq.123"}, require_match=True)
+        self.assertIn("Max-Age=0", response.headers["Set-Cookie"])
+
     def test_dashboard_reload_checks_cookie_session_before_guilds(self):
         frontend = (ROOT / "legal/dashboard.html").read_text(encoding="utf-8")
         self.assertLess(frontend.index("/api/auth/me"), frontend.index("/api/auth/guilds"))
@@ -248,6 +298,23 @@ class DashboardAuthTests(unittest.TestCase):
         self.assertIn("forgetOAuthState(state)", frontend)
         self.assertIn("slice(-4)", frontend)
         self.assertIn("history.replaceState", frontend)
+
+    def test_frontend_exposes_explicit_oauth_failure_states(self):
+        frontend = (ROOT / "legal/dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("access_denied", frontend)
+        self.assertIn("Abriendo Discord", frontend)
+        self.assertIn("pageshow", frontend)
+
+    def test_frontend_exposes_explicit_discord_disconnect_action(self):
+        frontend = (ROOT / "legal/dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("btn-dropdown-disconnect", frontend)
+        self.assertIn("/api/auth/disconnect", frontend)
+
+    def test_settings_save_waits_for_dirty_loaded_form(self):
+        frontend = (ROOT / "legal/dashboard.html").read_text(encoding="utf-8")
+        self.assertIn("settingsDirty", frontend)
+        self.assertIn("Cambios sin guardar", frontend)
+        self.assertIn("!settingsDirty", frontend)
 
     def test_production_frontend_uses_same_origin_api_proxy(self):
         legal = "".join(path.read_text(encoding="utf-8") for path in (ROOT / "legal").glob("*.html"))

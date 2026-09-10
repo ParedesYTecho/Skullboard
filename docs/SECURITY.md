@@ -8,6 +8,7 @@
 - `WEB_ALLOWED_ORIGINS` must contain only deployed frontend origins, comma-separated. Default: `https://skullboard.vercel.app`.
 - Supabase `service_role` is server-only. Never expose it as `VITE_*`, `NEXT_PUBLIC_*`, or frontend configuration.
 - `dashboard_sessions` and `dashboard_oauth_states` are deny-by-default under RLS; only the backend `service_role` may access them.
+- Logout closes only the current local session. `Desconectar Discord` explicitly revokes the Discord grant and removes all sessions for that user.
 - TLS is enforced by deployment (`Strict-Transport-Security`). Supabase provides TLS in transit and encryption at rest. Current tables contain operational IDs/configuration, not application secrets.
 
 ## Secrets and dependency checks
@@ -22,6 +23,6 @@ If a credential was ever committed: revoke/rotate it first, then purge the affec
 
 ## Database
 
-Applied to production on 2026-09-09: `supabase/migrations/20260909_security_baseline.sql` and `supabase/migrations/20260909_remove_direct_public_rpc_grants.sql`. They enable RLS, revoke direct `anon`/`authenticated` table access, and revoke direct RPC execution. `service_role` retains required access.
+Applied to production on 2026-09-09: `supabase/migrations/20260909_security_baseline.sql` and `supabase/migrations/20260909_remove_direct_public_rpc_grants.sql`. Applied on 2026-09-10: `supabase/migrations/20260910_dashboard_sessions_transition.sql` for encrypted dashboard sessions and one-use OAuth states. They enable RLS, revoke direct `anon`/`authenticated` table access, and revoke direct RPC execution. `service_role` retains required access.
 
 RLS policies must be added only after a trusted mapping between Supabase `auth.uid()` and Discord guild ownership exists. Until then, deny-by-default is safer than a guessed policy.

@@ -286,7 +286,8 @@ erDiagram
 | `/api/auth/token` | `POST` | Público + Origin permitido + `state` válido | Intercambia el Authorization Code y crea sesión persistente; el navegador recibe solo cookie opaca. |
 | `/api/auth/me` | `GET` | Cookie HttpOnly | Valida/renueva sesión y retorna perfil mínimo más CSRF efímero para escrituras. |
 | `/api/auth/guilds` | `GET` | Cookie HttpOnly | Retorna servidores del usuario con bandera `is_admin` (`0x8`) y estado de SkullBoard (`has_bot`, `config`). |
-| `/api/auth/logout` | `POST` | Cookie HttpOnly + Origin + CSRF | Elimina sesión persistida, revoca token cuando Discord lo acepta y limpia cookie. |
+| `/api/auth/logout` | `POST` | Cookie HttpOnly + Origin + CSRF | Cierra sesión local persistida y limpia cookie; no revoca el grant Discord. |
+| `/api/auth/disconnect` | `POST` | Cookie HttpOnly + Origin + CSRF | Revoca autorización Discord y elimina todas las sesiones persistidas del usuario. |
 | `/api/guild/<guild_id>/channels` | `GET` | Cookie HttpOnly (Admin `0x8`) | Lista canales de texto (tipo 0) y anuncios (tipo 5) del servidor para el selector de configuración. |
 | `/api/guild/<guild_id>/config` | `GET`, `POST` | Cookie HttpOnly (Admin `0x8`); POST exige Origin + CSRF | `GET`: Consulta configuración del servidor.<br>`POST`: Guarda `min_skulls`, `prefix`, `channel_id`, `pin_threshold`. |
 | `/api/guild/<guild_id>/leaderboard/public` | `GET` | Público | Retorna los 25 mensajes con más calaveras de un servidor sin requerir login. |

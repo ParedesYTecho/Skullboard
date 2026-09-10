@@ -3600,6 +3600,17 @@ input[type="number"] {
     font-size: 0.88rem;
 }
 
+.load-retry-state {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 28px 20px;
+    color: var(--bad);
+    text-align: center;
+}
+
 /* Avatar de marca en logo y footer */
 .brand-avatar {
     width: 100%;

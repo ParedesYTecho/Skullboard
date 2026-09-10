@@ -64,7 +64,7 @@
                 Accede a tu panel para gestionar los ajustes de tu comunidad, consultar los rankings y ver tus estadísticas personales en SkullBoard.
             </p>
             <div class="auth-state-actions">
-                <button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary">
+                <button type="button" data-auth-trigger onclick="triggerDiscordAuth()" class="btn btn-primary">
                     <svg style="width:20px;height:20px;fill:currentColor;stroke:none;"><use href="#i-discord"/></svg>
                     <span>Iniciar Sesión con Discord</span>
                 </button>
@@ -112,21 +112,21 @@
                 </div>
 
                 <!-- Pestañas del Servidor -->
-                <div class="segmented-tabs" style="margin:0;">
-                    <button id="tab-btn-leaderboard" class="segmented-tab active" type="button">
+                <div class="segmented-tabs" role="tablist" aria-label="Secciones del servidor" style="margin:0;">
+                    <button id="tab-btn-leaderboard" class="segmented-tab active" type="button" role="tab" aria-controls="panel-leaderboard" aria-selected="true" tabindex="0">
                         👑 Leaderboard
                     </button>
-                    <button id="tab-btn-my-messages" class="segmented-tab" type="button">
+                    <button id="tab-btn-my-messages" class="segmented-tab" type="button" role="tab" aria-controls="panel-my-messages" aria-selected="false" tabindex="-1">
                         💀 Mis Mensajes
                     </button>
-                    <button id="tab-btn-config" class="segmented-tab" type="button" style="display:none;">
+                    <button id="tab-btn-config" class="segmented-tab" type="button" role="tab" aria-controls="panel-config" aria-selected="false" tabindex="-1" style="display:none;">
                         ⚙️ Ajustes
                     </button>
                 </div>
             </div>
 
             <!-- PESTAÑA 1: 👑 LEADERBOARD DEL SERVIDOR -->
-            <section id="panel-leaderboard" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-leaderboard">
+            <section id="panel-leaderboard" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-leaderboard" tabindex="0">
                 <div class="bento-card" style="padding:28px; border-radius:20px;">
                     <div class="lb-header-wrap">
                         <div>
@@ -138,10 +138,10 @@
 
                         <!-- Sub-selector de vista (Top Usuarios vs Mensajes Legendarios) -->
                         <div class="lb-sub-tabs" role="tablist" aria-label="Modo de clasificación">
-                            <button type="button" id="lb-sub-btn-users" class="lb-sub-tab active" role="tab" aria-selected="true">
+                            <button type="button" id="lb-sub-btn-users" class="lb-sub-tab active" role="tab" aria-controls="guild-lb-list" aria-selected="true" tabindex="0">
                                 👑 Top Usuarios
                             </button>
-                            <button type="button" id="lb-sub-btn-messages" class="lb-sub-tab" role="tab" aria-selected="false">
+                            <button type="button" id="lb-sub-btn-messages" class="lb-sub-tab" role="tab" aria-controls="guild-lb-list" aria-selected="false" tabindex="-1">
                                 🔥 Mensajes Destacados
                             </button>
                         </div>
@@ -154,7 +154,7 @@
             </section>
 
             <!-- PESTAÑA 2: 💀 MIS MENSAJES EN ESTE SERVIDOR -->
-            <section id="panel-my-messages" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-my-messages" style="display:none;">
+            <section id="panel-my-messages" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-my-messages" tabindex="0" style="display:none;">
                 <div class="stat-grid-2">
                     <div class="stat-metric-card">
                         <div class="stat-metric-icon">💀</div>
@@ -183,7 +183,7 @@
             </section>
 
             <!-- PESTAÑA 3: ⚙️ AJUSTES DEL SERVIDOR (SOLO ADMINS) -->
-            <section id="panel-config" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-config" style="display:none;">
+            <section id="panel-config" class="server-tab-panel" role="tabpanel" aria-labelledby="tab-btn-config" tabindex="0" style="display:none;">
                 <div class="bento-card" style="padding:28px; border-radius:20px;">
                     <div style="margin-bottom:22px;">
                         <h3 style="font-size:1.25rem; font-weight:800; margin-bottom:4px;">⚙️ Configuración del Servidor</h3>
@@ -199,7 +199,7 @@
                                 <input type="hidden" id="cfg-channel" name="skullboard_channel_id" value="">
                                 <select id="cfg-channel-select" style="display:none;"></select>
 
-                                <button type="button" class="channel-combobox-trigger" id="channel-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <button type="button" class="channel-combobox-trigger" id="channel-trigger" aria-controls="channel-dropdown" aria-haspopup="listbox" aria-expanded="false" aria-label="Canal de Skullboard">
                                     <div style="display:flex; align-items:center; gap:10px; overflow:hidden;">
                                         <span class="channel-trigger-icon">#</span>
                                         <span class="channel-trigger-text" id="channel-trigger-text">Selecciona o busca un canal…</span>
@@ -422,11 +422,31 @@
             storageSet('sessionStorage', OAUTH_STATE_KEY, JSON.stringify(states));
         }
 
+        async function fetchWithTimeout(resource, options = {}, timeoutMs = 8000) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
+            try {
+                return await fetch(resource, { ...options, signal: controller.signal });
+            } finally {
+                clearTimeout(timer);
+            }
+        }
+
+        function setAuthButtonState(label, disabled) {
+            document.querySelectorAll('[data-auth-trigger]').forEach((btn) => {
+                btn.disabled = disabled;
+                const text = btn.querySelector('span');
+                if (text) text.textContent = label;
+                else btn.textContent = label;
+            });
+        }
+
         async function triggerDiscordAuth() {
             if (authInProgress) return;
             authInProgress = true;
+            setAuthButtonState('Abriendo Discord…', true);
             try {
-                const res = await fetch(`${API_BASE}/api/auth/start`, { credentials: 'include' });
+                const res = await fetchWithTimeout(`${API_BASE}/api/auth/start`, { credentials: 'include' });
                 const data = await res.json();
                 if (res.ok && data.ok && data.auth_url) {
                     const authUrl = new URL(data.auth_url);
@@ -434,9 +454,16 @@
                     if (!state) throw new Error();
                     if (!rememberOAuthState(state)) throw new Error();
                     window.location.assign(authUrl.href);
+                } else {
+                    authInProgress = false;
+                    setAuthButtonState('Iniciar Sesión con Discord', false);
+                    showToast('No se pudo iniciar sesión.', '❌');
                 }
-                else { authInProgress = false; showToast('No se pudo iniciar sesión.', '❌'); }
-            } catch (e) { authInProgress = false; showToast('Servicio temporalmente no disponible.', '❌'); }
+            } catch (e) {
+                authInProgress = false;
+                setAuthButtonState('Iniciar Sesión con Discord', false);
+                showToast('Servicio temporalmente no disponible.', '❌');
+            }
         }
 
         // El token Discord queda en servidor; navegador solo recibe cookie HttpOnly.
@@ -444,32 +471,44 @@
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
             const state = urlParams.get('state');
-            const hasOAuthResponse = code || state || urlParams.get('error');
+            const error = urlParams.get('error');
+            const hasOAuthResponse = code || state || error;
             const pendingStates = oauthStates();
             if (hasOAuthResponse) {
                 window.history.replaceState(null, null, window.location.pathname);
             }
+            if (error === 'access_denied') {
+                forgetOAuthState(state);
+                return { ok: false, message: 'Has cancelado el acceso con Discord.' };
+            }
             if (hasOAuthResponse && (!code || !state || !pendingStates.includes(state))) {
                 forgetOAuthState(state);
-                return false;
+                return { ok: false, message: 'Solicitud OAuth caducada o inválida.' };
             }
             if (code && state) {
                 forgetOAuthState(state);
                 try {
-                    const res = await fetch(`${API_BASE}/api/auth/token`, {
+                    const res = await fetchWithTimeout(`${API_BASE}/api/auth/token`, {
                         method: 'POST',
                         credentials: 'include',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ code, state, redirect_uri: REDIRECT_URI })
                     });
                     const data = await res.json();
-                    if (!(res.ok && data.ok)) return false;
+                    if (!(res.ok && data.ok)) {
+                        return { ok: false, message: data.error || 'No se pudo completar el inicio de sesión.' };
+                    }
                 } catch (e) {
-                    return false;
+                    return { ok: false, message: 'Error de conexión con Discord.' };
                 }
             }
-            return true;
+            return { ok: true };
         }
+
+        window.addEventListener('pageshow', () => {
+            authInProgress = false;
+            setAuthButtonState('Iniciar Sesión con Discord', false);
+        });
 
         let userGuilds = [];
         let activeGuild = null;
@@ -483,7 +522,11 @@
         const panelCfg = document.getElementById('panel-config');
 
         function switchServerTab(activeTabBtn, activePanel) {
-            [tabBtnLb, tabBtnMy, tabBtnCfg].forEach(b => b.classList.remove('active'));
+            [tabBtnLb, tabBtnMy, tabBtnCfg].forEach(b => {
+                b.classList.remove('active');
+                b.setAttribute('aria-selected', String(b === activeTabBtn));
+                b.setAttribute('tabindex', b === activeTabBtn ? '0' : '-1');
+            });
             [panelLb, panelMy, panelCfg].forEach(p => p.style.display = 'none');
             activeTabBtn.classList.add('active');
             activePanel.style.display = 'block';
@@ -497,6 +540,19 @@
         tabBtnCfg.addEventListener('click', () => {
             switchServerTab(tabBtnCfg, panelCfg);
             if (activeGuild) loadGuildConfig(activeGuild.id);
+        });
+
+        [tabBtnLb, tabBtnMy, tabBtnCfg].forEach((tab, index, tabs) => {
+            tab.addEventListener('keydown', (event) => {
+                if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+                event.preventDefault();
+                const visibleTabs = tabs.filter(item => item.style.display !== 'none');
+                const currentIndex = visibleTabs.indexOf(tab);
+                const nextIndex = event.key === 'Home' ? 0
+                    : event.key === 'End' ? visibleTabs.length - 1
+                    : (currentIndex + (event.key === 'ArrowRight' ? 1 : -1) + visibleTabs.length) % visibleTabs.length;
+                visibleTabs[nextIndex]?.focus();
+            });
         });
 
         let currentGuildLoadId = 0;
@@ -517,6 +573,25 @@
                 if (currentLbMode === 'messages') return;
                 if (activeGuild) loadGuildLeaderboard(activeGuild.id, 'messages');
             });
+            [lbSubBtnUsers, lbSubBtnMessages].forEach((subTab, idx, arr) => {
+                subTab.addEventListener('keydown', (e) => {
+                    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+                    e.preventDefault();
+                    const target = (e.key === 'Home' || (e.key === 'ArrowLeft' && idx === 1)) ? arr[0] : arr[1];
+                    target?.focus();
+                    target?.click();
+                });
+            });
+        }
+
+        function renderRetryState(container, message, retry) {
+            if (!container) return;
+            container.innerHTML = `
+                <div class="load-retry-state">
+                    <span>${escapeHtml(message)}</span>
+                    <button type="button" class="btn btn-ghost btn-sm">Reintentar</button>
+                </div>`;
+            container.querySelector('button')?.addEventListener('click', retry, { once: true });
         }
 
         // 1. CARGA DEL LEADERBOARD DEL SERVIDOR (RANKING DE USUARIOS O MENSAJES LEGENDARIOS)
@@ -535,16 +610,20 @@
                 if (mode === 'users') {
                     btnUsers.classList.add('active');
                     btnUsers.setAttribute('aria-selected', 'true');
+                    btnUsers.setAttribute('tabindex', '0');
                     btnMsgs.classList.remove('active');
                     btnMsgs.setAttribute('aria-selected', 'false');
+                    btnMsgs.setAttribute('tabindex', '-1');
                     if (iconEl) iconEl.textContent = '👑';
                     if (titleEl) titleEl.textContent = 'Ranking de Usuarios';
                     if (descEl) descEl.textContent = 'Miembros con mayor número de calaveras acumuladas en este servidor.';
                 } else {
                     btnMsgs.classList.add('active');
                     btnMsgs.setAttribute('aria-selected', 'true');
+                    btnMsgs.setAttribute('tabindex', '0');
                     btnUsers.classList.remove('active');
                     btnUsers.setAttribute('aria-selected', 'false');
+                    btnUsers.setAttribute('tabindex', '-1');
                     if (iconEl) iconEl.textContent = '🔥';
                     if (titleEl) titleEl.textContent = 'Mensajes Legendarios';
                     if (descEl) descEl.textContent = 'Publicaciones con mayor récord de calaveras registradas en este servidor.';
@@ -706,7 +785,7 @@
                 }
             } catch (e) {
                 if (requestId !== leaderboardRequestSerial || thisLoadId !== currentGuildLoadId || String(activeGuild?.id) !== String(guildId)) return;
-                list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar el Leaderboard.</div>';
+                renderRetryState(list, 'Error al cargar el Leaderboard.', () => loadGuildLeaderboard(guildId, mode));
             } finally {
                 if (requestId === leaderboardRequestSerial && thisLoadId === currentGuildLoadId) showFooter();
             }
@@ -802,11 +881,11 @@
                         list.innerHTML = '<div style="text-align:center; padding:30px; color:var(--ink-soft);">No tienes mensajes destacados en este servidor todavía.</div>';
                     }
                 } else {
-                    list.innerHTML = '<div style="text-align:center; padding:24px; color:var(--bad);">Error al cargar tus mensajes.</div>';
+                    renderRetryState(list, data.error || 'Error al cargar tus mensajes.', () => loadMyMessages(guildId));
                 }
             } catch (e) {
                 if (requestId !== messagesRequestSerial || thisLoadId !== currentGuildLoadId || String(activeGuild?.id) !== String(guildId)) return;
-                list.innerHTML = '<div style="text-align:center; padding:20px; color:var(--bad);">Error al cargar tus mensajes.</div>';
+                renderRetryState(list, 'Error al cargar tus mensajes.', () => loadMyMessages(guildId));
             } finally {
                 if (requestId === messagesRequestSerial && thisLoadId === currentGuildLoadId) showFooter();
             }
@@ -814,17 +893,35 @@
 
         let currentGuildChannels = [];
         let settingsReady = false;
+        let settingsDirty = false;
+        let settingsSaving = false;
+
+        function updateSettingsSaveButton() {
+            const btnSave = document.getElementById('btn-save-cfg');
+            if (btnSave) btnSave.disabled = !settingsReady || !settingsDirty || settingsSaving;
+        }
+
+        function markSettingsDirty() {
+            if (!settingsReady || settingsSaving) return;
+            settingsDirty = true;
+            const statusEl = document.getElementById('cfg-save-status');
+            if (statusEl) {
+                statusEl.textContent = 'Cambios sin guardar';
+                statusEl.style.color = 'var(--violet-2)';
+            }
+            updateSettingsSaveButton();
+        }
 
         function setSettingsFormState({ loading = false, error = null, ready = false }) {
             settingsReady = !loading && !error && ready;
-            const btnSave = document.getElementById('btn-save-cfg');
+            if (loading || error || !ready) settingsDirty = false;
             const skullsInput = document.getElementById('cfg-skulls');
             const pinInput = document.getElementById('cfg-pin');
             const prefixInput = document.getElementById('cfg-prefix');
             const channelTrigger = document.getElementById('channel-trigger');
             const statusEl = document.getElementById('cfg-save-status');
 
-            if (btnSave) btnSave.disabled = loading || !settingsReady;
+            updateSettingsSaveButton();
             if (skullsInput) skullsInput.disabled = loading;
             if (pinInput) pinInput.disabled = loading;
             if (prefixInput) prefixInput.disabled = loading;
@@ -846,6 +943,9 @@
                 } else if (error) {
                     statusEl.textContent = error;
                     statusEl.style.color = 'var(--bad)';
+                } else if (settingsDirty) {
+                    statusEl.textContent = 'Cambios sin guardar';
+                    statusEl.style.color = 'var(--violet-2)';
                 } else {
                     statusEl.textContent = '';
                 }
@@ -864,6 +964,7 @@
                     const manualRow = document.createElement('div');
                     manualRow.className = 'channel-option';
                     manualRow.setAttribute('role', 'option');
+                    manualRow.setAttribute('aria-selected', 'false');
                     manualRow.setAttribute('tabindex', '0');
                     manualRow.innerHTML = `<span class="channel-opt-hash">#</span> <span class="channel-opt-name">Usar ID numérico manual: <strong>${escapeHtml(trimmedQ)}</strong></span>`;
                     const selectManual = () => {
@@ -875,6 +976,10 @@
                         if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
                             selectManual();
+                        } else if (e.key === 'Escape') {
+                            e.preventDefault();
+                            closeChannelDropdown();
+                            document.getElementById('channel-trigger')?.focus();
                         }
                     });
                     container.appendChild(manualRow);
@@ -889,6 +994,7 @@
                 item.className = 'channel-option' + (String(c.id) === String(selectedId) ? ' selected' : '');
                 item.dataset.id = c.id;
                 item.setAttribute('role', 'option');
+                item.setAttribute('aria-selected', String(String(c.id) === String(selectedId)));
                 item.setAttribute('tabindex', '0');
                 const cleanOptName = escapeHtml(String(c.name).replace(/^#\s*/, ''));
                 item.innerHTML = `
@@ -905,6 +1011,23 @@
                     if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
                         selectThis();
+                    } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) {
+                        e.preventDefault();
+                        const options = [...container.querySelectorAll('[role="option"]')];
+                        const currentIndex = options.indexOf(item);
+                        if (e.key === 'ArrowUp' && currentIndex === 0) {
+                            const searchInput = document.getElementById('channel-search-input');
+                            searchInput?.focus();
+                            return;
+                        }
+                        const nextIndex = e.key === 'Home' ? 0
+                            : e.key === 'End' ? options.length - 1
+                            : (currentIndex + (e.key === 'ArrowDown' ? 1 : -1) + options.length) % options.length;
+                        options[nextIndex]?.focus();
+                    } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        closeChannelDropdown();
+                        document.getElementById('channel-trigger')?.focus();
                     }
                 });
                 container.appendChild(item);
@@ -918,6 +1041,7 @@
             if (!triggerText) return;
             if (!chanId) {
                 triggerText.textContent = 'Selecciona o busca un canal…';
+                markSettingsDirty();
                 return;
             }
             const cleanName = chanName ? String(chanName).replace(/^#\s*/, '') : '';
@@ -931,6 +1055,7 @@
                     triggerText.textContent = chanId;
                 }
             }
+            markSettingsDirty();
         }
 
         function openChannelDropdown() {
@@ -973,17 +1098,20 @@
                 if (requestId !== configRequestSerial || thisLoadId !== currentGuildLoadId || (activeGuild && String(activeGuild.id) !== String(guildId))) {
                     return;
                 }
-                if (chanData.ok && chanData.channels && chanData.channels.length > 0) {
-                    currentGuildChannels = chanData.channels;
+                if (chanData.ok) {
+                    currentGuildChannels = Array.isArray(chanData.channels) ? chanData.channels : [];
                     renderChannelOptions(currentGuildChannels);
+                    if (currentGuildChannels.length === 0 && container) {
+                        container.innerHTML = '<div class="channel-option-empty">No hay canales de texto disponibles para SkullBoard.</div>';
+                    }
                 } else {
                     channelsLoadFailed = true;
-                    if (container) container.innerHTML = '<div class="channel-option-empty">(Canales no disponibles)</div>';
+                    renderRetryState(container, chanData.error || 'Canales no disponibles.', () => loadGuildConfig(guildId));
                 }
             } catch (e) {
                 if (requestId !== configRequestSerial || thisLoadId !== currentGuildLoadId) return;
                 channelsLoadFailed = true;
-                if (container) container.innerHTML = '<div class="channel-option-empty">(Error al cargar canales)</div>';
+                renderRetryState(container, 'Error al cargar canales.', () => loadGuildConfig(guildId));
             }
 
             try {
@@ -1011,11 +1139,13 @@
                     setSettingsFormState({ loading: false, ready: !channelsLoadFailed });
                 } else {
                     setSettingsFormState({ loading: false, error: data.error || 'Error al cargar ajustes' });
+                    renderRetryState(container, data.error || 'Error al cargar ajustes.', () => loadGuildConfig(guildId));
                     showToast(data.error || 'Error al cargar ajustes', '✕');
                 }
             } catch (e) {
                 if (requestId !== configRequestSerial || thisLoadId !== currentGuildLoadId) return;
                 setSettingsFormState({ loading: false, error: 'Error de conexión con el servidor' });
+                renderRetryState(container, 'Error de conexión con el servidor.', () => loadGuildConfig(guildId));
                 showToast('Error cargando ajustes', '✕');
             } finally {
                 if (requestId === configRequestSerial && thisLoadId === currentGuildLoadId) showFooter();
@@ -1182,6 +1312,7 @@
             const btn = document.getElementById('btn-save-cfg');
             const status = document.getElementById('cfg-save-status');
             btn.disabled = true;
+            settingsSaving = true;
             status.textContent = 'Guardando…';
 
             const payload = {
@@ -1201,6 +1332,7 @@
                 const data = await res.json();
                 if (saveGeneration !== currentGuildLoadId || String(activeGuild?.id) !== guildId) return;
                 if (res.ok && data.ok) {
+                    settingsDirty = false;
                     showToast('¡Ajustes guardados!', '✅');
                     status.textContent = '✅ Guardado';
                     setTimeout(() => status.textContent = '', 2500);
@@ -1214,7 +1346,8 @@
                 status.textContent = '❌ Error';
             } finally {
                 if (saveGeneration === currentGuildLoadId && String(activeGuild?.id) === guildId) {
-                    btn.disabled = !settingsReady;
+                    settingsSaving = false;
+                    updateSettingsSaveButton();
                 }
             }
         });
@@ -1242,6 +1375,10 @@
                         <button type="button" class="user-dropdown-item item-logout" id="btn-dropdown-logout">
                             <svg class="dropdown-item-icon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
                             <span>Cerrar sesión</span>
+                        </button>
+                        <button type="button" class="user-dropdown-item item-disconnect" id="btn-dropdown-disconnect">
+                            <svg class="dropdown-item-icon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v9m6.36-6.36a9 9 0 1 1-12.72 0"/></svg>
+                            <span>Desconectar Discord</span>
                         </button>
                     </div>
                 </div>
@@ -1296,6 +1433,28 @@
                     }
                 });
             }
+
+            const btnDropdownDisconnect = document.getElementById('btn-dropdown-disconnect');
+            if (btnDropdownDisconnect) {
+                btnDropdownDisconnect.addEventListener('click', async () => {
+                    btnDropdownDisconnect.disabled = true;
+                    try {
+                        const res = await fetch(`${API_BASE}/api/auth/disconnect`, {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: { 'X-CSRF-Token': csrfToken }
+                        });
+                        const data = await res.json();
+                        if (!res.ok || !data.ok) throw new Error(data.error || 'disconnect_failed');
+                        storageRemove('localStorage', 'skb_last_guild_id');
+                        storageRemove('sessionStorage', OAUTH_STATE_KEY);
+                        window.location.href = '/?disconnected=1';
+                    } catch (e) {
+                        btnDropdownDisconnect.disabled = false;
+                        showToast(e.message || 'No se pudo desconectar Discord.', '❌');
+                    }
+                });
+            }
         }
 
         function processAndApplyGuilds(rawGuilds) {
@@ -1329,10 +1488,10 @@
         }
 
         async function init() {
-            const exchanged = await getOrExchangeAuthToken();
-            if (!exchanged) return showUnauthenticated('No se pudo validar el inicio de sesión.');
+            const authResult = await getOrExchangeAuthToken();
+            if (!authResult.ok) return showUnauthenticated(authResult.message);
             try {
-                const userRes = await fetch(`${API_BASE}/api/auth/me`, { credentials: 'include' });
+                const userRes = await fetchWithTimeout(`${API_BASE}/api/auth/me`, { credentials: 'include' });
                 const userData = await userRes.json();
                 if (userRes.status === 401) {
                     return showUnauthenticated(userData.error === 'Sesión expirada'
@@ -1341,7 +1500,7 @@
                 }
                 if (!userRes.ok) throw new Error();
                 csrfToken = userData.csrf_token || '';
-                const guildsRes = await fetch(`${API_BASE}/api/auth/guilds`, { credentials: 'include' });
+                const guildsRes = await fetchWithTimeout(`${API_BASE}/api/auth/guilds`, { credentials: 'include' });
                 if (guildsRes.status === 401) return showUnauthenticated('Sesión expirada. Vuelve a iniciar sesión.');
                 if (!guildsRes.ok) throw new Error();
                 const guildsData = await guildsRes.json();
@@ -1354,10 +1513,12 @@
         }
 
         function showUnauthenticated(message) {
+            authInProgress = false;
+            setAuthButtonState('Iniciar Sesión con Discord', false);
             document.getElementById('view-loading').style.display = 'none';
             document.getElementById('view-unauthenticated').style.display = 'block';
             document.querySelector('#view-unauthenticated p').textContent = message;
-            document.getElementById('auth-nav-slot').innerHTML = '<button type="button" onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Entrar</button>';
+            document.getElementById('auth-nav-slot').innerHTML = '<button type="button" data-auth-trigger onclick="triggerDiscordAuth()" class="btn btn-primary btn-sm">Entrar</button>';
             showFooter();
         }
 
@@ -1504,6 +1665,12 @@
             });
         }
 
+        [skullsInput, pinInput, document.getElementById('cfg-prefix')].forEach((input) => {
+            if (!input) return;
+            input.addEventListener('input', markSettingsDirty);
+            input.addEventListener('change', markSettingsDirty);
+        });
+
         // Combobox de selección y búsqueda de canales
         const channelTrigger = document.getElementById('channel-trigger');
         if (channelTrigger) {
@@ -1516,11 +1683,28 @@
                     openChannelDropdown();
                 }
             });
+            channelTrigger.addEventListener('keydown', (e) => {
+                if (['ArrowDown', 'Enter', ' '].includes(e.key)) {
+                    const dd = document.getElementById('channel-dropdown');
+                    if (!dd || dd.style.display !== 'block') {
+                        e.preventDefault();
+                        openChannelDropdown();
+                    }
+                } else if (e.key === 'Escape') {
+                    closeChannelDropdown();
+                }
+            });
         }
 
         const channelDropdown = document.getElementById('channel-dropdown');
         if (channelDropdown) {
             channelDropdown.addEventListener('click', (e) => e.stopPropagation());
+            channelDropdown.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    closeChannelDropdown();
+                    channelTrigger?.focus();
+                }
+            });
         }
 
         document.addEventListener('click', () => closeChannelDropdown());
@@ -1537,6 +1721,18 @@
                     c.name.toLowerCase().includes(q) || String(c.id).includes(q)
                 );
                 renderChannelOptions(filtered, q);
+            });
+            channelSearchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    closeChannelDropdown();
+                    channelTrigger?.focus();
+                } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const container = document.getElementById('channel-options-container');
+                    const firstOption = container?.querySelector('[role="option"]');
+                    firstOption?.focus();
+                }
             });
         }
 

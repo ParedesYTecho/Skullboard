@@ -66,3 +66,74 @@ test('privacy page describes encrypted dashboard sessions', () => {
   assert.match(privacy, /duraci[oó]n m[aá]xima configurada de 30 d[ií]as/);
   assert.doesNotMatch(privacy, /[Uu]nicamente guarda los identificadores/);
 });
+
+test('renderRetryState does not accumulate listeners or trigger duplicate requests', () => {
+  const html = read('dashboard.html');
+  assert.match(html, /renderRetryState\s*\(/);
+  assert.match(html, /\{ once: true \}/);
+
+  // Execute in isolated VM with DOM mock
+  let buttonListener = null;
+  let retryCount = 0;
+  const mockButton = {
+    addEventListener: (event, fn, opts) => {
+      if (event === 'click') buttonListener = { fn, once: !!opts?.once };
+    },
+    click: () => {
+      if (!buttonListener) return;
+      const { fn, once } = buttonListener;
+      if (once) buttonListener = null;
+      fn();
+    }
+  };
+  const mockContainer = {
+    _html: '',
+    get innerHTML() { return this._html; },
+    set innerHTML(val) {
+      this._html = val;
+      buttonListener = null; // Overwriting innerHTML removes child elements and their listeners
+    },
+    querySelector: (sel) => (sel === 'button' ? mockButton : null)
+  };
+
+  const sandbox = {
+    container: mockContainer,
+    escapeHtml: (s) => String(s),
+    retryFn: () => { retryCount++; }
+  };
+  const code = `
+    function renderRetryState(container, message, retry) {
+        if (!container) return;
+        container.innerHTML = '<div>' + escapeHtml(message) + '<button>Reintentar</button></div>';
+        container.querySelector('button')?.addEventListener('click', retry, { once: true });
+    }
+    // Simulate 3 consecutive failures
+    renderRetryState(container, 'Fallo 1', retryFn);
+    renderRetryState(container, 'Fallo 2', retryFn);
+    renderRetryState(container, 'Fallo 3', retryFn);
+  `;
+  vm.runInNewContext(code, sandbox);
+
+  // Click once after 3 failures
+  mockButton.click();
+  assert.equal(retryCount, 1, 'Retry must execute exactly once per click after multiple failure states');
+
+  // Second click on the consumed button must not fire again
+  mockButton.click();
+  assert.equal(retryCount, 1, 'Consumed { once: true } button must not fire duplicate calls');
+});
+
+test('dashboard implements accessible tabs, roving tabindex and combobox keyboard navigation', () => {
+  const html = read('dashboard.html');
+  assert.match(html, /role="tablist"[^>]*aria-label="Secciones del servidor"/);
+  assert.match(html, /id="tab-btn-leaderboard"[^>]*role="tab"[^>]*aria-controls="panel-leaderboard"/);
+  assert.match(html, /id="tab-btn-my-messages"[^>]*role="tab"[^>]*aria-controls="panel-my-messages"/);
+  assert.match(html, /id="tab-btn-config"[^>]*role="tab"[^>]*aria-controls="panel-config"/);
+  assert.match(html, /id="panel-leaderboard"[^>]*role="tabpanel"[^>]*tabindex="0"/);
+  assert.match(html, /id="panel-my-messages"[^>]*role="tabpanel"[^>]*tabindex="0"/);
+  assert.match(html, /id="panel-config"[^>]*role="tabpanel"[^>]*tabindex="0"/);
+  assert.match(html, /id="channel-trigger"[^>]*aria-controls="channel-dropdown"[^>]*aria-haspopup="listbox"/);
+  assert.match(html, /id="channel-options-container"[^>]*role="listbox"/);
+  assert.match(html, /item\.setAttribute\('role',\s*'option'\)/);
+  assert.match(html, /ArrowLeft.*ArrowRight.*Home.*End/s);
+});

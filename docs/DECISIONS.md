@@ -47,7 +47,7 @@ Al implementar cambios arquitectónicos, nuevas dependencias, mutaciones de base
 - **Herramienta / Agente**: Codex
 - **Contexto & Decisión**: Reemplazar sesiones process-locales y credenciales legibles por `dashboard_sessions`, HMAC del identificador, bundle OAuth Fernet cifrado, state de un solo uso y CSRF en escrituras.
 - **Archivos Clave**: `webserver.py`, `dashboard_sessions.py`, `legal/dashboard.html`, `legal/sw.js`, `supabase/migrations/20260910_*sessions*.sql`
-- **Impacto / Lección para futuros agentes**: Producción exige `SKULLBOARD_SESSION_ENCRYPTION_KEY`; migración remota y limpieza de `web_sessions` legado siguen pendientes de aprobación e inventario.
+- **Impacto / Lección para futuros agentes**: Producción exige `SKULLBOARD_SESSION_ENCRYPTION_KEY`; migración `dashboard_sessions`/`dashboard_oauth_states` aplicada el 2026-09-10. `web_sessions` legado sigue fuera del escritor nuevo.
 
 ### [2026-09-10] Estado OAuth persistente y renovación distribuida
 - **Herramienta / Agente**: Codex
@@ -60,10 +60,16 @@ Al implementar cambios arquitectónicos, nuevas dependencias, mutaciones de base
 - **Estado actual**: Supersedida por el requisito de que el navegador reciba una sola cookie. El backend persiste únicamente el HMAC del state y lo consume una vez; el frontend conserva solo una lista limitada de states transitorios en `sessionStorage`.
 - **Motivo**: Mantener una única cookie opaca de sesión y evitar cualquier cookie OAuth adicional. El state sigue siendo aleatorio, persistente, de un solo uso y no contiene tokens.
 - **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `supabase/migrations/20260910_*.sql`
-- **Impacto / Lección para futuros agentes**: Producción usa `__Host-skullboard_session` con `Secure`; desarrollo loopback usa variante no-Secure. La clave Fernet nunca llega a Vercel. Las tablas siguen pendientes de aplicar en producción.
+- **Impacto / Lección para futuros agentes**: Producción usa `__Host-skullboard_session` con `Secure`; desarrollo loopback usa variante no-Secure. La clave Fernet nunca llega a Vercel. Migración aplicada; no añadir cookie OAuth secundaria sin cambiar requisito.
 
 ### [2026-09-10] Estado operativo honesto y cargas de dashboard aisladas
 - **Herramienta / Agente**: Codex
 - **Contexto & Decisión**: El endpoint de estado informa `unknown` cuando ningún proveedor del bot está registrado; modal de estado deja de afirmar uptime/SLA inventados. Dashboard mantiene generaciones separadas para leaderboard, mensajes y ajustes; errores tardíos no pisan otro servidor ni habilitan guardado tras carga fallida.
 - **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `legal/styles.css`, cinco páginas públicas y `scripts/test_dashboard_auth.py`
 - **Impacto / Lección para futuros agentes**: Los estados visuales deben representar evidencia real; el footer permanece estable durante cargas y el foco del modal vuelve a su disparador.
+
+### [2026-09-10] Logout local y desconexión Discord explícita
+- **Herramienta / Agente**: Codex
+- **Contexto & Decisión**: `Cerrar sesión` elimina solo sesión local. `Desconectar Discord` revoca grant OAuth y elimina todas las sesiones persistidas del usuario. La configuración valida que el canal elegido sea visible para el bot antes de escribir.
+- **Archivos Clave**: `webserver.py`, `legal/dashboard.html`, `scripts/test_dashboard_auth.py`, `docs/SYSTEM_CONTEXT.md`, `docs/SECURITY.md`
+- **Impacto / Lección para futuros agentes**: No mezclar cierre de sesión con revocación global. Nunca aceptar Snowflake de canal sin comprobarlo contra Discord.
