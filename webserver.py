@@ -12,6 +12,7 @@ import random
 import functools
 import hashlib
 import logging
+from datetime import datetime, timezone
 
 logger = logging.getLogger("skullboard.webserver")
 
@@ -160,14 +161,27 @@ def _extract_bearer(req) -> str:
 
 def _new_session(discord_token: str) -> str:
     session_id = secrets.token_urlsafe(32)
+    expires_at = time.time() + SESSION_TTL
+    if _sb_upsert("web_sessions", {"session_id": session_id, "discord_token": discord_token,
+                                    "expires_at": datetime.fromtimestamp(expires_at, timezone.utc).isoformat()}):
+        return session_id
     with _session_lock:
-        _sessions[session_id] = (time.time() + SESSION_TTL, discord_token)
+        _sessions[session_id] = (expires_at, discord_token)
         while len(_sessions) > 5000:
             _sessions.popitem(last=False)
     return session_id
 
 def _session_token() -> str:
     session_id = request.cookies.get(SESSION_COOKIE, "")
+    if session_id:
+        rows = _sb_select("web_sessions", {"session_id": f"eq.{session_id}", "limit": 1})
+        if rows:
+            row = rows[0]
+            try:
+                if datetime.fromisoformat(row["expires_at"].replace("Z", "+00:00")).timestamp() > time.time():
+                    return row["discord_token"]
+            except (KeyError, ValueError):
+                pass
     with _session_lock:
         session = _sessions.get(session_id)
         if not session:
@@ -280,6 +294,20 @@ def _sb_upsert(table: str, data: dict):
     except (requests.RequestException, TimeoutError) as e:
         raise e
     except Exception:
+        return False
+
+@sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
+def _sb_delete(table: str, params: dict):
+    if not (SUPABASE_URL and SUPABASE_KEY):
+        return False
+    try:
+        r = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/{table}",
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"},
+            params=params, timeout=6
+        )
+        return r.status_code in (200, 204)
+    except requests.RequestException:
         return False
 
 @sync_db_retry(max_retries=3, base_delay=0.3, max_delay=2.0)
@@ -456,6 +484,9 @@ def api_auth_logout():
         return _cors(app.response_class(status=204))
     with _session_lock:
         _sessions.pop(request.cookies.get(SESSION_COOKIE, ""), None)
+    session_id = request.cookies.get(SESSION_COOKIE, "")
+    if session_id:
+        _sb_delete("web_sessions", {"session_id": f"eq.{session_id}"})
     response = make_response(_cors(jsonify(ok=True)))
     response.delete_cookie(SESSION_COOKIE, path="/", samesite="None", secure=True)
     return response
