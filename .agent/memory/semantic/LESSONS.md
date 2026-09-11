@@ -16,6 +16,8 @@
 ### 2026-09
 
 - Always run Graphify query before grep or full-file reads to minimize token consumption  <!-- status=accepted confidence=0.53 evidence=1 id=lesson_511129d5f911 -->
+- Validar scopes de Discord OAuth con issubset tolerando scopes previos acumulados y normalizando minusculas  <!-- status=accepted confidence=0.6 evidence=1 id=lesson_1e25c0b454be -->
+- En dashboards con login externo redirigir automaticamente al OAuth ante 401 pero con guard de intercambio para evitar bucles si la cookie falla  <!-- status=accepted confidence=0.6 evidence=1 id=lesson_5c0b2a1cce57 -->
 
 ### 2026-04
 

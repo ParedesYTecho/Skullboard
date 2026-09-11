@@ -1,0 +1,53 @@
+{
+  "id": "5c0b2a1cce57",
+  "key": "manual_5c0b2a",
+  "name": "manual_5c0b2a",
+  "claim": "En dashboards con login externo redirigir automaticamente al OAuth ante 401 pero con guard de intercambio para evitar bucles si la cookie falla",
+  "conditions": [
+    "ante",
+    "automaticamente",
+    "bucles",
+    "con",
+    "cookie",
+    "dashboards",
+    "evitar",
+    "externo",
+    "falla",
+    "guard",
+    "intercambio",
+    "login",
+    "oauth",
+    "para",
+    "pero",
+    "redirigir"
+  ],
+  "evidence_ids": [
+    "2026-09-11T00:43:54.362288+00:00"
+  ],
+  "cluster_size": 1,
+  "canonical_salience": 8.0,
+  "staged_at": "2026-09-11T00:43:54.362288+00:00",
+  "status": "accepted",
+  "decisions": [
+    {
+      "ts": "2026-09-11T00:43:54.362288+00:00",
+      "action": "staged",
+      "reviewer": "learn"
+    },
+    {
+      "ts": "2026-09-11T00:43:54.462870+00:00",
+      "action": "graduated",
+      "reviewer": "learn.py",
+      "notes": "Elimina pantallas intermedias redundantes estilo Werewolf y previene bucles infinitos de redireccion si el navegador bloquea cookies",
+      "provisional": false,
+      "evidence_snapshot": [
+        "2026-09-11T00:43:54.362288+00:00"
+      ],
+      "lessons_sha": "e3e7bfcac1e4"
+    }
+  ],
+  "rejection_count": 0,
+  "accepted_at": "2026-09-11T00:43:54.462862+00:00",
+  "reviewer": "learn.py",
+  "rationale": "Elimina pantallas intermedias redundantes estilo Werewolf y previene bucles infinitos de redireccion si el navegador bloquea cookies"
+}
