@@ -12,7 +12,7 @@ At the beginning of any non-trivial task, or when resuming work after a possible
 2. Check if the Graphify graph is stale (compare last graph build time vs latest file modifications if possible).
 3. If significant changes are detected, briefly acknowledge them and update your understanding before proceeding.
 4. Prefer reading the current state of files + Graphify over assuming previous knowledge is still fully valid.
-When you make important architectural or behavioral changes, briefly record them in the shared wiki/SecondBrain (`docs/DECISIONS.md`) so other tools and agents can find them later.
+When you make important architectural or behavioral changes, record them in the structured SecondBrain wiki (`SecondBrain/wiki/decisions/<id>-<name>.md` and `SecondBrain/wiki/index.md`) and mirror them in `docs/DECISIONS.md`. Graduate distilled lessons with `python .agent/tools/learn.py`.
 
 ## 2. Graphify Knowledge Graph
 This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and cross-file relationships.

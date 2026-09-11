@@ -6,22 +6,22 @@ Cualquier IA o Agente (Antigravity, Claude, Codex, etc.) que opere en este repos
 
 ---
 
-## 0. Brain & Memoria Compartida (.agent/)
-Este proyecto utiliza el cerebro portátil unificado de **agentic-stack**.
+## 0. Brain & Memoria Compartida (.agent/ & SecondBrain/)
+Este proyecto utiliza el cerebro portátil unificado de **agentic-stack** junto a la wiki de **SecondBrain/**:
 - **Startup**:
   1. `.agent/AGENTS.md` — Mapa y arquitectura del brain.
   2. `.agent/memory/personal/PREFERENCES.md` — Convenciones y estilo.
   3. `.agent/memory/semantic/LESSONS.md` — Lecciones destiladas compartidas.
   4. `.agent/protocols/permissions.md` — Reglas estrictas de ejecución.
-  5. `SecondBrain/` — Wiki estructurada de conocimiento y decisiones (`docs/DECISIONS.md`).
+  5. `SecondBrain/wiki/index.md` — Wiki estructurada de conocimiento, decisiones (`SecondBrain/wiki/decisions/`) y lecciones (`SecondBrain/wiki/lessons/`).
+  6. `docs/DECISIONS.md` — Registro cronológico y espejo de decisiones de diseño.
 - **Recall antes de tareas no triviales**:
   ```bash
   python .agent/tools/recall.py "<descripción de la tarea>"
   ```
-- **Registro rápido de aprendizajes**:
-  ```bash
-  python .agent/tools/learn.py "<regla/lección>" --rationale "<motivo>"
-  ```
+- **Registro obligatorio de aprendizajes y decisiones**:
+  - Lección/Bug: `python .agent/tools/learn.py "<regla/lección>" --rationale "<motivo>"` y documentar en `SecondBrain/wiki/lessons/`.
+  - Decisión arquitectónica/diseño: crear `SecondBrain/wiki/decisions/<id>-<nombre>.md`, enlazar en `SecondBrain/wiki/index.md` y reflejar en `docs/DECISIONS.md`.
 
 ---
 
@@ -46,23 +46,26 @@ El usuario practica **vibe-coding** (desarrollo ágil orientado a objetivos sin 
 
 ---
 
-## 2. Comandos de Verificación Local
-Antes de dar por finalizada cualquier tarea de código, ejecuta siempre:
-```bash
-python -m py_compile main.py webserver.py
-python scripts/safeguards_test.py
-```
-
-Si el frontend fue modificado, valida sintaxis HTML/CSS y coherencia de enlaces limpios (`/dashboard`, `/cambios`, `/privacy`, `/terms`).
-
----
-
-## 3. Despliegue y Política de Commit + Push
-1. **Commit + Push Automático por Defecto**:
-   - Una vez que los cambios estén implementados y verificados con las pruebas locales, **haz `git commit` y `git push origin main` automáticamente**.
+## 2. Checklist de Cierre Obligatorio (Antes de Commit y Push)
+Antes de dar por finalizada cualquier tarea de código, ejecuta estrictamente en este orden:
+1. **Verificación y Pruebas Locales**:
+   ```bash
+   python -m py_compile main.py webserver.py
+   python scripts/safeguards_test.py
+   python -m unittest discover -s scripts -p "test_dashboard_*.py"
+   ```
+   Si el frontend fue modificado, valida sintaxis HTML/CSS y coherencia de enlaces limpios (`/dashboard`, `/cambios`, `/privacy`, `/terms`).
+2. **Cierre de Ciclo de Memoria (SecondBrain y .agent/)**:
+   - Si hubo cambios arquitectónicos o decisiones de diseño: redactar ADR en `SecondBrain/wiki/decisions/<id>-<tema>.md`, enlazarlo en `SecondBrain/wiki/index.md` y reflejarlo en `docs/DECISIONS.md`.
+   - Si se descubrió un bug, comportamiento de API (Discord/Supabase/etc.) o regla operativa: ejecutar `python .agent/tools/learn.py "<regla>" --rationale "<motivo>"` y documentar en `SecondBrain/wiki/lessons/`.
+3. **Sincronización del Knowledge Graph**:
+   ```bash
+   python -m graphify extract . --code-only
+   ```
+4. **Despliegue y Política de Commit + Push**:
+   - Una vez verificados los pasos 1, 2 y 3, **haz `git commit` y `git push origin main` automáticamente**.
    - Render despliega automáticamente el backend del bot y Vercel despliega el frontend.
-2. **Excepción (Modo Mantenimiento / Pausa)**:
-   - Si el usuario indica expresamente: *"no hagas commit/push"*, *"espera"* o menciona que está en *"mantenimiento"*, **NO hagas push**. Mantén los cambios en local o en una rama y solicita confirmación antes de cualquier push remoto.
+   - *Excepción (Modo Mantenimiento / Pausa)*: Si el usuario indica expresamente: *"no hagas commit/push"*, *"espera"* o menciona que está en *"mantenimiento"*, **NO hagas push**. Mantén los cambios en local o en una rama y solicita confirmación antes de cualquier push remoto.
 
 ---
 
@@ -103,7 +106,7 @@ At the beginning of any non-trivial task, or when resuming work after a possible
 2. Check if the Graphify graph is stale (compare last graph build time vs latest file modifications if possible).
 3. If significant changes are detected, briefly acknowledge them and update your understanding before proceeding.
 4. Prefer reading the current state of files + Graphify over assuming previous knowledge is still fully valid.
-When you make important architectural or behavioral changes, briefly record them in the shared wiki/SecondBrain (`docs/DECISIONS.md`) so other tools and agents can find them later.
+When you make important architectural or behavioral changes, record them in the structured SecondBrain wiki (`SecondBrain/wiki/decisions/<id>-<name>.md` and `SecondBrain/wiki/index.md`) and mirror them in `docs/DECISIONS.md` so other tools and agents can find them later.
 
 ---
 
