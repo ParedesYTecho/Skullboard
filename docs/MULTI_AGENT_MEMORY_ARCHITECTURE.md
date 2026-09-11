@@ -9,7 +9,7 @@ Este documento describe la arquitectura técnica, historia de evolución y funci
 ### 1.1 El Contexto Original
 En flujos de trabajo avanzados de desarrollo asistido por IA (con decenas de miles de turnos de conversación y miles de millones de tokens consumidos), emergen tres problemas críticos:
 1. **Amnesia Cruzada entre Herramientas**: Cada herramienta (Codex, Antigravity, Claude Code) tiene su propio almacén de contexto. Al saltar de una a otra para aprovechar sus fortalezas específicas, el usuario se ve obligado a re-explicar la arquitectura, las decisiones pasadas, las normas de estilo y las trampas ya resueltas.
-2. **Exploración Ciega y Consumo Desbocado de Tokens**: Los agentes tradicionales ejecutan búsquedas masivas (grep, ind, o lectura completa de archivos fuente de 500-2000 líneas). Esto consume entre 30.000 y 80.000 tokens por turno, agotando las ventanas de cuota (límites de 5 horas o cuotas diarias de API) en apenas dos o tres auditorías.
+2. **Exploración Ciega y Consumo Desbocado de Tokens**: Los agentes tradicionales ejecutan búsquedas masivas (grep, find, o lectura completa de archivos fuente de 500-2000 líneas). Esto consume entre 30.000 y 80.000 tokens por turno, agotando las ventanas de cuota (límites de 5 horas o cuotas diarias de API) en apenas dos o tres auditorías.
 3. **Desincronización de Estado entre Editores**: Cuando un agente o editor modifica un archivo, otro agente en una sesión nueva asume el estado que tenía en su conocimiento previo, produciendo código desalineado, sobreescritura de cambios y regresiones silenciosas.
 
 ---
@@ -18,7 +18,7 @@ En flujos de trabajo avanzados de desarrollo asistido por IA (con decenas de mil
 
 Para erradicar estos problemas, el sistema se estructura sobre cuatro pilares interconectados:
 
-`mermaid
+```mermaid
 graph TD
     A[Agentes: Antigravity / Codex / Claude / Cursor] --> B[Pilar 1: Agentic Stack Runtime .agent/]
     A --> C[Pilar 2: SecondBrain Wiki Humano + LLM]
@@ -39,7 +39,7 @@ graph TD
     E --> E1[Caveman Mode -60% tokens salida]
     E --> E2[Change Awareness git status + diff]
     E --> E3[Checklist Cierre Obligatorio]
-`
+```
 
 ---
 
@@ -47,7 +47,7 @@ graph TD
 Originado en la suite de *agentic-stack* (codejunkie99/agentic-stack), este directorio actúa como el motor de memoria en tiempo de ejecución:
 - **Memoria Episódica (.agent/memory/episodic/AGENT_LEARNINGS.jsonl)**: Registro cronológico de acciones, intenciones y desenlaces generado mediante .agent/tools/memory_reflect.py.
 - **Memoria Semántica (.agent/memory/semantic/lessons.jsonl y LESSONS.md)**: Base de datos estructurada de reglas y patrones destilados. LESSONS.md nunca se edita a mano: se compila automáticamente al graduar lecciones.
-- **Ciclo de Sueño y Graduación (uto_dream.py, candidates/, graduate.py, learn.py)**:
+- **Ciclo de Sueño y Graduación (auto_dream.py, candidates/, graduate.py, learn.py)**:
   - Las lecciones candidatas se agrupan por vocabulario común y saliencia.
   - Para enseñar una regla inmediata: python .agent/tools/learn.py "<regla>" --rationale "<por qué>".
 - **Recall Proactivo (python .agent/tools/recall.py "<intención>")**:
@@ -61,7 +61,7 @@ Originado en la suite de *agentic-stack* (codejunkie99/agentic-stack), este dire
 ### Pilar 2: SecondBrain (SecondBrain/) — La Wiki Curada y Auditada
 A diferencia del runtime de .agent/, SecondBrain/ es una base de conocimiento legible tanto por humanos como por agentes, estructurada como una wiki de arquitectura:
 - **Estructura Estándar**:
-  `	ext
+  ```text
   SecondBrain/
   ├── README.md               # Explicación del almacén
   ├── AGENTS.md               # Contrato de operación para agentes
@@ -74,7 +74,7 @@ A diferencia del runtime de .agent/, SecondBrain/ es una base de conocimiento le
       ├── lessons/            # Lecciones de bugs y comportamiento de APIs externas
       ├── workflows/          # Procedimientos probados (deploy, change awareness)
       └── operations/         # Manuales de mantenimiento, consulta e ingesta
-  `
+  ```
 - **Principio de Localidad (Por Proyecto, No Global)**:
   - Inicialmente se intentó apuntar a un SecondBrain global en C:\Users\Fer\SecondBrain.
   - **Lección aprendida**: Un almacén global mezcla reglas de bots de Discord con proyectos personales o scripts de automatización. Cada repositorio DEBE tener su propio SecondBrain/ local en la raíz.
@@ -116,18 +116,18 @@ Las reglas no dependen de la memoria volátil del chat ni de que el usuario las 
 
 ### 3.1 La Trampa de Codificación Windows (CP1252 vs UTF-8)
 - **Problema**: En sistemas Windows, Python inicializa sys.stdout con la página de códigos local de Windows (típicamente cp1252). Las herramientas de Agentic Stack emitían caracteres tipográficos como → (\u2192), cajas ANSI o em-dashes —.
-- **Consecuencia**: ecall.py, graduate.py y show.py fallaban silenciosamente con UnicodeEncodeError: 'charmap' codec can't encode character '\u2192', impidiendo que los agentes graduaran o recuperaran lecciones.
+- **Consecuencia**: recall.py, graduate.py y show.py fallaban silenciosamente con UnicodeEncodeError: 'charmap' codec can't encode character '\u2192', impidiendo que los agentes graduaran o recuperaran lecciones.
 - **Solución Definitiva**: Inyección de reconfiguración segura al inicio de cada script en .agent/tools/:
-  `python
+  ```python
   if hasattr(sys.stdout, "reconfigure"):
       sys.stdout.reconfigure(encoding="utf-8", errors="replace")
   if hasattr(sys.stderr, "reconfigure"):
       sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-  `
+  ```
 
 ### 3.2 Concurrencia fcntl en Windows
-- **Problema**: gentic-stack utiliza primitivas POSIX cntl para bloqueo de escritura concurrente en lessons.jsonl.
-- **Comportamiento**: En Windows cntl no existe de forma nativa. Se emite un RuntimeWarning no bloqueante pero seguro para entornos de desarrollo personal monousuario.
+- **Problema**: Agentic Stack utiliza primitivas POSIX fcntl para bloqueo de escritura concurrente en lessons.jsonl.
+- **Comportamiento**: En Windows fcntl no existe de forma nativa. Se emite un RuntimeWarning no bloqueante pero seguro para entornos de desarrollo personal monousuario.
 
 ### 3.3 Ambigüedad entre docs/DECISIONS.md y SecondBrain/wiki/
 - **Problema**: Las directivas antiguas indicaban genéricamente "registra en docs/DECISIONS.md". Los agentes asumían que ese único archivo era todo el SecondBrain y nunca creaban ni consultaban SecondBrain/wiki/decisions/.
