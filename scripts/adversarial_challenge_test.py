@@ -51,6 +51,10 @@ if "flask" not in sys.modules:
             self.name = name
             self.routes = {}
             self.after_request_funcs = []
+            self.before_request_funcs = []
+        def before_request(self, f):
+            self.before_request_funcs.append(f)
+            return f
         def after_request(self, f):
             self.after_request_funcs.append(f)
             return f
@@ -76,6 +80,14 @@ if "flask" not in sys.modules:
         m.json = data
         return m
     mock_flask.jsonify = mock_jsonify
+    def mock_make_response(rv=None):
+        m = MagicMock()
+        m.set_cookie = MagicMock()
+        m.delete_cookie = MagicMock()
+        m.headers = {}
+        m.data = rv
+        return m
+    mock_flask.make_response = mock_make_response
     sys.modules["flask"] = mock_flask
 
 if "requests" not in sys.modules:
