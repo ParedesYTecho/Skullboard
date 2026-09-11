@@ -1,9 +1,13 @@
-﻿# SecondBrain Wiki Index
+# SecondBrain Wiki Index
 
 Shared knowledge index for Skullboard and AI coding agents.
 
 ## Projects
 - [Skullboard Core Project](projects/skullboard.md) — Architecture, tech stack, and components.
+
+## Guías y Arquitectura Multi-IA
+- [Arquitectura del Sistema de Memoria Compartida](../../docs/MULTI_AGENT_MEMORY_ARCHITECTURE.md) — Explicación técnica de la memoria, orquestación y conexión entre herramientas.
+- [Guía de Onboarding para Nuevas IAs](../../docs/NEW_AGENT_ONBOARDING_GUIDE.md) — Manual de inmersión rápida y réplica desde cero.
 
 ## Decisions (ADRs)
 - [ADR-001: Agentic Stack & Shared Memory Integration](decisions/001-agentic-stack-setup.md) — Unified portable memory bridge between Antigravity, Codex, and Cursor.
