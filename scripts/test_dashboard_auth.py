@@ -359,10 +359,11 @@ class DashboardAuthTests(unittest.TestCase):
         self.assertIn("Abriendo Discord", frontend)
         self.assertIn("pageshow", frontend)
 
-    def test_frontend_exposes_explicit_discord_disconnect_action(self):
+    def test_frontend_exposes_clean_logout_action(self):
         frontend = (ROOT / "legal/dashboard.html").read_text(encoding="utf-8")
-        self.assertIn("btn-dropdown-disconnect", frontend)
-        self.assertIn("/api/auth/disconnect", frontend)
+        self.assertIn("btn-dropdown-logout", frontend)
+        self.assertIn("/api/auth/logout", frontend)
+        self.assertNotIn("btn-dropdown-disconnect", frontend)
 
     def test_settings_save_waits_for_dirty_loaded_form(self):
         frontend = (ROOT / "legal/dashboard.html").read_text(encoding="utf-8")

@@ -1379,10 +1379,6 @@
                             <svg class="dropdown-item-icon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
                             <span>Cerrar sesión</span>
                         </button>
-                        <button type="button" class="user-dropdown-item item-disconnect" id="btn-dropdown-disconnect">
-                            <svg class="dropdown-item-icon" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 3v9m6.36-6.36a9 9 0 1 1-12.72 0"/></svg>
-                            <span>Desconectar Discord</span>
-                        </button>
                     </div>
                 </div>
             `;
@@ -1433,28 +1429,6 @@
                     } catch (e) {
                         btnDropdownLogout.disabled = false;
                         showToast('No se pudo cerrar sesión. Inténtalo de nuevo.', '❌');
-                    }
-                });
-            }
-
-            const btnDropdownDisconnect = document.getElementById('btn-dropdown-disconnect');
-            if (btnDropdownDisconnect) {
-                btnDropdownDisconnect.addEventListener('click', async () => {
-                    btnDropdownDisconnect.disabled = true;
-                    try {
-                        const res = await fetch(`${API_BASE}/api/auth/disconnect`, {
-                            method: 'POST',
-                            credentials: 'include',
-                            headers: { 'X-CSRF-Token': csrfToken }
-                        });
-                        const data = await res.json();
-                        if (!res.ok || !data.ok) throw new Error(data.error || 'disconnect_failed');
-                        storageRemove('localStorage', 'skb_last_guild_id');
-                        storageRemove('sessionStorage', OAUTH_STATE_KEY);
-                        window.location.href = '/?disconnected=1';
-                    } catch (e) {
-                        btnDropdownDisconnect.disabled = false;
-                        showToast(e.message || 'No se pudo desconectar Discord.', '❌');
                     }
                 });
             }
