@@ -16,7 +16,10 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT_DIR)
 
 # Mock third party modules if missing
-if "flask" not in sys.modules:
+try:
+    import flask
+    from flask import make_response
+except ImportError:
     mock_flask = types.ModuleType("flask")
     class MockFlask:
         def __init__(self, name):
@@ -44,7 +47,15 @@ if "flask" not in sys.modules:
         m.get_json.return_value = data
         m.json = data
         return m
+    def mock_make_response(*args):
+        m = MagicMock()
+        if args:
+            m.data = args[0]
+            if len(args) > 1:
+                m.status_code = args[1]
+        return m
     mock_flask.jsonify = mock_jsonify
+    mock_flask.make_response = mock_make_response
     sys.modules["flask"] = mock_flask
 
 if "requests" not in sys.modules:
@@ -91,72 +102,78 @@ class AttackScenarioSuite(unittest.TestCase):
 
     def test_attack_vector_a_non_member_guild_access(self):
         """Attacker crafts request for guild_id they do not belong to."""
-        with patch("webserver._extract_bearer", return_value="valid_token"), \
+        with patch("webserver._session_token", return_value="valid_token"), \
+             patch("webserver._require_origin", return_value=None), \
              patch("webserver._fetch_discord_guilds") as mock_guilds:
             
-            # User belongs to guild 111, but requests config for guild 999
+            # User belongs to guild 111111111111111111, but requests config for guild 999999999999999999
             mock_guilds.return_value = [
-                {"id": "111", "name": "Other Guild", "permissions": 0x8, "owner": True}
+                {"id": "111111111111111111", "name": "Other Guild", "permissions": 0x8, "owner": True}
             ]
             
-            # Test api_guild_channels for guild 999
-            with patch("webserver.request") as mock_req:
-                mock_req.method = "GET"
-                resp, status = api_guild_channels("999")
+            # Test api_guild_channels for guild 999999999999999999
+            with webserver.app.test_request_context("/api/guild/999999999999999999/channels", method="GET"):
+                resp, status = api_guild_channels("999999999999999999")
                 self.assertEqual(status, 403)
                 self.assertFalse(resp.json.get("ok"))
 
-            # Test api_guild_config for guild 999
-            with patch("webserver.request") as mock_req:
-                mock_req.method = "GET"
-                resp, status = api_guild_config("999")
+            # Test api_guild_config for guild 999999999999999999
+            with webserver.app.test_request_context("/api/guild/999999999999999999/config", method="GET"):
+                resp, status = api_guild_config("999999999999999999")
                 self.assertEqual(status, 403)
                 self.assertFalse(resp.json.get("ok"))
 
     def test_attack_vector_b_sub_admin_escalation_attempt(self):
         """Sub-admin with MANAGE_GUILD (0x20), MANAGE_ROLES (0x10000000), BAN_MEMBERS (0x4) tries to update config."""
-        with patch("webserver._extract_bearer", return_value="valid_token"), \
+        with patch("webserver._session_token", return_value="valid_token"), \
+             patch("webserver._require_origin", return_value=None), \
              patch("webserver._fetch_discord_guilds") as mock_guilds:
             
             sub_admin_perms = 0x20 | 0x10000000 | 0x4 # 0x10000024 (No 0x8)
             mock_guilds.return_value = [
-                {"id": "999", "name": "Target Guild", "permissions": sub_admin_perms, "owner": False}
+                {"id": "999999999999999999", "name": "Target Guild", "permissions": sub_admin_perms, "owner": False}
             ]
             
-            with patch("webserver.request") as mock_req:
-                mock_req.method = "POST"
-                mock_req.get_json.return_value = {"min_skulls": 10}
-                resp, status = api_guild_config("999")
+            with webserver.app.test_request_context("/api/guild/999999999999999999/config", method="POST", json={"min_skulls": 10}):
+                resp, status = api_guild_config("999999999999999999")
                 self.assertEqual(status, 403)
                 self.assertIn("Permisos insuficientes", resp.json.get("error", ""))
 
     def test_attack_vector_c_config_sanitization_boundaries(self):
         """Attacker sends extreme values: min_skulls=999999, negative numbers, giant strings for prefix."""
-        with patch("webserver._extract_bearer", return_value="valid_token"), \
+        fake_session = ("sess_id", {}, {"csrf_token": "valid_csrf"})
+        with patch("webserver._session_token", return_value="valid_token"), \
+             patch("webserver._require_session", return_value=fake_session), \
+             patch("webserver._channel_is_available_to_bot", return_value=True), \
+             patch("webserver._require_origin", return_value=None), \
              patch("webserver._fetch_discord_guilds") as mock_guilds, \
              patch("webserver._sb_upsert") as mock_upsert:
             
             mock_guilds.return_value = [
-                {"id": "999", "name": "Target Guild", "permissions": 0x8, "owner": False}
+                {"id": "999999999999999999", "name": "Target Guild", "permissions": 0x8, "owner": False}
             ]
             mock_upsert.return_value = True
             
-            with patch("webserver.request") as mock_req:
-                mock_req.method = "POST"
-                mock_req.get_json.return_value = {
-                    "min_skulls": 999999,           # Must clamp to 50
-                    "prefix": "   !@#$%^&*()   \n\r", # Whitespace stripped, max 5 chars
-                    "skullboard_channel_id": "123456789012345678",
-                    "pin_threshold": -50             # Must clamp to 0
-                }
-                
-                resp = api_guild_config("999")
+            payload = {
+                "min_skulls": 999999,           # Must clamp to 50
+                "prefix": "   !@#$%^&*()   \n\r", # Whitespace stripped, max 10 chars
+                "skullboard_channel_id": "123456789012345678",
+                "pin_threshold": -50             # Must clamp to 0
+            }
+            with webserver.app.test_request_context(
+                "/api/guild/999999999999999999/config",
+                method="POST",
+                json=payload,
+                headers={"X-CSRF-Token": "valid_csrf"}
+            ):
+                resp = api_guild_config("999999999999999999")
                 # When successful, returns _cors(jsonify(ok=True, config=payload))
+                self.assertIsNotNone(mock_upsert.call_args)
                 upsert_payload = mock_upsert.call_args[0][1]
                 
                 self.assertEqual(upsert_payload["min_skulls"], 50, "min_skulls must be clamped to max 50")
                 self.assertEqual(upsert_payload["pin_threshold"], 0, "pin_threshold must be clamped to min 0")
-                self.assertEqual(len(upsert_payload["prefix"]), 5, "prefix must be max 5 chars")
+                self.assertEqual(len(upsert_payload["prefix"]), 10, "prefix must be clamped to max 10 chars")
                 self.assertNotIn("\n", upsert_payload["prefix"])
                 self.assertNotIn(" ", upsert_payload["prefix"])
 

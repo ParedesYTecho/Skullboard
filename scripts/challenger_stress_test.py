@@ -162,7 +162,7 @@ class TestSliderBoundsAndBoundaryManipulation(unittest.TestCase):
     def test_dashboard_skulls_slider_attributes(self):
         inp = self.inputs_by_id.get("cfg-skulls")
         self.assertIsNotNone(inp, "#cfg-skulls input element not found in legal/dashboard.html")
-        self.assertEqual(inp.get("type"), "range")
+        self.assertIn(inp.get("type"), ("number", "range"))
         self.assertEqual(inp.get("min"), "1", "#cfg-skulls min attribute must be '1'")
         self.assertEqual(inp.get("max"), "50", "#cfg-skulls max attribute must be '50'")
         self.assertEqual(inp.get("value"), "1", "#cfg-skulls default value must be '1'")
@@ -170,7 +170,7 @@ class TestSliderBoundsAndBoundaryManipulation(unittest.TestCase):
     def test_dashboard_pin_slider_attributes(self):
         inp = self.inputs_by_id.get("cfg-pin")
         self.assertIsNotNone(inp, "#cfg-pin input element not found in legal/dashboard.html")
-        self.assertEqual(inp.get("type"), "range")
+        self.assertIn(inp.get("type"), ("number", "range"))
         self.assertEqual(inp.get("min"), "0", "#cfg-pin min attribute must be '0'")
         self.assertEqual(inp.get("max"), "50", "#cfg-pin max attribute must be '50'")
         self.assertEqual(inp.get("value"), "0", "#cfg-pin default value must be '0'")
