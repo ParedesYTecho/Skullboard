@@ -123,8 +123,8 @@ Rules:
 - Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when query/path/explain do not surface enough context.
 - After modifying code, run `python -m graphify extract . --code-only` or git commit (git hooks auto-update) to keep the graph current.
 
-## 9. Preset Plus Luna-max y gate de delegación
-- Root/orchestrator: `gpt-5.6-luna` + `max` via `.codex/config.toml`.
+## 9. Modelo raíz libre y gate de delegación
+- Root/orchestrator: modelo y reasoning elegidos por usuario; no fijar ambos en `.codex/config.toml`.
 - `explorer`, `worker`, `tester`, `researcher`: `gpt-5.6-luna` + `medium`.
 - `reviewer`: `gpt-6-astra` + `low`; usar solo con riesgo material.
 - Máximo 3 hilos de subagente por sesión. Nunca subir root a Astra.
