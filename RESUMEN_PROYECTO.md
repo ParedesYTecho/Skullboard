@@ -1,4 +1,4 @@
-# 💀 PROJECT_SUMMARY.md — Documento Maestro de Contexto Técnico Definitivo
+# 💀 RESUMEN_PROYECTO.md — Documento Maestro de Contexto Técnico Definitivo
 
 > **ESTADO DEL SISTEMA:** PRODUCCIÓN / VIVO  
 > **VERSIÓN ARQUITECTÓNICA:** v2.5.2 (AutoShardedBot, Dashboard OAuth2 Cifrado Fernet, Sapphire Multi-column Footer, Status API en Vivo, Knowledge Graph AST, 100% Suites de Pruebas Aprobadas)  
