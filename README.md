@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servidores&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Servidores donde SkullBoard está instalado ahora mismo (dato en vivo)">
   <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.members&label=miembros&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Suma de miembros de esos servidores (dato en vivo)">
   <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstats&query=%24.commands&label=comandos&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Comandos disponibles (dato en vivo)">
-  <img src="https://img.shields.io/github/v/release/ParedesYTecho/Skullboard?label=versión&color=c9caff&labelColor=131318&style=flat-square" alt="Última versión publicada">
+  <img src="https://img.shields.io/github/v/release/ParedesYTecho/Skullboard?label=versi%C3%B3n&color=c9caff&labelColor=131318&style=flat-square" alt="Última versión publicada">
   <br>
   <sub>Datos en vivo del bot. Los miembros suman todos los servidores, incluidos bots y personas que están en varios.</sub>
 </p>
