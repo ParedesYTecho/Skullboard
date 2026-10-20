@@ -15,7 +15,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servers+running+SkullBoard&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Servers where SkullBoard is installed right now (live data)">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servers&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Servers where SkullBoard is installed right now (live data)">
+  &nbsp;
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.members&label=members&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Total members across those servers (live data)">
+  <br>
+  <sub>Live data from the bot. Members add up every server, including bots and people who are in several.</sub>
 </p>
 
 SkullBoard is a Discord bot for communities that already use the 💀 reaction as applause. When a message collects enough skulls, the bot copies it into a channel of its own: the server's hall of fame. It also keeps score. It knows who has the most skulls, which messages were the most voted this month and this year, and what the current record is.

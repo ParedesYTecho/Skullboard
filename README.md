@@ -15,7 +15,11 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servidores+con+SkullBoard&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Servidores donde SkullBoard está instalado ahora mismo (dato en vivo)">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servidores&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Servidores donde SkullBoard está instalado ahora mismo (dato en vivo)">
+  &nbsp;
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.members&label=miembros&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Suma de miembros de esos servidores (dato en vivo)">
+  <br>
+  <sub>Datos en vivo del bot. Los miembros suman todos los servidores, incluidos bots y personas que están en varios.</sub>
 </p>
 
 SkullBoard es un bot de Discord para comunidades que ya usan la reacción 💀 como aplauso. Cuando un mensaje reúne suficientes calaveras, el bot lo copia en un canal propio: el tablón de honor del servidor. También lleva la cuenta. Sabe quién acumula más, cuáles son los mensajes más votados del mes y del año, y cuál es el récord actual.
