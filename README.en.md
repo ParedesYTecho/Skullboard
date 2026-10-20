@@ -16,8 +16,9 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servers&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Servers where SkullBoard is installed right now (live data)">
-  &nbsp;
   <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.members&label=members&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Total members across those servers (live data)">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstats&query=%24.commands&label=commands&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Available commands (live data)">
+  <img src="https://img.shields.io/github/v/release/ParedesYTecho/Skullboard?label=version&color=c9caff&labelColor=131318&style=flat-square" alt="Latest published version">
   <br>
   <sub>Live data from the bot. Members add up every server, including bots and people who are in several.</sub>
 </p>
@@ -64,6 +65,40 @@ Screenshots use demo data. Left: a server's ranking. Right: the settings page, v
 3. Set how many skulls are needed with `/set_min`. One is enough by default.
 
 That is all it needs. `/setup_pin`, `/ignore` and `/prefix` are optional, and everything can also be changed from the [dashboard](https://skullboard.vercel.app/dashboard).
+
+## FAQ
+
+<details>
+<summary>Which permissions does the bot ask for?</summary>
+
+View channels, send messages (including in threads), embed links, attach files, read message history and use application commands. Auto-pin also needs the ability to pin messages in the board channel.
+</details>
+
+<details>
+<summary>Does it store my messages?</summary>
+
+No. It stores server, channel, message and author identifiers, the skull count and the server's settings. Message text stays on Discord. More in the [privacy policy](https://skullboard.vercel.app/privacy) (Spanish).
+</details>
+
+<details>
+<summary>How much does it cost?</summary>
+
+It is free.
+</details>
+
+<details>
+<summary>Where do I ask for help or suggest something?</summary>
+
+Use the contact form on the [website](https://skullboard.vercel.app/#contacto).
+</details>
+
+## What's new
+
+- `v2.6.0` (12 Sep 2026): redesigned website and dashboard, with search, filters and per-server settings drafts.
+- `v2.5.1` (3 Sep 2026): live system status and a leaderboard with avatars and message links.
+- `v2.5.0` (1 Sep 2026): dashboard with Discord login and settings from the browser.
+
+Every version is in the [changelog](CHANGELOG.md) (Spanish) and the [releases](https://github.com/ParedesYTecho/Skullboard/releases).
 
 ## Behind the bot
 

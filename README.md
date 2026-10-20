@@ -16,8 +16,9 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servidores&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Servidores donde SkullBoard está instalado ahora mismo (dato en vivo)">
-  &nbsp;
   <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.members&label=miembros&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Suma de miembros de esos servidores (dato en vivo)">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstats&query=%24.commands&label=comandos&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Comandos disponibles (dato en vivo)">
+  <img src="https://img.shields.io/github/v/release/ParedesYTecho/Skullboard?label=versión&color=c9caff&labelColor=131318&style=flat-square" alt="Última versión publicada">
   <br>
   <sub>Datos en vivo del bot. Los miembros suman todos los servidores, incluidos bots y personas que están en varios.</sub>
 </p>
@@ -62,6 +63,40 @@ Capturas con datos de demostración. A la izquierda, el ranking de un servidor. 
 3. Ajusta cuántas calaveras hacen falta con `/set_min`. Por defecto basta una.
 
 Con eso ya funciona. `/setup_pin`, `/ignore` y `/prefix` son opcionales, y todo se puede cambiar también desde el [dashboard](https://skullboard.vercel.app/dashboard).
+
+## Preguntas frecuentes
+
+<details>
+<summary>¿Qué permisos pide el bot?</summary>
+
+Ver canales, enviar mensajes (también en hilos), insertar enlaces, adjuntar archivos, leer el historial y usar comandos de aplicación. Para el auto-pin necesita además poder fijar mensajes en el canal del tablón.
+</details>
+
+<details>
+<summary>¿Guarda mis mensajes?</summary>
+
+No. Guarda identificadores de servidor, canal, mensaje y autor, el recuento de calaveras y la configuración del servidor. El texto de los mensajes se queda en Discord. Más detalles en la [política de privacidad](https://skullboard.vercel.app/privacy).
+</details>
+
+<details>
+<summary>¿Cuánto cuesta?</summary>
+
+Es gratis.
+</details>
+
+<details>
+<summary>¿Dónde pido ayuda o propongo algo?</summary>
+
+En el formulario de contacto de la [web](https://skullboard.vercel.app/#contacto).
+</details>
+
+## Novedades
+
+- `v2.6.0` (12 sep 2026): web y dashboard rediseñados, con búsqueda, filtros y borradores de ajustes por servidor.
+- `v2.5.1` (3 sep 2026): estado del sistema en vivo y leaderboard con avatares y enlaces al mensaje.
+- `v2.5.0` (1 sep 2026): dashboard con inicio de sesión de Discord y ajustes desde el navegador.
+
+Todas las versiones están en el [historial de cambios](CHANGELOG.md) y en las [releases](https://github.com/ParedesYTecho/Skullboard/releases).
 
 ## Detrás del bot
 
