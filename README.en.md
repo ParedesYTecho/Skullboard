@@ -36,23 +36,24 @@ Someone reacts to a message with 💀. If the count reaches the threshold the se
 
 ## What it includes
 
-- Automatic board, with optional auto-pin for messages that reach a higher threshold.
-- Per-server rankings: users with the most skulls, most voted messages, and monthly and yearly tops.
-- Per-server settings: destination channel, threshold, command prefix and ignored channels.
-- Direct-message notice to the author when their message makes it to the board. Each user can turn it off with `/notify`.
-- Web dashboard with Discord login, to browse rankings and, for administrators, change settings without typing commands.
-- Slash and text commands: 22 in total, [listed on the website](https://skullboard.vercel.app/#comandos).
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Automatic board</b><br><sub>Copies messages that reach the threshold. Optional auto-pin for the most voted.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Most voted users and messages for each server, with monthly and yearly tops.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Per-server settings</b><br><sub>Channel, threshold, prefix and ignored channels, server by server.</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Author notice</b><br><sub>Direct message when their message enters the board. Turn it off with <code>/notify</code>.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Web dashboard</b><br><sub>Log in with Discord, browse rankings and, if you administer, change settings.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 commands</b><br><sub>Slash and text. The full list is on <a href="https://skullboard.vercel.app/#comandos">the website</a>.</sub></td>
+  </tr>
+</table>
 
 SkullBoard stores identifiers and counters. It does not store message text. Details are in the [privacy policy](https://skullboard.vercel.app/privacy) (Spanish).
 
 ## Dashboard
 
-<table>
-  <tr>
-    <td width="50%"><img src="assets/screens/dashboard-ranking.png" alt="User ranking of a demo server"></td>
-    <td width="50%"><img src="assets/screens/dashboard-ajustes.png" alt="Settings screen of a demo server"></td>
-  </tr>
-</table>
+<img src="assets/screens/dashboard-duo.png" alt="Dashboard ranking and settings with demo data" width="100%">
 
 Screenshots use demo data. Left: a server's ranking. Right: the settings page, visible to administrators only.
 

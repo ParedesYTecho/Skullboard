@@ -34,23 +34,24 @@ Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha
 
 ## Qué incluye
 
-- Tablón automático, con auto-pin opcional para fijar los mensajes que llegan a un umbral más alto.
-- Rankings por servidor: usuarios con más calaveras, mensajes más votados y tops del mes y del año.
-- Configuración propia en cada servidor: canal de destino, umbral, prefijo de comandos y canales que no cuentan.
-- Aviso por mensaje directo al autor cuando su mensaje entra en el tablón. Cada usuario puede desactivarlo con `/notify`.
-- Dashboard web con inicio de sesión de Discord, para consultar rankings y, si eres administrador, cambiar la configuración sin escribir comandos.
-- Comandos slash y de texto: 22 en total, [listados en la web](https://skullboard.vercel.app/#comandos).
+<table>
+  <tr>
+    <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Tablón automático</b><br><sub>Copia los mensajes que alcanzan el umbral. Auto-pin opcional para los más votados.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Usuarios y mensajes más votados de cada servidor, con tops del mes y del año.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Configuración propia</b><br><sub>Canal, umbral, prefijo y canales ignorados, servidor por servidor.</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Aviso al autor</b><br><sub>Mensaje directo cuando su mensaje entra en el tablón. Se desactiva con <code>/notify</code>.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Dashboard web</b><br><sub>Inicia sesión con Discord, consulta rankings y, si administras, cambia los ajustes.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 comandos</b><br><sub>Slash y de texto. La lista completa está en <a href="https://skullboard.vercel.app/#comandos">la web</a>.</sub></td>
+  </tr>
+</table>
 
 SkullBoard guarda identificadores y contadores. No guarda el texto de los mensajes. Los detalles están en la [política de privacidad](https://skullboard.vercel.app/privacy).
 
 ## Dashboard
 
-<table>
-  <tr>
-    <td width="50%"><img src="assets/screens/dashboard-ranking.png" alt="Ranking de usuarios de un servidor de demostración"></td>
-    <td width="50%"><img src="assets/screens/dashboard-ajustes.png" alt="Pantalla de ajustes de un servidor de demostración"></td>
-  </tr>
-</table>
+<img src="assets/screens/dashboard-duo.png" alt="Ranking y ajustes del dashboard con datos de demostración" width="100%">
 
 Capturas con datos de demostración. A la izquierda, el ranking de un servidor. A la derecha, los ajustes, que solo ven los administradores.
 
