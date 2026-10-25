@@ -94,9 +94,9 @@ Use the contact form on the [website](https://skullboard.vercel.app/#contacto).
 
 ## What's new
 
-- `v2.6.0` (12 Sep 2026): redesigned website and dashboard, with search, filters and per-server settings drafts.
-- `v2.5.1` (3 Sep 2026): live system status and a leaderboard with avatars and message links.
-- `v2.5.0` (1 Sep 2026): dashboard with Discord login and settings from the browser.
+- `v1.9.2` (12 Sep 2026): redesigned website and dashboard, with search, filters and per-server settings drafts.
+- `v1.9.1` (3 Sep 2026): live system status and a leaderboard with avatars and message links.
+- `v1.9` (1 Sep 2026): dashboard with Discord login and settings from the browser.
 
 Every version is in the [changelog](CHANGELOG.md) (Spanish) and the [releases](https://github.com/ParedesYTecho/Skullboard/releases).
 
