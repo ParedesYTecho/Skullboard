@@ -2,6 +2,23 @@
 
 Resumen de las versiones de SkullBoard. El historial completo, con más detalle, está en la [web](https://skullboard.vercel.app/cambios).
 
+<details>
+<summary>Numeración de versiones</summary>
+
+El 25 de octubre de 2026 las versiones se renumeraron para coincidir con las de la web. El contenido y las fechas no cambian. Equivalencias con la numeración anterior:
+
+| Ahora | Antes | | Ahora | Antes |
+|---|---|---|---|---|
+| v1.9.2 | v2.6.0 | | v1.5 | v2.3.0 |
+| v1.9.1 | v2.5.1 | | v1.4 | v2.2.0 |
+| v1.9 | v2.5.0 | | v1.3 | v2.1.0 |
+| v1.8 | v2.4.2 | | v1.2 | v2.0.0 |
+| v1.7.1 | v2.4.1 | | v1.1 | v1.5.0 |
+| v1.7 | v2.4.0 | | v1.0 | v1.0.0 |
+| v1.6 | v2.3.1 | | | |
+
+</details>
+
 ## v1.9.2 · 12 de septiembre de 2026
 Interfaz web y dashboard rediseñados para móvil y escritorio. El dashboard incorpora búsqueda de servidores y filtros por autor, canal, fecha o ID, borradores de ajustes por servidor y direcciones que recuerdan el servidor y la pestaña abiertos.
 
