@@ -70,6 +70,8 @@ La página de estado no muestra cifras que no pueda respaldar. Cuando el proveed
 
 Las pruebas son de tres tipos: comprobaciones estáticas de invariantes del proyecto, pruebas de la autenticación y las rutas con el cliente de pruebas de Flask, y el recorrido de extremo a extremo en un navegador real. Los despliegues salen de la rama principal, protegida, a través de pull requests. Render redespliega el backend y Vercel la web, y cada despliegue previo queda disponible para volver atrás.
 
-## Pendiente
+## Estado actual
 
-Rediseñar la web pública y reducir el tiempo del inicio de sesión.
+La web rediseñada está publicada en las rutas principales desde octubre de 2026. La API se sirve con Waitress y las dependencias del backend están fijadas. Los rankings resuelven los perfiles de Discord en paralelo cuando la caché está fría. El destacado al azar puede recuperar el texto desde la copia publicada en el canal de destacados si no puede leer el original.
+
+El panel distingue los fallos de consulta de la ausencia real de mensajes. Todavía no hay paginación: cada ranking muestra hasta 25 resultados.
