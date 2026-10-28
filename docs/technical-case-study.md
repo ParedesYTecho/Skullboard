@@ -70,6 +70,8 @@ The status page does not show figures it cannot back up. When the bot's provider
 
 There are three kinds of tests: static checks of project invariants, authentication and route tests with Flask's test client, and the end-to-end walkthrough in a real browser. Deployments come from the protected main branch through pull requests. Render redeploys the backend and Vercel the website, and each previous deployment stays available for rollback.
 
-## Pending
+## Current state
 
-Redesigning the public website and reducing login time.
+The redesigned website has been live on the main routes since October 2026. The API runs on Waitress, with pinned backend dependencies. Rankings resolve Discord profiles in parallel when the cache is cold. Random highlights can read the copy posted in the highlights channel when the original message is unavailable.
+
+The dashboard now distinguishes a failed request from a server with no highlights. Pagination is not implemented yet: rankings show up to 25 entries.
