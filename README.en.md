@@ -39,13 +39,13 @@ Someone reacts to a message with 💀. If the count reaches the threshold the se
 
 <table>
   <tr>
-    <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Automatic board</b><br><sub>Copies messages that reach the threshold. Optional auto-pin for the most voted.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Most voted users and messages for each server, with monthly and yearly tops.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Automatic highlights</b><br><sub>Copies messages that reach the threshold. Optional pinning for the most voted.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Most voted users and messages for each server: this month, this year or all time.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Per-server settings</b><br><sub>Channel, threshold, prefix and ignored channels, server by server.</sub></td>
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Author notice</b><br><sub>Direct message when their message enters the board. Turn it off with <code>/notify</code>.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Web dashboard</b><br><sub>Log in with Discord, browse rankings and, if you administer, change settings.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Web dashboard</b><br><sub>Browse rankings and random highlights. Server admins can also change settings.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 commands</b><br><sub>Slash and text. The full list is on <a href="https://skullboard.vercel.app/#comandos">the website</a>.</sub></td>
   </tr>
 </table>
@@ -111,6 +111,7 @@ An event-driven bot looks simple until twenty people react to the same message w
 - Dashboard sessions. The browser gets an opaque cookie. Discord tokens are encrypted on the server and never reach the client. The OAuth `state` is stored as an HMAC and works only once.
 - Closed-by-default database. Tables have row-level security with no public policies. Only the backend can read them.
 - Testing. Static checks, authentication tests, and a local environment that runs the real backend with simulated Discord and database behind a proxy that mirrors production. A real browser walks through login, settings and logout.
+- Dashboard queries. With a cold cache, the ranking fetches Discord profiles in parallel. The random highlight reads the original message and, if it cannot, uses its copy in the highlights channel.
 
 The [technical case study](docs/technical-case-study.md) goes deeper into four concrete problems and how they were solved.
 

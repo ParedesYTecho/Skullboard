@@ -37,13 +37,13 @@ Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha
 
 <table>
   <tr>
-    <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Tablón automático</b><br><sub>Copia los mensajes que alcanzan el umbral. Auto-pin opcional para los más votados.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Usuarios y mensajes más votados de cada servidor, con tops del mes y del año.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Destacados automáticos</b><br><sub>Copia los mensajes que alcanzan el umbral. Fijado opcional para los más votados.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Usuarios y mensajes más votados de cada servidor: este mes, este año o desde el principio.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Configuración propia</b><br><sub>Canal, umbral, prefijo y canales ignorados, servidor por servidor.</sub></td>
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Aviso al autor</b><br><sub>Mensaje directo cuando su mensaje entra en el tablón. Se desactiva con <code>/notify</code>.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Dashboard web</b><br><sub>Inicia sesión con Discord, consulta rankings y, si administras, cambia los ajustes.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Dashboard web</b><br><sub>Consulta rankings y destacados al azar. Si administras el servidor, también puedes cambiar los ajustes.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 comandos</b><br><sub>Slash y de texto. La lista completa está en <a href="https://skullboard.vercel.app/#comandos">la web</a>.</sub></td>
   </tr>
 </table>
@@ -108,6 +108,7 @@ Un bot que reacciona a eventos parece sencillo hasta que veinte personas reaccio
 - Sesiones del dashboard. El navegador recibe una cookie opaca. Los tokens de Discord se cifran en el servidor y nunca llegan al cliente. El `state` de OAuth se guarda como HMAC y solo sirve una vez.
 - Base de datos cerrada por defecto. Las tablas tienen RLS sin políticas públicas. Solo el backend puede leerlas.
 - Pruebas. Hay comprobaciones estáticas, pruebas de autenticación y un entorno local que ejecuta el backend real con Discord y la base de datos simulados, detrás de un proxy equivalente al de producción. Un navegador real recorre el login, los ajustes y el cierre de sesión.
+- Consultas del panel. Con la caché fría, el ranking recupera los perfiles de Discord en paralelo. El destacado al azar lee el mensaje original y, si no puede leerlo, usa su copia del canal de destacados.
 
 El [caso técnico](docs/caso-tecnico.md) cuenta con más detalle cuatro problemas concretos y cómo se resolvieron.
 
