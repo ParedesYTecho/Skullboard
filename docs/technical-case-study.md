@@ -72,6 +72,6 @@ There are three kinds of tests: static checks of project invariants, authenticat
 
 ## Current state
 
-The redesigned website has been live on the main routes since October 2026. The API runs on Waitress, with pinned backend dependencies. Rankings resolve Discord profiles in parallel when the cache is cold. Random highlights can read the copy posted in the highlights channel when the original message is unavailable.
+The redesigned website has been live on the main routes since October 2026. The API runs on Waitress, with pinned backend dependencies. Rankings resolve Discord profiles in parallel when the cache is cold. The random highlight can read the copy posted in the highlights channel when it cannot read the original message.
 
 The dashboard now distinguishes a failed request from a server with no highlights. Pagination is not implemented yet: rankings show up to 25 entries.
