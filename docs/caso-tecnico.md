@@ -32,6 +32,8 @@ Un tablón que copia mensajes acumula inconsistencias: duplicados por reintentos
 
 Esa operación hace muchas llamadas a Discord, y varios servidores pueden lanzarla a la vez. Por eso comparten un limitador global de 8 peticiones por segundo, bastante por debajo del límite global de la API. El lock por servidor evita además que dos reconciliaciones del mismo canal compitan entre sí.
 
+Los fallos parciales se tratan por separado. Si la base no responde al preguntar si un mensaje ya está destacado, el bot no publica nada y lo reintenta, porque suponer que no existe habría creado un duplicado. Si Discord publica la copia y la base no guarda el registro, el bot retira la copia recién publicada en lugar de dejarla huérfana. Los reintentos son tres, a los 5, 20 y 60 segundos, y solo ante fallos pasajeros (base de datos o errores 5xx de Discord).
+
 ## 3. Un dashboard con inicio de sesión de Discord
 
 El dashboard permite consultar rankings y, a los administradores, cambiar la configuración. Eso exige OAuth2, y la autenticación es donde más fácil resulta equivocarse. Estas son las decisiones principales.
@@ -74,4 +76,4 @@ Las pruebas son de tres tipos: comprobaciones estáticas de invariantes del proy
 
 La web rediseñada está publicada en las rutas principales desde octubre de 2026. La API se sirve con Waitress y las dependencias del backend están fijadas. Los rankings resuelven los perfiles de Discord en paralelo cuando la caché está fría. El destacado al azar puede recuperar el texto desde la copia publicada en el canal de destacados si no puede leer el original.
 
-El panel distingue los fallos de consulta de la ausencia real de mensajes. Todavía no hay paginación: cada ranking muestra hasta 25 resultados.
+El panel distingue los fallos de consulta de la ausencia real de mensajes. Cada ranking muestra 25 resultados y «Cargar más» añade otros 25, hasta 100. La base devuelve siempre un prefijo ordenado con desempate estable, de modo que ampliar la lista no repite ni se salta filas.

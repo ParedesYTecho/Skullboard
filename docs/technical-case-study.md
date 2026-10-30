@@ -32,6 +32,8 @@ A board that copies messages accumulates inconsistencies: duplicates from retrie
 
 That operation makes many Discord calls, and several servers may run it at once. So they share a global limiter of 8 requests per second, well below the API's global limit. A per-server lock also stops two reconciliations of the same channel from competing.
 
+Partial failures are handled separately. If the database does not answer when the bot asks whether a message is already highlighted, the bot posts nothing and retries, because assuming it does not exist would create a duplicate. If Discord accepts the post but the database does not save the record, the bot removes the post it just published instead of leaving it orphaned. There are three retries, after 5, 20 and 60 seconds, and only for transient failures (database errors or Discord 5xx responses).
+
 ## 3. A dashboard with Discord login
 
 The dashboard lets users browse rankings and, for administrators, change settings. That requires OAuth2, and authentication is where mistakes are easiest. These are the main decisions.
@@ -74,4 +76,4 @@ There are three kinds of tests: static checks of project invariants, authenticat
 
 The redesigned website has been live on the main routes since October 2026. The API runs on Waitress, with pinned backend dependencies. Rankings resolve Discord profiles in parallel when the cache is cold. The random highlight can read the copy posted in the highlights channel when it cannot read the original message.
 
-The dashboard now distinguishes a failed request from a server with no highlights. Pagination is not implemented yet: rankings show up to 25 entries.
+The dashboard now distinguishes a failed request from a server with no highlights. Each ranking shows 25 entries and "Load more" adds 25 more, up to 100. The database always returns an ordered prefix with a stable tie-break, so extending the list never repeats or skips rows.
