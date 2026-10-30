@@ -38,7 +38,7 @@ Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha
 <table>
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Destacados automáticos</b><br><sub>Copia los mensajes que alcanzan el umbral. Fijado opcional para los más votados.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Usuarios y mensajes más votados de cada servidor: este mes, este año o desde el principio.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Usuarios y mensajes más votados de cada servidor: este mes, este año o desde el principio. Se ven 25 a la vez y «Cargar más» llega hasta 100.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Configuración propia</b><br><sub>Canal, umbral, prefijo y canales ignorados, servidor por servidor.</sub></td>
   </tr>
   <tr>

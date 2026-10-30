@@ -40,7 +40,7 @@ Someone reacts to a message with 💀. If the count reaches the threshold the se
 <table>
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Automatic highlights</b><br><sub>Copies messages that reach the threshold. Optional pinning for the most voted.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Most voted users and messages for each server: this month, this year or all time.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Most voted users and messages for each server: this month, this year or all time. Shows 25 at a time, up to 100 with "Load more".</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Per-server settings</b><br><sub>Channel, threshold, prefix and ignored channels, server by server.</sub></td>
   </tr>
   <tr>
