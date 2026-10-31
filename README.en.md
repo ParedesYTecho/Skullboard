@@ -33,7 +33,7 @@ The website and the bot's messages are in Spanish. This page is the English summ
 
 <img src="assets/flujo.svg" alt="Six stages from a reaction to the featured message" width="100%">
 
-Someone reacts to a message with 💀. If the count reaches the threshold the server has set, SkullBoard posts the message in the hall-of-fame channel with its author, text, image if any, and a link to the original. Each new skull updates that same post instead of creating another one, and the marker changes from 💀 to ☠️ once the threshold is doubled. If the original message is deleted, the copy is removed too.
+Someone reacts to a message with 💀. If the count reaches the threshold the server has set, SkullBoard posts the message in the hall-of-fame channel with its author, text, image if any, and a link to the original. Each new skull updates that same post instead of creating another one, and the marker changes from 💀 to ☠️ once the threshold is doubled. If the original message is deleted, the copy is removed too, unless the server chose to keep it.
 
 ## What it includes
 
@@ -41,7 +41,7 @@ Someone reacts to a message with 💀. If the count reaches the threshold the se
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Automatic highlights</b><br><sub>Copies messages that reach the threshold. Optional pinning for the most voted.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Most voted users and messages for each server: this month, this year or all time. Shows 25 at a time, up to 100 with "Load more".</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Per-server settings</b><br><sub>Channel, threshold, prefix and ignored channels, server by server.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Per-server settings</b><br><sub>Channel, threshold, prefix and ignored channels, server by server. Servers can also choose whether copies follow edits and deletions of the original.</sub></td>
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Author notice</b><br><sub>Direct message when their message enters the board. Turn it off with <code>/notify</code>.</sub></td>
@@ -63,6 +63,8 @@ Screenshots use demo data. Left: a server's ranking. Right: the settings page, v
 1. [Invite the bot](https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands) to your server.
 2. Pick the hall-of-fame channel with `/set_channel`.
 3. Set how many skulls are needed with `/set_min`. One is enough by default.
+
+If you would rather not type commands, `/setup` opens a guided panel with menus and buttons: channel, ignored channels, minimum skulls, auto-pin, and what happens on edits and deletions.
 
 That is all it needs. `/setup_pin`, `/ignore` and `/prefix` are optional, and everything can also be changed from the [dashboard](https://skullboard.vercel.app/dashboard).
 

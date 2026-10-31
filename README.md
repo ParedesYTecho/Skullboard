@@ -31,7 +31,7 @@ Empezó en mayo de 2025 como proyecto personal y sigue en marcha. Este repositor
 
 <img src="assets/flujo.svg" alt="Seis etapas desde una reacción hasta el mensaje destacado" width="100%">
 
-Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha fijado el servidor, SkullBoard lo publica en el canal de destacados con su autor, su texto, la imagen si la hay y un enlace al original. Cada calavera nueva actualiza esa misma publicación en lugar de crear otra, y el marcador pasa de 💀 a ☠️ cuando se duplica el umbral. Si el mensaje original se borra, la copia desaparece también.
+Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha fijado el servidor, SkullBoard lo publica en el canal de destacados con su autor, su texto, la imagen si la hay y un enlace al original. Cada calavera nueva actualiza esa misma publicación en lugar de crear otra, y el marcador pasa de 💀 a ☠️ cuando se duplica el umbral. Si el mensaje original se borra, la copia desaparece también, salvo que el servidor haya elegido conservarla.
 
 ## Qué incluye
 
@@ -39,7 +39,7 @@ Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Destacados automáticos</b><br><sub>Copia los mensajes que alcanzan el umbral. Fijado opcional para los más votados.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Usuarios y mensajes más votados de cada servidor: este mes, este año o desde el principio. Se ven 25 a la vez y «Cargar más» llega hasta 100.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Configuración propia</b><br><sub>Canal, umbral, prefijo y canales ignorados, servidor por servidor.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Configuración propia</b><br><sub>Canal, umbral, prefijo y canales ignorados, servidor por servidor. También si las copias siguen las ediciones y los borrados del original.</sub></td>
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Aviso al autor</b><br><sub>Mensaje directo cuando su mensaje entra en el tablón. Se desactiva con <code>/notify</code>.</sub></td>
@@ -61,6 +61,8 @@ Capturas con datos de demostración. A la izquierda, el ranking de un servidor. 
 1. [Invita el bot](https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands) a tu servidor.
 2. Elige el canal de destacados con `/set_channel`.
 3. Ajusta cuántas calaveras hacen falta con `/set_min`. Por defecto basta una.
+
+Si prefieres no escribir comandos, `/setup` abre un asistente con menús y botones: canal, canales ignorados, mínimo de calaveras, fijado automático y qué pasa con las ediciones y los borrados.
 
 Con eso ya funciona. `/setup_pin`, `/ignore` y `/prefix` son opcionales, y todo se puede cambiar también desde el [dashboard](https://skullboard.vercel.app/dashboard).
 
