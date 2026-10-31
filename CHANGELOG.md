@@ -26,7 +26,7 @@ Interfaz web y dashboard rediseñados para móvil y escritorio. El dashboard inc
 Estado del sistema en vivo (`/api/status`) con modal de salud de cada componente. Pie de página nuevo. El leaderboard muestra el avatar y el nombre del autor, con enlaces para saltar al mensaje, y el panel solo lista servidores donde el bot está o donde eres administrador.
 
 ## v1.9 · 1 de septiembre de 2026
-Dashboard con inicio de sesión de Discord (OAuth2): ajustes del servidor y leaderboard desde el navegador. `AutoShardedBot`, alertas de fallos por webhook, aviso al propietario cuando faltan permisos en el canal del tablón y soporte PWA.
+Dashboard con inicio de sesión de Discord (OAuth2): ajustes del servidor y leaderboard desde el navegador. `AutoShardedBot`, alertas de fallos por webhook, aviso al propietario cuando faltan permisos en el canal de destacados y soporte PWA.
 
 ## v1.8 · 1 de septiembre de 2026
 Cachés con expiración y tamaño acotado, `orjson`, `uvloop` y un endpoint de salud con el consumo de memoria.
