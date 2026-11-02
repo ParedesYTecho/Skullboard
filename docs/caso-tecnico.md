@@ -26,9 +26,9 @@ La misma idea se aplica al borrado. Cuando se borran mensajes en bloque, el bot 
 
 La configuración de cada servidor, el prefijo, los canales ignorados y el récord se guardan en cachés con caducidad de entre dos y cinco minutos. Se invalidan de forma explícita al escribir, de modo que un cambio desde el dashboard se nota de inmediato.
 
-## 2. Cuando el tablón y la realidad no coinciden
+## 2. Cuando los destacados y la realidad no coinciden
 
-Un tablón que copia mensajes acumula inconsistencias: duplicados por reintentos, copias de mensajes que ya no existen y recuentos desfasados. Para repararlo, `/resync` recorre el canal de destacados y extrae de cada copia el enlace al mensaje original. Agrupa las copias por original, conserva la más reciente y borra el resto. Después consulta el mensaje original: si ya no existe, elimina sus copias y su registro, y si existe, corrige el recuento.
+Un canal que copia mensajes acumula inconsistencias: duplicados por reintentos, copias de mensajes que ya no existen y recuentos desfasados. Para repararlo, `/resync` recorre el canal de destacados y extrae de cada copia el enlace al mensaje original. Agrupa las copias por original, conserva la más reciente y borra el resto. Después consulta el mensaje original: si ya no existe, elimina sus copias y su registro, y si existe, corrige el recuento.
 
 Esa operación hace muchas llamadas a Discord, y varios servidores pueden lanzarla a la vez. Por eso comparten un limitador global de 8 peticiones por segundo, bastante por debajo del límite global de la API. El lock por servidor evita además que dos reconciliaciones del mismo canal compitan entre sí.
 
@@ -52,7 +52,7 @@ Si el usuario ya había autorizado la aplicación con otros permisos, la respues
 
 ### El backend no se fía del cliente al escribir
 
-Los cambios de configuración exigen cabecera CSRF, origen permitido y permisos de administrador comprobados contra Discord. El canal elegido tiene que ser visible para el bot antes de guardarse, porque aceptar cualquier identificador numérico permitiría apuntar el tablón a un sitio donde no puede escribir.
+Los cambios de configuración exigen cabecera CSRF, origen permitido y permisos de administrador comprobados contra Discord. El canal elegido tiene que ser visible para el bot antes de guardarse, porque aceptar cualquier identificador numérico permitiría apuntar los destacados a un sitio donde no puede escribir.
 
 ## 4. Un error que las pruebas no veían
 

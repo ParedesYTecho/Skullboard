@@ -19,6 +19,9 @@ El 25 de octubre de 2026 las versiones se renumeraron para coincidir con las de 
 
 </details>
 
+## v1.10 · 31 de octubre de 2026
+Configuración guiada con `/setup` (menús y botones), y cada servidor decide si la copia sigue las ediciones del mensaje original y si se borra con él. Menos destacados duplicados o huérfanos, reintentos ante fallos pasajeros de Discord, rankings con «Cargar más» hasta 100 resultados y un panel que distingue entre «sin destacados», «ocultos» y «datos no disponibles». El bot y la API pasan a Frankfurt: la respuesta mediana de `/api/status` bajó de 189 ms a 75 ms en las mediciones del 31 de octubre. Copias de seguridad diarias cifradas con restauración de prueba.
+
 ## v1.9.2 · 12 de septiembre de 2026
 Interfaz web y dashboard rediseñados para móvil y escritorio. El dashboard incorpora búsqueda de servidores y filtros por autor, canal, fecha o ID, borradores de ajustes por servidor y direcciones que recuerdan el servidor y la pestaña abiertos.
 
@@ -26,7 +29,7 @@ Interfaz web y dashboard rediseñados para móvil y escritorio. El dashboard inc
 Estado del sistema en vivo (`/api/status`) con modal de salud de cada componente. Pie de página nuevo. El leaderboard muestra el avatar y el nombre del autor, con enlaces para saltar al mensaje, y el panel solo lista servidores donde el bot está o donde eres administrador.
 
 ## v1.9 · 1 de septiembre de 2026
-Dashboard con inicio de sesión de Discord (OAuth2): ajustes del servidor y leaderboard desde el navegador. `AutoShardedBot`, alertas de fallos por webhook, aviso al propietario cuando faltan permisos en el canal del tablón y soporte PWA.
+Dashboard con inicio de sesión de Discord (OAuth2): ajustes del servidor y leaderboard desde el navegador. `AutoShardedBot`, alertas de fallos por webhook, aviso al propietario cuando faltan permisos en el canal de destacados y soporte PWA.
 
 ## v1.8 · 1 de septiembre de 2026
 Cachés con expiración y tamaño acotado, `orjson`, `uvloop` y un endpoint de salud con el consumo de memoria.

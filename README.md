@@ -23,7 +23,7 @@
   <sub>Datos en vivo del bot. Los miembros suman todos los servidores, incluidos bots y personas que están en varios.</sub>
 </p>
 
-SkullBoard es un bot de Discord para comunidades que ya usan la reacción 💀 como aplauso. Cuando un mensaje reúne suficientes calaveras, el bot lo copia en un canal propio: el tablón de honor del servidor. También lleva la cuenta. Sabe quién acumula más, cuáles son los mensajes más votados del mes y del año, y cuál es el récord actual.
+SkullBoard es un bot de Discord para comunidades que ya usan la reacción 💀 como aplauso. Cuando un mensaje reúne suficientes calaveras, el bot lo copia en un canal propio: donde quedan los mejores mensajes del servidor. También lleva la cuenta. Sabe quién acumula más, cuáles son los mensajes más votados del mes y del año, y cuál es el récord actual.
 
 Empezó en mayo de 2025 como proyecto personal y sigue en marcha. Este repositorio es su escaparate: explica qué hace el bot y cómo está construido. El código fuente es privado.
 
@@ -31,7 +31,7 @@ Empezó en mayo de 2025 como proyecto personal y sigue en marcha. Este repositor
 
 <img src="assets/flujo.svg" alt="Seis etapas desde una reacción hasta el mensaje destacado" width="100%">
 
-Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha fijado el servidor, SkullBoard lo publica en el canal de destacados con su autor, su texto, la imagen si la hay y un enlace al original. Cada calavera nueva actualiza esa misma publicación en lugar de crear otra, y el marcador pasa de 💀 a ☠️ cuando se duplica el umbral. Si el mensaje original se borra, la copia desaparece también.
+Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha fijado el servidor, SkullBoard lo publica en el canal de destacados con su autor, su texto, la imagen si la hay y un enlace al original. Cada calavera nueva actualiza esa misma publicación en lugar de crear otra, y el marcador pasa de 💀 a ☠️ cuando se duplica el umbral. Si el mensaje original se borra, la copia desaparece también, salvo que el servidor haya elegido conservarla.
 
 ## Qué incluye
 
@@ -39,10 +39,10 @@ Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-tablon.svg" width="44" alt=""><br><b>Destacados automáticos</b><br><sub>Copia los mensajes que alcanzan el umbral. Fijado opcional para los más votados.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-ranking.svg" width="44" alt=""><br><b>Rankings</b><br><sub>Usuarios y mensajes más votados de cada servidor: este mes, este año o desde el principio. Se ven 25 a la vez y «Cargar más» llega hasta 100.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Configuración propia</b><br><sub>Canal, umbral, prefijo y canales ignorados, servidor por servidor.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-ajustes.svg" width="44" alt=""><br><b>Configuración propia</b><br><sub>Canal, umbral, prefijo y canales ignorados, servidor por servidor. También si las copias siguen las ediciones y los borrados del original.</sub></td>
   </tr>
   <tr>
-    <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Aviso al autor</b><br><sub>Mensaje directo cuando su mensaje entra en el tablón. Se desactiva con <code>/notify</code>.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Aviso al autor</b><br><sub>Mensaje directo cuando su mensaje se destaca. Se desactiva con <code>/notify</code>.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Dashboard web</b><br><sub>Consulta rankings y destacados al azar. Si administras el servidor, también puedes cambiar los ajustes.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 comandos</b><br><sub>Slash y de texto. La lista completa está en <a href="https://skullboard.vercel.app/#comandos">la web</a>.</sub></td>
   </tr>
@@ -62,6 +62,8 @@ Capturas con datos de demostración. A la izquierda, el ranking de un servidor. 
 2. Elige el canal de destacados con `/set_channel`.
 3. Ajusta cuántas calaveras hacen falta con `/set_min`. Por defecto basta una.
 
+Si prefieres no escribir comandos, `/setup` abre un asistente con menús y botones: canal, canales ignorados, mínimo de calaveras, fijado automático y qué pasa con las ediciones y los borrados.
+
 Con eso ya funciona. `/setup_pin`, `/ignore` y `/prefix` son opcionales, y todo se puede cambiar también desde el [dashboard](https://skullboard.vercel.app/dashboard).
 
 ## Preguntas frecuentes
@@ -69,7 +71,7 @@ Con eso ya funciona. `/setup_pin`, `/ignore` y `/prefix` son opcionales, y todo 
 <details>
 <summary>¿Qué permisos pide el bot?</summary>
 
-Ver canales, enviar mensajes (también en hilos), insertar enlaces, adjuntar archivos, leer el historial y usar comandos de aplicación. Para el auto-pin necesita además poder fijar mensajes en el canal del tablón.
+Ver canales, enviar mensajes (también en hilos), insertar enlaces, adjuntar archivos, leer el historial y usar comandos de aplicación. Para el auto-pin necesita además poder fijar mensajes en el canal de destacados.
 </details>
 
 <details>
@@ -104,7 +106,7 @@ Un bot que reacciona a eventos parece sencillo hasta que veinte personas reaccio
 <img src="assets/arquitectura.svg" alt="Arquitectura: Discord, proceso Python en Render con el bot y la API Flask, Supabase y la web en Vercel" width="100%">
 
 - Ráfagas de reacciones. Cada mensaje tiene un temporizador de dos segundos que se reinicia con cada reacción, y un lock que impide dos comprobaciones simultáneas. Veinte reacciones seguidas producen una sola comprobación.
-- Límites de Discord. Las operaciones masivas, como reconciliar un tablón entero con `/resync`, pasan por un limitador global de 8 peticiones por segundo para todo el proceso, así que lanzarlas en varios servidores a la vez no agota el cupo del bot.
+- Límites de Discord. Las operaciones masivas, como reconciliar un canal de destacados entero con `/resync`, pasan por un limitador global de 8 peticiones por segundo para todo el proceso, así que lanzarlas en varios servidores a la vez no agota el cupo del bot.
 - Sesiones del dashboard. El navegador recibe una cookie opaca. Los tokens de Discord se cifran en el servidor y nunca llegan al cliente. El `state` de OAuth se guarda como HMAC y solo sirve una vez.
 - Base de datos cerrada por defecto. Las tablas tienen RLS sin políticas públicas. Solo el backend puede leerlas.
 - Pruebas. Hay comprobaciones estáticas, pruebas de autenticación y un entorno local que ejecuta el backend real con Discord y la base de datos simulados, detrás de un proxy equivalente al de producción. Un navegador real recorre el login, los ajustes y el cierre de sesión.
