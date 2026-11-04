@@ -28,6 +28,8 @@ Each server's settings, prefix, ignored channels and record are kept in caches t
 
 ## 2. When the board and reality disagree
 
+<img src="../assets/resync.svg" alt="Steps of /resync: server lock, walk the channel, group copies, then fix the count or delete the copies depending on whether the original still exists" width="100%">
+
 A board that copies messages accumulates inconsistencies: duplicates from retries, copies of messages that no longer exist, and stale counts. To repair it, `/resync` walks the hall-of-fame channel and extracts the link to the original message from each copy. It groups copies by original, keeps the newest and deletes the rest. Then it fetches the original: if it is gone, it removes its copies and its record, and if it exists, it fixes the count.
 
 That operation makes many Discord calls, and several servers may run it at once. So they share a global limiter of 8 requests per second, well below the API's global limit. A per-server lock also stops two reconciliations of the same channel from competing.
@@ -37,6 +39,8 @@ Partial failures are handled separately. If the database does not answer when th
 ## 3. A dashboard with Discord login
 
 The dashboard lets users browse rankings and, for administrators, change settings. That requires OAuth2, and authentication is where mistakes are easiest. These are the main decisions.
+
+<img src="../assets/login.svg" alt="Login sequence: the API stores a single-use state, Discord returns a code, the API exchanges it for tokens and the browser only receives an opaque cookie" width="100%">
 
 ### Discord tokens never reach the browser
 
