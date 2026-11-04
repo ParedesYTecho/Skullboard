@@ -43,7 +43,7 @@ Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Aviso al autor</b><br><sub>Mensaje directo cuando su mensaje se destaca. Se desactiva con <code>/notify</code>.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Dashboard web</b><br><sub>Consulta rankings y destacados al azar. Si administras el servidor, también puedes cambiar los ajustes.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Dashboard web</b><br><sub>Consulta rankings, estadísticas y destacados al azar, y explora los destacados con filtros. Si administras el servidor, también puedes cambiar los ajustes.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 comandos</b><br><sub>Slash y de texto. La lista completa está en <a href="https://skullboard.vercel.app/#comandos">la web</a>.</sub></td>
   </tr>
 </table>
@@ -62,7 +62,7 @@ Capturas con datos de demostración. A la izquierda, el ranking de un servidor. 
 2. Elige el canal de destacados con `/set_channel`.
 3. Ajusta cuántas calaveras hacen falta con `/set_min`. Por defecto basta una.
 
-Si prefieres no escribir comandos, `/setup` abre un asistente con menús y botones: canal, canales ignorados, mínimo de calaveras, fijado automático y qué pasa con las ediciones y los borrados.
+Si prefieres no escribir comandos, `/setup` abre un asistente con menús y botones. Puedes seguir la configuración completa, en seis pasos, o cambiar solo lo que necesites con los ajustes rápidos: canal, mínimo de calaveras, canales ignorados, ediciones y borrados, y apariencia.
 
 Con eso ya funciona. `/setup_pin`, `/ignore` y `/prefix` son opcionales, y todo se puede cambiar también desde el [dashboard](https://skullboard.vercel.app/dashboard).
 

@@ -45,7 +45,7 @@ Someone reacts to a message with 💀. If the count reaches the threshold the se
   </tr>
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Author notice</b><br><sub>Direct message when their message enters the board. Turn it off with <code>/notify</code>.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Web dashboard</b><br><sub>Browse rankings and random highlights. Server admins can also change settings.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Web dashboard</b><br><sub>Browse rankings, statistics and random highlights, and explore highlights with filters. Server admins can also change settings.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 commands</b><br><sub>Slash and text. The full list is on <a href="https://skullboard.vercel.app/#comandos">the website</a>.</sub></td>
   </tr>
 </table>
@@ -64,7 +64,7 @@ Screenshots use demo data. Left: a server's ranking. Right: the settings page, v
 2. Pick the highlights channel with `/set_channel`.
 3. Set how many skulls are needed with `/set_min`. One is enough by default.
 
-If you would rather not type commands, `/setup` opens a guided panel with menus and buttons: channel, ignored channels, minimum skulls, auto-pin, and what happens on edits and deletions.
+If you would rather not type commands, `/setup` opens a guided panel with menus and buttons. Follow the full setup in six steps, or change just what you need with the quick settings: channel, minimum skulls, ignored channels, edits and deletions, and appearance.
 
 That is all it needs. `/setup_pin`, `/ignore` and `/prefix` are optional, and everything can also be changed from the [dashboard](https://skullboard.vercel.app/dashboard).
 
