@@ -15,10 +15,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servers&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Servers where SkullBoard is installed right now (live data)">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.members&label=members&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Total members across those servers (live data)">
-  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstats&query=%24.commands&label=commands&color=c9caff&labelColor=131318&style=flat-square&cacheSeconds=3600" alt="Available commands (live data)">
-  <img src="https://img.shields.io/github/v/release/ParedesYTecho/Skullboard?label=version&color=c9caff&labelColor=131318&style=flat-square" alt="Latest published version">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.guilds&label=servers&color=f2b62a&labelColor=17181b&style=flat-square&cacheSeconds=3600" alt="Servers where SkullBoard is installed right now (live data)">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstatus&query=%24.bot.members&label=members&color=f2b62a&labelColor=17181b&style=flat-square&cacheSeconds=3600" alt="Total members across those servers (live data)">
+  <img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fskullboard.vercel.app%2Fapi%2Fstats&query=%24.commands&label=commands&color=f2b62a&labelColor=17181b&style=flat-square&cacheSeconds=3600" alt="Available commands (live data)">
+  <img src="https://img.shields.io/github/v/release/ParedesYTecho/Skullboard?label=version&color=f2b62a&labelColor=17181b&style=flat-square" alt="Latest published version">
   <br>
   <sub>Live data from the bot. Members add up every server, including bots and people who are in several.</sub>
 </p>
