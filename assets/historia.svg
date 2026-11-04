@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="360" viewBox="0 0 1100 360" role="img" aria-labelledby="historia-title historia-desc"><title id="historia-title">Hitos de SkullBoard</title><desc id="historia-desc">Línea de tiempo con ocho hitos del proyecto entre mayo de 2025 y octubre de 2026; el eje se interrumpe en dos tramos sin versiones para mantener la escala legible.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#8a8a99"/></marker><marker id="arrow-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#c9caff"/></marker></defs><rect width="1100" height="360" fill="#0b0b0e"/>
+<path d="M48 180 H240" stroke="#44445a" stroke-width="1.5"/>
+<path d="M48 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M112 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M176 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M240 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M296 180 H360" stroke="#44445a" stroke-width="1.5"/>
+<path d="M296 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M360 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M424 180 H1000" stroke="#44445a" stroke-width="1.5"/>
+<path d="M424 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M520 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M616 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M712 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M808 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M904 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M1000 175 V185" stroke="#44445a" stroke-width="1"/>
+<path d="M261.0 188 L269.0 172" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M267.0 188 L275.0 172" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M385.0 188 L393.0 172" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M391.0 188 L399.0 172" stroke="#8a8a99" stroke-width="1.5"/>
+<text x="48" y="226" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#b8b8c3" text-anchor="start" letter-spacing="1.2">2025</text>
+<text x="296" y="226" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#b8b8c3" text-anchor="start" letter-spacing="1.2">2025</text>
+<text x="424" y="226" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#b8b8c3" text-anchor="start" letter-spacing="1.2">2026</text>
+<text x="116" y="202" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#8a8a99" text-anchor="start" letter-spacing="0">jun</text>
+<text x="180" y="202" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#8a8a99" text-anchor="start" letter-spacing="0">jul</text>
+<text x="300" y="202" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#8a8a99" text-anchor="start" letter-spacing="0">dic</text>
+<text x="524" y="202" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#8a8a99" text-anchor="start" letter-spacing="0">jun</text>
+<text x="620" y="202" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#8a8a99" text-anchor="start" letter-spacing="0">jul</text>
+<text x="716" y="202" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#8a8a99" text-anchor="start" letter-spacing="0">ago</text>
+<text x="908" y="202" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#8a8a99" text-anchor="start" letter-spacing="0">oct</text>
+<path d="M48 174 V124" stroke="#8a8a99" stroke-width="1"/>
+<circle cx="48" cy="180" r="4" fill="#0b0b0e" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M150 186 V236" stroke="#8a8a99" stroke-width="1"/>
+<circle cx="150" cy="180" r="4" fill="#0b0b0e" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M356 174 V124" stroke="#8a8a99" stroke-width="1"/>
+<circle cx="356" cy="180" r="4" fill="#0b0b0e" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M446 186 V236" stroke="#8a8a99" stroke-width="1"/>
+<circle cx="446" cy="180" r="4" fill="#0b0b0e" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M594 174 V124" stroke="#8a8a99" stroke-width="1"/>
+<circle cx="594" cy="180" r="4" fill="#0b0b0e" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M762 186 V236" stroke="#8a8a99" stroke-width="1"/>
+<circle cx="762" cy="180" r="4" fill="#0b0b0e" stroke="#8a8a99" stroke-width="1.5"/>
+<path d="M808 174 V124" stroke="#c9caff" stroke-width="1"/>
+<circle cx="808" cy="180" r="6" fill="#c9caff" stroke="#c9caff" stroke-width="1.5"/>
+<path d="M997 186 V236" stroke="#c9caff" stroke-width="1"/>
+<circle cx="997" cy="180" r="6" fill="#c9caff" stroke="#c9caff" stroke-width="1.5"/>
+<rect x="36" y="56" width="176" height="68" rx="6" fill="#131318" stroke="#44445a" stroke-width="1.5"/>
+<text x="48" y="80" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#8a8a99" text-anchor="start" letter-spacing="0">v1.0 · 1 may</text>
+<text x="48" y="104" font-family="Geist,Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#f2f2f5" text-anchor="start" letter-spacing="0">Primera versión</text>
+<rect x="62.400000000000006" y="236" width="176" height="68" rx="6" fill="#131318" stroke="#44445a" stroke-width="1.5"/>
+<text x="74.4" y="260" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#8a8a99" text-anchor="start" letter-spacing="0">v1.1 · 19 jun</text>
+<text x="74.4" y="284" font-family="Geist,Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#f2f2f5" text-anchor="start" letter-spacing="0">Datos en la nube</text>
+<rect x="267.8709677419355" y="56" width="176" height="68" rx="6" fill="#131318" stroke="#44445a" stroke-width="1.5"/>
+<text x="279.8709677419355" y="80" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#8a8a99" text-anchor="start" letter-spacing="0">v1.2 · 30 dic</text>
+<text x="279.8709677419355" y="104" font-family="Geist,Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#f2f2f5" text-anchor="start" letter-spacing="0">Cliente de Supabase</text>
+<rect x="357.6774193548387" y="236" width="176" height="68" rx="6" fill="#131318" stroke="#44445a" stroke-width="1.5"/>
+<text x="369.6774193548387" y="260" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#8a8a99" text-anchor="start" letter-spacing="0">v1.3 · 8 may</text>
+<text x="369.6774193548387" y="284" font-family="Geist,Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#f2f2f5" text-anchor="start" letter-spacing="0">Rankings y auto-pin</text>
+<rect x="505.6" y="56" width="176" height="68" rx="6" fill="#131318" stroke="#44445a" stroke-width="1.5"/>
+<text x="517.6" y="80" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#8a8a99" text-anchor="start" letter-spacing="0">v1.4 · 24 jun</text>
+<text x="517.6" y="104" font-family="Geist,Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#f2f2f5" text-anchor="start" letter-spacing="0">Comando /resync</text>
+<rect x="673.5483870967741" y="236" width="176" height="68" rx="6" fill="#131318" stroke="#44445a" stroke-width="1.5"/>
+<text x="685.5483870967741" y="260" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#8a8a99" text-anchor="start" letter-spacing="0">v1.7 · 17 ago</text>
+<text x="685.5483870967741" y="284" font-family="Geist,Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#f2f2f5" text-anchor="start" letter-spacing="0">Rankings en la base</text>
+<rect x="720.0" y="56" width="176" height="68" rx="6" fill="#171727" stroke="#c9caff" stroke-width="1.5"/>
+<text x="732.0" y="80" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#c9caff" text-anchor="start" letter-spacing="0">v1.9 · 1 sep</text>
+<text x="732.0" y="104" font-family="Geist,Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#f2f2f5" text-anchor="start" letter-spacing="0">Dashboard con login</text>
+<rect x="888" y="236" width="176" height="68" rx="6" fill="#171727" stroke="#c9caff" stroke-width="1.5"/>
+<text x="900" y="260" font-family="'Geist Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#c9caff" text-anchor="start" letter-spacing="0">v1.10 · 31 oct</text>
+<text x="900" y="284" font-family="Geist,Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#f2f2f5" text-anchor="start" letter-spacing="0">/setup y Frankfurt</text>
+</svg>

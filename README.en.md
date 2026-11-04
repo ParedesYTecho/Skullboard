@@ -94,6 +94,10 @@ It is free.
 Use the contact form on the [website](https://skullboard.vercel.app/#contacto).
 </details>
 
+## Milestones
+
+<img src="assets/historia.svg" alt="Timeline of the project's milestones from May 2025 to October 2026" width="100%">
+
 ## What's new
 
 - `v1.9.2` (12 Sep 2026): redesigned website and dashboard, with search, filters and per-server settings drafts.

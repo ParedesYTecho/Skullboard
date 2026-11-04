@@ -92,6 +92,10 @@ Es gratis.
 En el formulario de contacto de la [web](https://skullboard.vercel.app/#contacto).
 </details>
 
+## Recorrido
+
+<img src="assets/historia.svg" alt="Línea de tiempo con los hitos del proyecto entre mayo de 2025 y octubre de 2026" width="100%">
+
 ## Novedades
 
 - `v1.9.2` (12 sep 2026): web y dashboard rediseñados, con búsqueda, filtros y borradores de ajustes por servidor.

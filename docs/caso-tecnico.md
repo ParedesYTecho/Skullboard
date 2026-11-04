@@ -28,6 +28,8 @@ La configuración de cada servidor, el prefijo, los canales ignorados y el réco
 
 ## 2. Cuando los destacados y la realidad no coinciden
 
+<img src="../assets/resync.svg" alt="Pasos de /resync: lock del servidor, recorrer el canal, agrupar copias y, según exista o no el original, corregir el recuento o borrar las copias" width="100%">
+
 Un canal que copia mensajes acumula inconsistencias: duplicados por reintentos, copias de mensajes que ya no existen y recuentos desfasados. Para repararlo, `/resync` recorre el canal de destacados y extrae de cada copia el enlace al mensaje original. Agrupa las copias por original, conserva la más reciente y borra el resto. Después consulta el mensaje original: si ya no existe, elimina sus copias y su registro, y si existe, corrige el recuento.
 
 Esa operación hace muchas llamadas a Discord, y varios servidores pueden lanzarla a la vez. Por eso comparten un limitador global de 8 peticiones por segundo, bastante por debajo del límite global de la API. El lock por servidor evita además que dos reconciliaciones del mismo canal compitan entre sí.
@@ -37,6 +39,8 @@ Los fallos parciales se tratan por separado. Si la base no responde al preguntar
 ## 3. Un dashboard con inicio de sesión de Discord
 
 El dashboard permite consultar rankings y, a los administradores, cambiar la configuración. Eso exige OAuth2, y la autenticación es donde más fácil resulta equivocarse. Estas son las decisiones principales.
+
+<img src="../assets/login.svg" alt="Secuencia del inicio de sesión: la API guarda un state de un solo uso, Discord devuelve un código, la API lo cambia por tokens y el navegador solo recibe una cookie opaca" width="100%">
 
 ### Los tokens de Discord no llegan al navegador
 
