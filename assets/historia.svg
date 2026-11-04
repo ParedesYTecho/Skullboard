@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="360" viewBox="0 0 1100 360" role="img" aria-labelledby="historia-title historia-desc"><title id="historia-title">Hitos de SkullBoard</title><desc id="historia-desc">Línea de tiempo con ocho hitos del proyecto entre mayo de 2025 y octubre de 2026; el eje se interrumpe en dos tramos sin versiones para mantener la escala legible.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9a968d"/></marker><marker id="arrow-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#f2b62a"/></marker></defs><rect width="1100" height="360" fill="#101113"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="360" viewBox="0 0 1100 360" role="img" aria-labelledby="historia-title historia-desc"><title id="historia-title">Hitos de SkullBoard</title><desc id="historia-desc">Línea de tiempo con nueve hitos del proyecto entre mayo de 2025 y noviembre de 2026; el eje se interrumpe en dos tramos sin versiones para mantener la escala legible.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#9a968d"/></marker><marker id="arrow-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#f2b62a"/></marker></defs><rect width="1100" height="360" fill="#101113"/>
 <path d="M48 180 H240" stroke="#3e3f40" stroke-width="1.5"/>
 <path d="M48 175 V185" stroke="#3e3f40" stroke-width="1"/>
 <path d="M112 175 V185" stroke="#3e3f40" stroke-width="1"/>
@@ -7,14 +7,15 @@
 <path d="M296 180 H360" stroke="#3e3f40" stroke-width="1.5"/>
 <path d="M296 175 V185" stroke="#3e3f40" stroke-width="1"/>
 <path d="M360 175 V185" stroke="#3e3f40" stroke-width="1"/>
-<path d="M424 180 H1000" stroke="#3e3f40" stroke-width="1.5"/>
+<path d="M424 180 H1040" stroke="#3e3f40" stroke-width="1.5"/>
 <path d="M424 175 V185" stroke="#3e3f40" stroke-width="1"/>
-<path d="M520 175 V185" stroke="#3e3f40" stroke-width="1"/>
-<path d="M616 175 V185" stroke="#3e3f40" stroke-width="1"/>
-<path d="M712 175 V185" stroke="#3e3f40" stroke-width="1"/>
-<path d="M808 175 V185" stroke="#3e3f40" stroke-width="1"/>
-<path d="M904 175 V185" stroke="#3e3f40" stroke-width="1"/>
-<path d="M1000 175 V185" stroke="#3e3f40" stroke-width="1"/>
+<path d="M512 175 V185" stroke="#3e3f40" stroke-width="1"/>
+<path d="M600 175 V185" stroke="#3e3f40" stroke-width="1"/>
+<path d="M688 175 V185" stroke="#3e3f40" stroke-width="1"/>
+<path d="M776 175 V185" stroke="#3e3f40" stroke-width="1"/>
+<path d="M864 175 V185" stroke="#3e3f40" stroke-width="1"/>
+<path d="M952 175 V185" stroke="#3e3f40" stroke-width="1"/>
+<path d="M1040 175 V185" stroke="#3e3f40" stroke-width="1"/>
 <path d="M261.0 188 L269.0 172" stroke="#9a968d" stroke-width="1.5"/>
 <path d="M267.0 188 L275.0 172" stroke="#9a968d" stroke-width="1.5"/>
 <path d="M385.0 188 L393.0 172" stroke="#9a968d" stroke-width="1.5"/>
@@ -25,26 +26,28 @@
 <text x="116" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">jun</text>
 <text x="180" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">jul</text>
 <text x="300" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">dic</text>
-<text x="524" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">jun</text>
-<text x="620" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">jul</text>
-<text x="716" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">ago</text>
-<text x="908" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">oct</text>
+<text x="516" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">jun</text>
+<text x="604" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">jul</text>
+<text x="692" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">ago</text>
+<text x="868" y="202" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="400" fill="#9a968d" text-anchor="start" letter-spacing="0">oct</text>
 <path d="M48 174 V124" stroke="#9a968d" stroke-width="1"/>
 <circle cx="48" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
 <path d="M150 186 V236" stroke="#9a968d" stroke-width="1"/>
 <circle cx="150" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
 <path d="M356 174 V124" stroke="#9a968d" stroke-width="1"/>
 <circle cx="356" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
-<path d="M446 186 V236" stroke="#9a968d" stroke-width="1"/>
-<circle cx="446" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
-<path d="M594 174 V124" stroke="#9a968d" stroke-width="1"/>
-<circle cx="594" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
-<path d="M762 186 V236" stroke="#9a968d" stroke-width="1"/>
-<circle cx="762" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
-<path d="M808 174 V124" stroke="#f2b62a" stroke-width="1"/>
-<circle cx="808" cy="180" r="6" fill="#f2b62a" stroke="#f2b62a" stroke-width="1.5"/>
-<path d="M997 186 V236" stroke="#f2b62a" stroke-width="1"/>
-<circle cx="997" cy="180" r="6" fill="#f2b62a" stroke="#f2b62a" stroke-width="1.5"/>
+<path d="M444 186 V236" stroke="#9a968d" stroke-width="1"/>
+<circle cx="444" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
+<path d="M579 174 V124" stroke="#9a968d" stroke-width="1"/>
+<circle cx="579" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
+<path d="M733 186 V236" stroke="#9a968d" stroke-width="1"/>
+<circle cx="733" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
+<path d="M776 174 V124" stroke="#f2b62a" stroke-width="1"/>
+<circle cx="776" cy="180" r="6" fill="#f2b62a" stroke="#f2b62a" stroke-width="1.5"/>
+<path d="M949 186 V236" stroke="#9a968d" stroke-width="1"/>
+<circle cx="949" cy="180" r="4" fill="#101113" stroke="#9a968d" stroke-width="1.5"/>
+<path d="M961 174 V124" stroke="#f2b62a" stroke-width="1"/>
+<circle cx="961" cy="180" r="6" fill="#f2b62a" stroke="#f2b62a" stroke-width="1.5"/>
 <rect x="36" y="56" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
 <text x="48" y="80" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.0 · 1 may</text>
 <text x="48" y="104" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Primera versión</text>
@@ -54,19 +57,22 @@
 <rect x="267.8709677419355" y="56" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
 <text x="279.8709677419355" y="80" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.2 · 30 dic</text>
 <text x="279.8709677419355" y="104" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Cliente de Supabase</text>
-<rect x="357.6774193548387" y="236" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
-<text x="369.6774193548387" y="260" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.3 · 8 may</text>
-<text x="369.6774193548387" y="284" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Rankings y auto-pin</text>
-<rect x="505.6" y="56" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
-<text x="517.6" y="80" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.4 · 24 jun</text>
-<text x="517.6" y="104" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Comando /resync</text>
-<rect x="673.5483870967741" y="236" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
-<text x="685.5483870967741" y="260" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.7 · 17 ago</text>
-<text x="685.5483870967741" y="284" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Rankings en la base</text>
-<rect x="720.0" y="56" width="176" height="68" rx="6" fill="#2b261c" stroke="#f2b62a" stroke-width="1.5"/>
-<text x="732.0" y="80" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#f2b62a" text-anchor="start" letter-spacing="0">v1.9 · 1 sep</text>
-<text x="732.0" y="104" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Dashboard con login</text>
-<rect x="888" y="236" width="176" height="68" rx="6" fill="#2b261c" stroke="#f2b62a" stroke-width="1.5"/>
-<text x="900" y="260" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#f2b62a" text-anchor="start" letter-spacing="0">v1.10 · 31 oct</text>
-<text x="900" y="284" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">/setup y Frankfurt</text>
+<rect x="355.8709677419355" y="236" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
+<text x="367.8709677419355" y="260" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.3 · 8 may</text>
+<text x="367.8709677419355" y="284" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Rankings y auto-pin</text>
+<rect x="491.4666666666667" y="56" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
+<text x="503.4666666666667" y="80" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.4 · 24 jun</text>
+<text x="503.4666666666667" y="104" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Comando /resync</text>
+<rect x="645.4193548387096" y="236" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
+<text x="657.4193548387096" y="260" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.7 · 17 ago</text>
+<text x="657.4193548387096" y="284" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Rankings en la base</text>
+<rect x="688.0" y="56" width="176" height="68" rx="6" fill="#2b261c" stroke="#f2b62a" stroke-width="1.5"/>
+<text x="700.0" y="80" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#f2b62a" text-anchor="start" letter-spacing="0">v1.9 · 1 sep</text>
+<text x="700.0" y="104" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Dashboard con login</text>
+<rect x="861.1612903225806" y="236" width="176" height="68" rx="6" fill="#17181b" stroke="#3e3f40" stroke-width="1.5"/>
+<text x="873.1612903225806" y="260" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#9a968d" text-anchor="start" letter-spacing="0">v1.10 · 31 oct</text>
+<text x="873.1612903225806" y="284" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">/setup y Frankfurt</text>
+<rect x="872.8" y="56" width="176" height="68" rx="6" fill="#2b261c" stroke="#f2b62a" stroke-width="1.5"/>
+<text x="884.8" y="80" font-family="'JetBrains Mono','SF Mono',Consolas,'Liberation Mono',monospace" font-size="12" font-weight="500" fill="#f2b62a" text-anchor="start" letter-spacing="0">v1.11 · 4 nov</text>
+<text x="884.8" y="104" font-family="'Hanken Grotesk','Mona Sans',Inter,'Segoe UI',Helvetica,Arial,sans-serif" font-size="14" font-weight="600" fill="#efebe2" text-anchor="start" letter-spacing="0">Estadísticas y /setup</text>
 </svg>
