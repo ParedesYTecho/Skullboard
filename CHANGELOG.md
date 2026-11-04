@@ -19,6 +19,9 @@ El 25 de octubre de 2026 las versiones se renumeraron para coincidir con las de 
 
 </details>
 
+## v1.11 · 4 de noviembre de 2026
+Estadísticas de cada servidor en el panel: gráfica de evolución, perfil de cada usuario y un explorador de destacados con filtros que se comparten por enlace. `/setup` ofrece ahora una configuración completa en seis pasos y unos ajustes rápidos, con plantillas, comprobación de permisos del canal e importación de los destacados anteriores. Los rankings muestran el nombre real de cada autor y, si el bot no puede ver un canal, explica qué permiso le falta.
+
 ## v1.10 · 31 de octubre de 2026
 Configuración guiada con `/setup` (menús y botones), y cada servidor decide si la copia sigue las ediciones del mensaje original y si se borra con él. Menos destacados duplicados o huérfanos, reintentos ante fallos pasajeros de Discord, rankings con «Cargar más» hasta 100 resultados y un panel que distingue entre «sin destacados», «ocultos» y «datos no disponibles». El bot y la API pasan a Frankfurt: la respuesta mediana de `/api/status` bajó de 189 ms a 75 ms en las mediciones del 31 de octubre. Copias de seguridad diarias cifradas con restauración de prueba.
 

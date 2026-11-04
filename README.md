@@ -94,10 +94,12 @@ En el formulario de contacto de la [web](https://skullboard.vercel.app/#contacto
 
 ## Recorrido
 
-<img src="assets/historia.svg" alt="Línea de tiempo con los hitos del proyecto entre mayo de 2025 y octubre de 2026" width="100%">
+<img src="assets/historia.svg" alt="Línea de tiempo con los hitos del proyecto entre mayo de 2025 y noviembre de 2026" width="100%">
 
 ## Novedades
 
+- `v1.11` (4 nov 2026): estadísticas de cada servidor en el panel y `/setup` con configuración completa y ajustes rápidos.
+- `v1.10` (31 oct 2026): configuración guiada con `/setup`, ajustes de ediciones y borrados, y el bot en Frankfurt.
 - `v1.9.2` (12 sep 2026): web y dashboard rediseñados, con búsqueda, filtros y borradores de ajustes por servidor.
 - `v1.9.1` (3 sep 2026): estado del sistema en vivo y leaderboard con avatares y enlaces al mensaje.
 - `v1.9` (1 sep 2026): dashboard con inicio de sesión de Discord y ajustes desde el navegador.

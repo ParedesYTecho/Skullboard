@@ -96,10 +96,12 @@ Use the contact form on the [website](https://skullboard.vercel.app/#contacto).
 
 ## Milestones
 
-<img src="assets/historia.svg" alt="Timeline of the project's milestones from May 2025 to October 2026" width="100%">
+<img src="assets/historia.svg" alt="Timeline of the project's milestones from May 2025 to November 2026" width="100%">
 
 ## What's new
 
+- `v1.11` (4 Nov 2026): per-server statistics in the dashboard, and `/setup` with a full walkthrough and quick settings.
+- `v1.10` (31 Oct 2026): guided setup with `/setup`, edit and delete settings, and the bot moved to Frankfurt.
 - `v1.9.2` (12 Sep 2026): redesigned website and dashboard, with search, filters and per-server settings drafts.
 - `v1.9.1` (3 Sep 2026): live system status and a leaderboard with avatars and message links.
 - `v1.9` (1 Sep 2026): dashboard with Discord login and settings from the browser.
