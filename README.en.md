@@ -27,7 +27,7 @@ SkullBoard is a Discord bot for communities that already use the 💀 reaction a
 
 It started in May 2025 as a personal project and is still running. This repository is its showcase: it explains what the bot does and how it is built. The source code is private.
 
-The website and the bot's messages are in Spanish. This page is the English summary.
+The website is available in English and Spanish, and the bot answers in each server's language. This page is the English summary.
 
 ## How it works
 
@@ -46,9 +46,11 @@ Someone reacts to a message with 💀. If the count reaches the threshold the se
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Author notice</b><br><sub>Direct message when their message enters the board. Turn it off with <code>/notify</code>.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Web dashboard</b><br><sub>Browse rankings and random highlights. Server admins can also change settings.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 commands</b><br><sub>Slash and text. The full list is on <a href="https://skullboard.vercel.app/#comandos">the website</a>.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>25 commands</b><br><sub>Slash and text. The full list is on <a href="https://skullboard.vercel.app/#comandos">the website</a>.</sub></td>
   </tr>
 </table>
+
+Each server can turn on skull achievements: its own tiers, optional roles and a monthly top. `/perfil` and `/logros` show each member's progress.
 
 SkullBoard stores identifiers and counters. It does not store message text. Details are in the [privacy policy](https://skullboard.vercel.app/privacy) (Spanish).
 
@@ -100,11 +102,11 @@ Use the contact form on the [website](https://skullboard.vercel.app/#contacto).
 
 ## What's new
 
+- `v1.12` (8 Nov 2026): skull achievements with roles, `/perfil` and `/logros`, and the website in English and Spanish.
 - `v1.11` (4 Nov 2026): per-server statistics in the dashboard, and `/setup` with a full walkthrough and quick settings.
 - `v1.10` (31 Oct 2026): guided setup with `/setup`, edit and delete settings, and the bot moved to Frankfurt.
 - `v1.9.2` (12 Sep 2026): redesigned website and dashboard, with search, filters and per-server settings drafts.
 - `v1.9.1` (3 Sep 2026): live system status and a leaderboard with avatars and message links.
-- `v1.9` (1 Sep 2026): dashboard with Discord login and settings from the browser.
 
 Every version is in the [changelog](CHANGELOG.md) (Spanish) and the [releases](https://github.com/ParedesYTecho/Skullboard/releases).
 
