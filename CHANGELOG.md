@@ -19,6 +19,9 @@ El 25 de octubre de 2026 las versiones se renumeraron para coincidir con las de 
 
 </details>
 
+## v1.12 · 8 de noviembre de 2026
+Logros por calaveras: cada servidor define sus escalones, con roles opcionales, vista previa antes de aplicarlos y un top mensual. `/perfil` y `/logros` muestran el progreso de cada miembro y el panel tiene una pestaña de Logros. La web está en español e inglés y el bot usa el idioma de cada servidor. Los canales ignorados dejan de contar en los rankings, el explorador de destacados busca canal y autor al escribir, y el selector de tema es nuevo.
+
 ## v1.11 · 4 de noviembre de 2026
 Estadísticas de cada servidor en el panel: gráfica de evolución, perfil de cada usuario y un explorador de destacados con filtros que se comparten por enlace. `/setup` ofrece ahora una configuración completa en seis pasos y unos ajustes rápidos, con plantillas, comprobación de permisos del canal e importación de los destacados anteriores. Los rankings muestran el nombre real de cada autor y, si el bot no puede ver un canal, explica qué permiso le falta.
 

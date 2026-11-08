@@ -44,9 +44,11 @@ Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Aviso al autor</b><br><sub>Mensaje directo cuando su mensaje se destaca. Se desactiva con <code>/notify</code>.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Dashboard web</b><br><sub>Consulta rankings y destacados al azar. Si administras el servidor, también puedes cambiar los ajustes.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>22 comandos</b><br><sub>Slash y de texto. La lista completa está en <a href="https://skullboard.vercel.app/#comandos">la web</a>.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>25 comandos</b><br><sub>Slash y de texto. La lista completa está en <a href="https://skullboard.vercel.app/#comandos">la web</a>.</sub></td>
   </tr>
 </table>
+
+Cada servidor puede activar logros por calaveras: escalones propios, roles opcionales y un top mensual. `/perfil` y `/logros` muestran el progreso de cada miembro. La web está en español e inglés y el bot responde en el idioma del servidor.
 
 SkullBoard guarda identificadores y contadores. No guarda el texto de los mensajes. Los detalles están en la [política de privacidad](https://skullboard.vercel.app/privacy).
 
@@ -98,11 +100,11 @@ En el formulario de contacto de la [web](https://skullboard.vercel.app/#contacto
 
 ## Novedades
 
+- `v1.12` (8 nov 2026): logros y roles por calaveras, `/perfil` y `/logros`, y la web en español e inglés.
 - `v1.11` (4 nov 2026): estadísticas de cada servidor en el panel y `/setup` con configuración completa y ajustes rápidos.
 - `v1.10` (31 oct 2026): configuración guiada con `/setup`, ajustes de ediciones y borrados, y el bot en Frankfurt.
 - `v1.9.2` (12 sep 2026): web y dashboard rediseñados, con búsqueda, filtros y borradores de ajustes por servidor.
 - `v1.9.1` (3 sep 2026): estado del sistema en vivo y leaderboard con avatares y enlaces al mensaje.
-- `v1.9` (1 sep 2026): dashboard con inicio de sesión de Discord y ajustes desde el navegador.
 
 Todas las versiones están en el [historial de cambios](CHANGELOG.md) y en las [releases](https://github.com/ParedesYTecho/Skullboard/releases).
 
