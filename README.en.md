@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands"><b>Add to Discord</b></a>
+  <a href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277293943808&scope=bot+applications.commands"><b>Add to Discord</b></a>
   &nbsp;·&nbsp;
   <a href="https://skullboard.vercel.app">Website</a>
   &nbsp;·&nbsp;
@@ -62,7 +62,7 @@ Screenshots use demo data. Left: a server's ranking. Right: the settings page, v
 
 ## Getting started
 
-1. [Invite the bot](https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands) to your server.
+1. [Invite the bot](https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277293943808&scope=bot+applications.commands) to your server.
 2. Pick the highlights channel with `/set_channel`.
 3. Set how many skulls are needed with `/set_min`. One is enough by default.
 

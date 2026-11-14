@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <a href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands"><b>Añadir a Discord</b></a>
+  <a href="https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277293943808&scope=bot+applications.commands"><b>Añadir a Discord</b></a>
   &nbsp;·&nbsp;
   <a href="https://skullboard.vercel.app">Web</a>
   &nbsp;·&nbsp;
@@ -60,7 +60,7 @@ Capturas con datos de demostración. A la izquierda, el ranking de un servidor. 
 
 ## Empezar
 
-1. [Invita el bot](https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277025508352&scope=bot+applications.commands) a tu servidor.
+1. [Invita el bot](https://discord.com/oauth2/authorize?client_id=1367463352774955059&permissions=277293943808&scope=bot+applications.commands) a tu servidor.
 2. Elige el canal de destacados con `/set_channel`.
 3. Ajusta cuántas calaveras hacen falta con `/set_min`. Por defecto basta una.
 
