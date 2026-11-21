@@ -19,6 +19,9 @@ El 25 de octubre de 2026 las versiones se renumeraron para coincidir con las de 
 
 </details>
 
+## 18 de noviembre de 2026
+Cualquier miembro puede usar `/vote` para abrir la página de votación de SkullBoard en Top.gg. El bot tiene 26 comandos de barra. También se revisaron la ayuda de Discord y los textos del panel en español e inglés.
+
 ## v1.12 · 8 de noviembre de 2026
 Logros por calaveras: cada servidor define sus escalones, con roles opcionales, vista previa antes de aplicarlos y un top mensual. `/perfil` y `/logros` muestran el progreso de cada miembro y el panel tiene una pestaña de Logros. La web está en español e inglés y el bot usa el idioma de cada servidor. Los canales ignorados dejan de contar en los rankings, el explorador de destacados busca canal y autor al escribir, y el selector de tema es nuevo.
 

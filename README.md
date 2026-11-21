@@ -44,13 +44,19 @@ Alguien reacciona con 💀 a un mensaje. Si el recuento alcanza el umbral que ha
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Aviso al autor</b><br><sub>Mensaje directo cuando su mensaje se destaca. Se desactiva con <code>/notify</code>.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Dashboard web</b><br><sub>Consulta rankings y destacados al azar. Si administras el servidor, también puedes cambiar los ajustes.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>25 comandos</b><br><sub>Slash y de texto. La lista completa está en <a href="https://skullboard.vercel.app/#comandos">la web</a>.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>26 comandos de barra</b><br><sub>La lista completa está en <a href="https://skullboard.vercel.app/#comandos">la web</a>.</sub></td>
   </tr>
 </table>
 
 Cada servidor puede activar logros por calaveras: escalones propios, roles opcionales y un top mensual. `/perfil` y `/logros` muestran el progreso de cada miembro. La web está en español e inglés y el bot responde en el idioma del servidor.
 
 SkullBoard guarda identificadores y contadores. No guarda el texto de los mensajes. Los detalles están en la [política de privacidad](https://skullboard.vercel.app/privacy).
+
+Si quieres apoyar SkullBoard, usa `/vote` en Discord o [vota en Top.gg](https://top.gg/bot/1367463352774955059/vote).
+
+<img src="assets/screens/vote-es-en.png" alt="Vista de demostración de /vote en español e inglés, con un botón que abre Top.gg." width="100%">
+
+Demostración de la respuesta privada de `/vote` en español e inglés.
 
 ## Dashboard
 
