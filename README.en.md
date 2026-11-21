@@ -56,6 +56,10 @@ SkullBoard stores identifiers and counters. It does not store message text. Deta
 
 To support SkullBoard, use `/vote` in Discord or [vote on Top.gg](https://top.gg/bot/1367463352774955059/vote).
 
+<img src="assets/screens/vote-es-en.png" alt="Demo of /vote in Spanish and English, with a button that opens Top.gg." width="100%">
+
+Demo of the private `/vote` reply in Spanish and English.
+
 ## Dashboard
 
 <img src="assets/screens/dashboard-duo.png" alt="Dashboard ranking and settings with demo data" width="100%">

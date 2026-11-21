@@ -54,6 +54,10 @@ SkullBoard guarda identificadores y contadores. No guarda el texto de los mensaj
 
 Si quieres apoyar SkullBoard, usa `/vote` en Discord o [vota en Top.gg](https://top.gg/bot/1367463352774955059/vote).
 
+<img src="assets/screens/vote-es-en.png" alt="Vista de demostración de /vote en español e inglés, con un botón que abre Top.gg." width="100%">
+
+Demostración de la respuesta privada de `/vote` en español e inglés.
+
 ## Dashboard
 
 <img src="assets/screens/dashboard-duo.png" alt="Ranking y ajustes del dashboard con datos de demostración" width="100%">
