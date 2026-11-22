@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="SkullBoard" width="100%">
+  <img src="assets/banner.svg" alt="SkullBoard · Destaca lo mejor de tu chat" width="100%">
 </p>
 
 <p align="center">
