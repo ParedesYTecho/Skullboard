@@ -46,13 +46,19 @@ Someone reacts to a message with 💀. If the count reaches the threshold the se
   <tr>
     <td width="33%" valign="top"><img src="assets/icon-avisos.svg" width="44" alt=""><br><b>Author notice</b><br><sub>Direct message when their message enters the board. Turn it off with <code>/notify</code>.</sub></td>
     <td width="33%" valign="top"><img src="assets/icon-dashboard.svg" width="44" alt=""><br><b>Web dashboard</b><br><sub>Browse rankings and random highlights. Server admins can also change settings.</sub></td>
-    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>25 commands</b><br><sub>Slash and text. The full list is on <a href="https://skullboard.vercel.app/#comandos">the website</a>.</sub></td>
+    <td width="33%" valign="top"><img src="assets/icon-comandos.svg" width="44" alt=""><br><b>26 slash commands</b><br><sub>The full list is on <a href="https://skullboard.vercel.app/#comandos">the website</a>.</sub></td>
   </tr>
 </table>
 
 Each server can turn on skull achievements: its own tiers, optional roles and a monthly top. `/perfil` and `/logros` show each member's progress.
 
 SkullBoard stores identifiers and counters. It does not store message text. Details are in the [privacy policy](https://skullboard.vercel.app/privacy) (Spanish).
+
+To support SkullBoard, use `/vote` in Discord or [vote on Top.gg](https://top.gg/bot/1367463352774955059/vote).
+
+<img src="assets/screens/vote-es-en.png" alt="Demo of /vote in Spanish and English, with a button that opens Top.gg." width="100%">
+
+Demo of the private `/vote` reply in Spanish and English.
 
 ## Dashboard
 
